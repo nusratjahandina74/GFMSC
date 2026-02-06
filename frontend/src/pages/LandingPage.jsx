@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import "../styles/landing.css";
 
 function useTheme() {
+  
   const [dark, setDark] = useState(() => localStorage.getItem("gfmsc_theme") === "dark");
   useEffect(() => {
     const root = document.documentElement;
@@ -119,7 +120,8 @@ export default function LandingPage() {
 
     try {
       // ✅ If backend contact API exists, it will send to Gmail (Step-8 below)
-      const res = await fetch("http://127.0.0.1:5000/api/contact", {
+      const API_BASE = import.meta.env.VITE_API_BASE;
+      const res = await fetch(`${API_BASE}/api/contact`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

@@ -35,7 +35,7 @@ export default function LandingPage() {
 
   const school = useMemo(() => ({
     name: "GFMSC",
-    whatsapp: "01711687761", // ✅ replace
+    whatsapp: "8801711687761", // ✅ replace
     address: "40/4, Ward No-72, South City Corporation, Manda, Mugdha, Dhaka, Bangladesh",
     mapEmbedUrl: "https://www.google.com/maps/dir//Glory+Future+Model+School+and+College,+Dipa+Kunzo+80+North+Manda,+63,+Dhaka+1214/@23.7273088,90.4429568,14z/data=!4m8!4m7!1m0!1m5!1m1!1s0x3755b83baa8360d3:0xf3b769b38af6c1bb!2m2!1d90.4384285!2d23.7300848?entry=ttu&g_ep=EgoyMDI2MDIwNC4wIKXMDSoKLDEwMDc5MjA2N0gBUAM%3D", // ✅ replace with real map
   }), []);

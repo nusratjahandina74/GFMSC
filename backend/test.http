@@ -1,0 +1,8 @@
+POST http://localhost:5000/api/auth/superadmin
+Content-Type: application/json
+
+{
+  "name": "Admin Dina",
+  "email": "dina@example.com",
+  "password": "Dina1234"
+}

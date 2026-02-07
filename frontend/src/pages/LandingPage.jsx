@@ -120,13 +120,23 @@ export default function LandingPage() {
 
     try {
       // ✅ If backend contact API exists, it will send to Gmail (Step-8 below)
-      const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
-      const res = await fetch(`${API_BASE}/api/contact`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      // const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/+$/, "");
+      // const res = await fetch(`${API_BASE}/api/contact`, {
+      //   method: "POST",
+      //   headers: { "Content-Type": "application/json" },
+      //   body: JSON.stringify(payload),
+      // });
+const controller = new AbortController();
+const t = setTimeout(() => controller.abort(), 15000);
 
+const res = await fetch(`${API_BASE}/api/contact`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(payload),
+  signal: controller.signal,
+});
+
+clearTimeout(t);
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         throw new Error(d?.message || "Failed to send message");

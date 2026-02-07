@@ -394,7 +394,7 @@ export default function LandingPage() {
       <section id="contact" className="section">
         <div className="container">
           <h2 className="sectionTitle">Contact</h2>
-          <p className="sectionSub">Send us a message for demo/admission/support.</p>
+          <p className="sectionSub">Send us a message for admission & support.</p>
 
           <div className="contactGrid">
             <div className="box">

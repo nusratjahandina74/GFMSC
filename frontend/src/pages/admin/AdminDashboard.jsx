@@ -170,7 +170,7 @@ export default function AdminDashboard() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="date"
-                  tickFormatter={(d) => d?.slice(5)}
+                  tickFormatter={(d) => (typeof d === "string" ? d.slice(5) : d ? String(d) : "")}
                   fontSize={12}
                 />
                 <YAxis domain={[0, 100]} unit="%" fontSize={12} />

@@ -5,7 +5,11 @@ import Routine from "../models/Routine.js";
 // Get all class teachers for a school
 export const getClassTeachers = async (req, res) => {
   try {
-    const classTeachers = await ClassTeacher.find({ schoolId: req.user.schoolId })
+    const filter = {};
+    const targetSchoolId = req.query.schoolId || req.user.schoolId;
+    if (targetSchoolId) filter.schoolId = targetSchoolId;
+
+    const classTeachers = await ClassTeacher.find(filter)
       .populate("teacherId", "name email");
     res.json({ classTeachers });
   } catch (error) {
@@ -17,7 +21,11 @@ export const getClassTeachers = async (req, res) => {
 export const getClassTeacher = async (req, res) => {
   try {
     const { className, section } = req.params;
-    const classTeacher = await ClassTeacher.findOne({ schoolId: req.user.schoolId, className, section })
+    const filter = { className, section };
+    const targetSchoolId = req.query.schoolId || req.user.schoolId;
+    if (targetSchoolId) filter.schoolId = targetSchoolId;
+
+    const classTeacher = await ClassTeacher.findOne(filter)
       .populate("teacherId", "name email");
     res.json({ classTeacher });
   } catch (error) {
@@ -28,34 +36,21 @@ export const getClassTeacher = async (req, res) => {
 // Assign class teacher
 export const assignClassTeacher = async (req, res) => {
   try {
-    const { teacherId, className, section } = req.body;
+    const { teacherId, className, section, schoolId } = req.body;
+    const targetSchoolId = schoolId || req.user.schoolId;
     if (!teacherId || !className) {
       return res.status(400).json({ message: "teacherId and className are required" });
     }
-
-    // Eligibility rule: the teacher must hold period 1 for this exact
-    // class/section on at least one day, per the Routine. Without this,
-    // "class teacher" would be an arbitrary label with no connection to
-    // whether the teacher actually starts the day with that class.
-    const hasFirstPeriod = await Routine.findOne({
-      schoolId: req.user.schoolId,
-      teacherId,
-      className,
-      section: section || "",
-      period: 1,
-    });
-    if (!hasFirstPeriod) {
-      return res.status(400).json({
-        message: `This teacher doesn't have a 1st-period class for ${className}${section ? "-" + section : ""} in the routine. Add that routine entry first, or choose a different teacher.`,
-      });
+    if (!targetSchoolId) {
+      return res.status(400).json({ message: "School ID is required to assign a class teacher" });
     }
 
-    let classTeacher = await ClassTeacher.findOne({ schoolId: req.user.schoolId, className, section });
+    let classTeacher = await ClassTeacher.findOne({ schoolId: targetSchoolId, className, section: section || "" });
     if (classTeacher) {
       classTeacher.teacherId = teacherId;
       await classTeacher.save();
     } else {
-      classTeacher = await ClassTeacher.create({ schoolId: req.user.schoolId, teacherId, className, section });
+      classTeacher = await ClassTeacher.create({ schoolId: targetSchoolId, teacherId, className, section: section || "" });
     }
 
     res.json({ message: "Class teacher assigned successfully", classTeacher });

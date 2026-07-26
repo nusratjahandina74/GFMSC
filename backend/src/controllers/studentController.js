@@ -3,12 +3,15 @@ import Student from "../models/Student.js";
 // ➕ Create Student (SchoolAdmin only)
 export const createStudent = async (req, res) => {
   try {
-    console.log("=== createStudent req.body ===", req.body);
-    console.log("=== req.user ===", req.user);
-    const student = await Student.create({
-      ...req.body,
-      schoolId: req.user.schoolId,
-    });
+    const targetSchoolId = req.body.schoolId || req.user.schoolId;
+    if (!targetSchoolId) {
+      return res.status(400).json({ message: "School ID is required to create a student." });
+    }
+    const studentData = { ...req.body, schoolId: targetSchoolId };
+    if (!studentData.password || studentData.password.trim() === "") {
+      studentData.password = "123456";
+    }
+    const student = await Student.create(studentData);
 
     res.status(201).json({
       message: "Student created successfully",
@@ -96,11 +99,11 @@ export const updateStudent = async (req, res) => {
     if (!student) return res.status(404).json({ message: "Student not found" });
 
     const { schoolId, password, studentId, ...updateData } = req.body;
-    // Only touch the password if a real new one was actually provided —
-    // otherwise the always-present-but-blank password field from the edit
-    // form would wipe out the existing hashed password and fail validation.
-    if (password) {
-      updateData.password = password;
+    if (password && password.trim() !== "") {
+      student.password = password;
+    }
+    if (studentId && studentId.trim() !== "") {
+      student.studentId = studentId;
     }
     Object.assign(student, updateData);
     await student.save();

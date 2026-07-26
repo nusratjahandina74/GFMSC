@@ -1,5 +1,7 @@
 import User from "../models/User.js";
 import School from "../models/School.js";
+import Student from "../models/Student.js";
+import Guardian from "../models/Guardian.js";
 
 // SchoolAdmin -> Create Teacher User
 export const createTeacherUser = async (req, res) => {
@@ -181,31 +183,71 @@ export const deleteUser = async (req, res) => {
   }
 };
 
-// Get current user profile
+// Get current user profile (supports all roles)
 export const getMyProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select("-password -verificationToken -verificationTokenExpires -resetPasswordToken -resetPasswordExpires").populate("schoolId", "name email");
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    let account;
+    if (req.user.role === "student") {
+      account = await Student.findById(req.user.userId).select("-password");
+    } else if (req.user.role === "guardian") {
+      account = await Guardian.findById(req.user.userId).select("-password");
+    } else {
+      account = await User.findById(req.user.userId)
+        .select("-password -verificationToken -verificationTokenExpires -resetPasswordToken -resetPasswordExpires")
+        .populate("schoolId", "name email");
     }
-    res.json({ user });
+
+    if (!account) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+
+    const userData = {
+      _id: account._id,
+      name: req.user.role === "student" ? account.studentName : account.name,
+      email: account.email || "",
+      role: req.user.role,
+      studentId: account.studentId || undefined,
+      schoolId: account.schoolId || undefined,
+    };
+
+    res.json({ user: userData });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Update my profile (cannot change email or role)
+// Update my profile (supports all roles, cannot change email or role)
 export const updateMyProfile = async (req, res) => {
   try {
     const { name, password } = req.body;
-    const user = await User.findById(req.user.userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    let account;
+    if (req.user.role === "student") {
+      account = await Student.findById(req.user.userId);
+      if (account && name) account.studentName = name;
+    } else if (req.user.role === "guardian") {
+      account = await Guardian.findById(req.user.userId);
+      if (account && name) account.name = name;
+    } else {
+      account = await User.findById(req.user.userId);
+      if (account && name) account.name = name;
     }
-    if (name) user.name = name;
-    if (password) user.password = password;
-    await user.save();
-    res.json({ message: "Profile updated successfully", user });
+
+    if (!account) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+    if (password && password.trim() !== "") account.password = password;
+    await account.save();
+
+    const updatedUser = {
+      id: account._id,
+      name: req.user.role === "student" ? account.studentName : account.name,
+      email: account.email || "",
+      role: req.user.role,
+      studentId: account.studentId || undefined,
+      schoolId: account.schoolId || undefined,
+    };
+
+    res.json({ message: "Profile updated successfully", user: updatedUser });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

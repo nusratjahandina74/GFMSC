@@ -43,79 +43,79 @@ export default function AdminSidebar() {
       name: "Notices",
       path: "/admin/notices",
       icon: FileText,
-      roles: ["schoolAdmin"],
+      roles: ["schoolAdmin", "superAdmin"],
     },
     {
       name: "Students",
       path: "/admin/students",
       icon: GraduationCap,
-      roles: ["schoolAdmin"],
+      roles: ["schoolAdmin", "superAdmin"],
     },
     {
       name: "Teachers",
       path: "/admin/teachers",
       icon: Users,
-      roles: ["schoolAdmin"],
+      roles: ["schoolAdmin", "superAdmin"],
     },
     {
       name: "Staff",
       path: "/admin/staff",
       icon: Briefcase,
-      roles: ["schoolAdmin"],
+      roles: ["schoolAdmin", "superAdmin"],
     },
     {
       name: "Guardians",
       path: "/admin/guardians",
       icon: Users,
-      roles: ["schoolAdmin"],
+      roles: ["schoolAdmin", "superAdmin"],
     },
     {
       name: "Class Subjects",
       path: "/admin/class-subjects",
       icon: BookOpen,
-      roles: ["schoolAdmin"],
+      roles: ["schoolAdmin", "superAdmin"],
     },
     {
       name: "Class Teachers",
       path: "/admin/class-teachers",
       icon: Users,
-      roles: ["schoolAdmin"],
+      roles: ["schoolAdmin", "superAdmin"],
     },
     {
       name: "Routine",
       path: "/admin/routine",
       icon: Calendar,
-      roles: ["schoolAdmin"],
+      roles: ["schoolAdmin", "superAdmin"],
     },
     {
       name: "Attendance",
       path: "/admin/attendance",
       icon: CheckSquare,
-      roles: ["schoolAdmin"],
+      roles: ["schoolAdmin", "superAdmin"],
     },
     {
       name: "Exams",
       path: "/admin/exams",
       icon: ClipboardList,
-      roles: ["schoolAdmin"],
+      roles: ["schoolAdmin", "superAdmin"],
     },
     {
       name: "Marks Entry",
       path: "/admin/marks-entry",
       icon: BookOpen,
-      roles: ["schoolAdmin"],
+      roles: ["schoolAdmin", "superAdmin"],
     },
     {
       name: "Report Cards",
       path: "/admin/report-cards",
       icon: Award,
-      roles: ["schoolAdmin"],
+      roles: ["schoolAdmin", "superAdmin"],
     },
     {
       name: "School Settings",
       path: "/admin/school-settings",
       icon: SettingsIcon,
-      roles: ["schoolAdmin"],
+      roles: ["schoolAdmin", "superAdmin"],
     },
     {
       name: "My Profile",
@@ -125,9 +125,6 @@ export default function AdminSidebar() {
     },
   ];
 
-  // superAdmin manages schools/school-admins only (no schoolId of their own,
-  // so Students/Teachers/Staff/Routine/etc. don't apply to them at all —
-  // showing those links would just lead to empty pages or 400 errors).
   const navItems = allNavItems.filter((item) => item.roles.includes(role));
 
   return (

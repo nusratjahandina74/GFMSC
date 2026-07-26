@@ -13,46 +13,50 @@ export const listStaff = async (req, res) => {
 };
 
 export const createStaff = async (req, res) => {
-  const { name, phone, email, designation, department, address, password } = req.body;
-  if (!name || !password) return res.status(400).json({ message: "Name and password are required" });
+  const { name, phone, email, designation, department, address, password, schoolId } = req.body;
+  const targetSchoolId = schoolId || req.user?.schoolId;
+
+  if (!name || !email || !password) {
+    return res.status(400).json({ message: "Name, email, and password are required for staff account creation." });
+  }
 
   // Check if email already exists
-  let existingUser = null;
-  if (email) {
-    existingUser = await User.findOne({ email });
-    if (existingUser) {
-      return res.status(400).json({ message: "User with this email already exists" });
-    }
+  const existingUser = await User.findOne({ email });
+  if (existingUser) {
+    return res.status(400).json({ message: "User with this email already exists" });
   }
 
-  // Create User first if email provided
-  let user = null;
-  if (email) {
-    user = await User.create({
-      name,
-      email,
-      password,
-      role: "staff",
-      schoolId: req.user?.schoolId,
-      emailVerified: true,
-    });
-  }
+  // Create User account first
+  const user = await User.create({
+    name,
+    email,
+    password,
+    role: "staff",
+    schoolId: targetSchoolId,
+    emailVerified: true,
+  });
 
-  // Create Staff
+  // Create Staff record
   const row = await Staff.create({
-    name, phone, email, designation, department, address,
-    schoolId: req.user?.schoolId,
-    userId: user ? user._id : null,
+    name,
+    phone,
+    email,
+    designation,
+    department,
+    address,
+    schoolId: targetSchoolId,
+    userId: user._id,
   });
 
   res.status(201).json({
-    ...row.toObject(),
-    user: user ? {
+    message: "Staff created successfully",
+    staff: row,
+    user: {
       id: user._id,
       name: user.name,
       email: user.email,
       role: user.role,
-    } : null
+    },
   });
 };
 

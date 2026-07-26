@@ -33,7 +33,7 @@ export default function AdminLayout() {
             </Link>
           </div>
         )}
-        <ErrorBoundary>
+        <ErrorBoundary key={location.pathname}>
           <Outlet />
         </ErrorBoundary>
       </main>

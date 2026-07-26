@@ -4,6 +4,11 @@ import Attendance from "../models/Attendance.js";
 import Staff from "../models/Staff.js";
 import Guardian from "../models/Guardian.js";
 import School from "../models/School.js";
+import Mark from "../models/Mark.js";
+import Exam from "../models/Exam.js";
+import Leave from "../models/Leave.js";
+import Notice from "../models/Notice.js";
+import Invoice from "../models/Invoice.js";
 
 // SuperAdmin: how many students/teachers/staff/guardians/account-role
 // people exist per school, for the cross-school overview chart.
@@ -194,6 +199,148 @@ export const getSchoolAdminAnalytics = async (req, res) => {
       roleCounts: { students, teachers, staff, guardians },
       attendanceTrend,
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// 🏆 SuperAdmin Class-Wise Results List
+export const getSuperAdminResults = async (req, res) => {
+  try {
+    const { schoolId, className } = req.query;
+    const filter = {};
+    if (schoolId) filter.schoolId = schoolId;
+
+    const exams = await Exam.find(filter).lean();
+    const examIds = exams.map((e) => e._id);
+
+    const markFilter = { examId: { $in: examIds } };
+    if (schoolId) markFilter.schoolId = schoolId;
+
+    const marks = await Mark.find(markFilter)
+      .populate("studentId", "studentName studentId className section classRoll")
+      .populate("examId", "name term className section")
+      .sort({ createdAt: -1 })
+      .limit(200)
+      .lean();
+
+    const filtered = className
+      ? marks.filter((m) => m.studentId?.className === className || m.examId?.className === className)
+      : marks;
+
+    res.status(200).json({ results: filtered });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// 📅 SuperAdmin Attendance Check (Admins, Teachers, Staff, Students)
+export const getSuperAdminAttendance = async (req, res) => {
+  try {
+    const { date, schoolId } = req.query;
+    const targetDate = date || new Date().toISOString().slice(0, 10);
+    const filter = { date: targetDate };
+    if (schoolId) filter.schoolId = schoolId;
+
+    const records = await Attendance.find(filter)
+      .populate("takenBy", "name role")
+      .lean();
+
+    const summary = {
+      date: targetDate,
+      totalSessions: records.length,
+      records,
+    };
+
+    res.status(200).json(summary);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// 💳 SuperAdmin Fee / Due Check
+export const getSuperAdminDues = async (req, res) => {
+  try {
+    const { schoolId, className } = req.query;
+    const filter = {};
+    if (schoolId) filter.schoolId = schoolId;
+
+    const invoices = await Invoice.find(filter)
+      .populate("studentId", "studentName studentId className section classRoll fathersPhone")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const filtered = className
+      ? invoices.filter((i) => i.studentId?.className === className)
+      : invoices;
+
+    const totalDue = filtered.reduce((acc, inv) => acc + (inv.dueAmount || 0), 0);
+
+    res.status(200).json({ invoices: filtered, totalDue });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// 🏖️ SuperAdmin Teacher & Staff Leave Requests
+export const getSuperAdminLeaves = async (req, res) => {
+  try {
+    const { schoolId, status } = req.query;
+    const filter = {};
+    if (schoolId) filter.schoolId = schoolId;
+    if (status) filter.status = status;
+
+    const leaves = await Leave.find(filter)
+      .populate("applicantId", "name email phone studentName studentId")
+      .populate("schoolId", "name")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    res.status(200).json({ leaves });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+export const updateSuperAdminLeaveStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    if (!["Approved", "Rejected", "Pending"].includes(status)) {
+      return res.status(400).json({ message: "Invalid leave status" });
+    }
+
+    const leave = await Leave.findById(id);
+    if (!leave) return res.status(404).json({ message: "Leave request not found" });
+
+    leave.status = status;
+    leave.approvedBy = req.user.userId;
+    await leave.save();
+
+    res.status(200).json({ message: `Leave status updated to ${status}`, leave });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// 📢 SuperAdmin Notice & Meeting Publisher
+export const createSuperAdminNotice = async (req, res) => {
+  try {
+    const { title, body, tag, targetAudience, schoolId } = req.body;
+    if (!title || !body) {
+      return res.status(400).json({ message: "Title and body are required" });
+    }
+
+    const notice = await Notice.create({
+      title,
+      body,
+      tag: tag || "Notice",
+      targetAudience: targetAudience || "all",
+      schoolId: schoolId || undefined,
+      createdBy: req.user.userId,
+    });
+
+    res.status(201).json({ message: "Notice published successfully", notice });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

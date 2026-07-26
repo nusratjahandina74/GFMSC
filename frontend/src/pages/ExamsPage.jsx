@@ -384,7 +384,14 @@ export default function ExamsPage() {
                       <TableCell>{exam?.section || "-"}</TableCell>
                       <TableCell>{exam?.date || "-"}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
+                        <div className="flex justify-end gap-2 items-center">
+                          <a
+                            href={`/dashboard/report-card?examId=${encodeURIComponent(exam._id)}`}
+                            title="View Report Cards"
+                            className="text-emerald-600 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-200 font-bold px-2 py-1 text-xs rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-all border border-emerald-300 dark:border-emerald-700"
+                          >
+                            Report Cards
+                          </a>
                           <button
                             onClick={() => openStats(exam)}
                             title="View pass/fail stats"

@@ -198,7 +198,7 @@ export default function RoutinePage() {
                 Add Routine
               </button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingId ? "Edit Routine Entry" : "Add New Routine Entry"}</DialogTitle>
               </DialogHeader>
@@ -251,9 +251,12 @@ export default function RoutinePage() {
                     <SelectContent>
                       {(() => {
                         const cs = classSubjects.find(cs => cs.className === formData.className);
-                        return cs?.subjects?.map(sub => (
-                          <SelectItem key={sub.subjectName} value={sub.subjectName}>{sub.subjectName}</SelectItem>
-                        )) || [];
+                        const customSubjects = (cs?.subjects || []).map(sub => typeof sub === "string" ? sub : sub.subjectName || sub.name);
+                        const defaultSubjects = ["Bangla", "English", "Mathematics", "Science", "Social Science", "Religion", "ICT", "General Knowledge", "Physics", "Chemistry", "Biology", "Accounting"];
+                        const combined = Array.from(new Set([...customSubjects, ...defaultSubjects]));
+                        return combined.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ));
                       })()}
                     </SelectContent>
                   </Select>

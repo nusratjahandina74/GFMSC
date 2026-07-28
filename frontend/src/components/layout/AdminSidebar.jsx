@@ -99,6 +99,7 @@ export default function AdminSidebar() {
       path: "/admin/exams",
       icon: ClipboardList,
       roles: ["schoolAdmin", "superAdmin"],
+
     },
     {
       name: "Exam Duties",

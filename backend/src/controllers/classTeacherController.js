@@ -36,7 +36,11 @@ export const getClassTeacher = async (req, res) => {
 // Assign class teacher
 export const assignClassTeacher = async (req, res) => {
   try {
+
     const { teacherId, className, section, schoolId, isFirstPeriodTeacher } = req.body;
+
+    const { teacherId, className, section, schoolId } = req.body;
+
     const targetSchoolId = schoolId || req.user.schoolId;
     if (!teacherId || !className) {
       return res.status(400).json({ message: "teacherId and className are required" });
@@ -44,6 +48,7 @@ export const assignClassTeacher = async (req, res) => {
     if (!targetSchoolId) {
       return res.status(400).json({ message: "School ID is required to assign a class teacher" });
     }
+
 
     if (isFirstPeriodTeacher) {
       const hasFirstPeriod = await Routine.findOne({
@@ -66,6 +71,7 @@ export const assignClassTeacher = async (req, res) => {
       classTeacher.isFirstPeriodTeacher = !!isFirstPeriodTeacher;
       await classTeacher.save();
     } else {
+
       classTeacher = await ClassTeacher.create({
         schoolId: targetSchoolId,
         teacherId,
@@ -73,6 +79,8 @@ export const assignClassTeacher = async (req, res) => {
         section: section || "",
         isFirstPeriodTeacher: !!isFirstPeriodTeacher,
       });
+
+      classTeacher = await ClassTeacher.create({ schoolId: targetSchoolId, teacherId, className, section: section || "" });
     }
 
     res.json({ message: "Class teacher assigned successfully", classTeacher });

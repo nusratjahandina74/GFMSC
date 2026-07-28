@@ -150,11 +150,12 @@ export default function AdminStaff() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Email</Label>
+                <Label>Email (Required for login) *</Label>
                 <Input
                   type="email"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  required
                 />
               </div>
               <div className="space-y-2">
@@ -212,7 +213,7 @@ export default function AdminStaff() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Designation</TableHead>
+                  <TableHead>Role / Designation</TableHead>
                   <TableHead>Department</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Actions</TableHead>
@@ -222,7 +223,12 @@ export default function AdminStaff() {
                 {staff.map((member) => (
                   <TableRow key={member._id}>
                     <TableCell className="font-medium">{member.name}</TableCell>
-                    <TableCell>{member.designation}</TableCell>
+                    <TableCell>
+                      <span className="font-semibold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-1 rounded text-xs">
+                        {member.role || "Staff"}
+                      </span>{" "}
+                      ({member.designation})
+                    </TableCell>
                     <TableCell>{member.department}</TableCell>
                     <TableCell>{member.email || "-"}</TableCell>
                     <TableCell>

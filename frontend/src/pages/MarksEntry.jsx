@@ -90,12 +90,16 @@ export default function MarksEntry() {
     setLoadingSubjects(true);
     getSubjectsForClass(className)
       .then((list) => {
-        setSubjectOptions(list);
-        setSubject((prev) => (list.includes(prev) ? prev : list[0] || ""));
+        const defaultSubjects = ["Bangla", "English", "Mathematics", "Science", "Social Science", "Religion", "ICT", "Physics", "Chemistry", "Biology", "Accounting"];
+        const combined = Array.from(new Set([...(list || []), ...defaultSubjects]));
+        setSubjectOptions(combined);
+        setSubject((prev) => (combined.includes(prev) ? prev : combined[0] || ""));
       })
       .catch((err) => {
         console.error("Load class subjects error:", err);
-        setSubjectOptions([]);
+        const defaultSubjects = ["Bangla", "English", "Mathematics", "Science", "Social Science", "Religion", "ICT", "Physics", "Chemistry", "Biology", "Accounting"];
+        setSubjectOptions(defaultSubjects);
+        setSubject(defaultSubjects[0]);
       })
       .finally(() => setLoadingSubjects(false));
   }, [className]);

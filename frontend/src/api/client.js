@@ -1,7 +1,20 @@
 import axios from "axios";
 
+// Single source of truth for the API base URL. Reads VITE_API_BASE_URL from
+// the environment (.env for local dev, .env.production for the Vercel
+// build) and falls back to localhost only if it's missing entirely.
+// Normalizes so it always ends in exactly one "/api" segment, regardless of
+// whether the env var was set with or without it (this previously caused
+// every request in production to 404 when VITE_API_BASE_URL was set to
+// "https://gfmsc-backend.onrender.com" without the trailing "/api").
+const rawBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+const normalizedBase = rawBase.replace(/\/+$/, "");
+const API_BASE_URL = normalizedBase.endsWith("/api") ? normalizedBase : `${normalizedBase}/api`;
+
+console.log(`[GFMSC System Engine] Active Network Gateway Bound To: ${API_BASE_URL}`);
+
 const api = axios.create({
-  baseURL: "https://gfmsc-backend.onrender.com/api",
+  baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
   timeout: 120000,
   withCredentials: true,

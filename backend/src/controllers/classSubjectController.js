@@ -3,7 +3,11 @@ import ClassSubject from "../models/ClassSubject.js";
 // Get all class subjects for a school
 export const getClassSubjects = async (req, res) => {
   try {
-    const classSubjects = await ClassSubject.find({ schoolId: req.user.schoolId });
+    const filter = {};
+    const targetSchoolId = req.query.schoolId || req.user.schoolId;
+    if (targetSchoolId) filter.schoolId = targetSchoolId;
+
+    const classSubjects = await ClassSubject.find(filter);
     res.json({ classSubjects });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -14,8 +18,12 @@ export const getClassSubjects = async (req, res) => {
 export const getSubjectsForClass = async (req, res) => {
   try {
     const { className } = req.params;
-    const classSubject = await ClassSubject.findOne({ schoolId: req.user.schoolId, className });
-    const subjectNames = (classSubject?.subjects || []).map((s) => s.subjectName);
+    const filter = { className };
+    const targetSchoolId = req.query.schoolId || req.user.schoolId;
+    if (targetSchoolId) filter.schoolId = targetSchoolId;
+
+    const classSubject = await ClassSubject.findOne(filter);
+    const subjectNames = (classSubject?.subjects || []).map((s) => (typeof s === "string" ? s : s.subjectName || s.name));
     res.json({ subjects: subjectNames });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -25,14 +33,18 @@ export const getSubjectsForClass = async (req, res) => {
 // Create or update class subjects
 export const createOrUpdateClassSubjects = async (req, res) => {
   try {
-    const { className, subjects } = req.body;
+    const { className, subjects, schoolId } = req.body;
+    const targetSchoolId = schoolId || req.user.schoolId;
+    if (!targetSchoolId) {
+      return res.status(400).json({ message: "School ID is required" });
+    }
 
-    let classSubject = await ClassSubject.findOne({ schoolId: req.user.schoolId, className });
+    let classSubject = await ClassSubject.findOne({ schoolId: targetSchoolId, className });
     if (classSubject) {
       classSubject.subjects = subjects;
       await classSubject.save();
     } else {
-      classSubject = await ClassSubject.create({ schoolId: req.user.schoolId, className, subjects });
+      classSubject = await ClassSubject.create({ schoolId: targetSchoolId, className, subjects });
     }
 
     res.json({ message: "Class subjects updated successfully", classSubject });

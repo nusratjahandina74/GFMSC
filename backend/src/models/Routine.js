@@ -3,6 +3,11 @@ import mongoose from "mongoose";
 const routineSchema = new mongoose.Schema(
   {
     schoolId: { type: mongoose.Schema.Types.ObjectId, ref: "School", required: true },
+    shift: {
+      type: String,
+      enum: ["7:00 AM - 11:00 AM", "11:00 AM - 5:00 PM", "7:00 AM - 3:00 PM"],
+      required: true,
+    },
     className: { 
       type: String, 
       required: true, 
@@ -27,5 +32,6 @@ const routineSchema = new mongoose.Schema(
 // Indexes for common routine queries
 routineSchema.index({ schoolId: 1, className: 1, section: 1, day: 1 });
 routineSchema.index({ schoolId: 1, teacherId: 1, day: 1 });
+routineSchema.index({ schoolId: 1, shift: 1, day: 1 });
 
 export default mongoose.model("Routine", routineSchema);

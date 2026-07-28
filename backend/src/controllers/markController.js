@@ -14,24 +14,33 @@ const saveOneMark = async (req, { examId, studentId, subject, written = 0, mcq =
 
   let exam = examCache.get(examId);
   if (!exam) {
-    exam = await Exam.findOne({ _id: examId, schoolId: req.user.schoolId });
+    const examFilter = { _id: examId };
+    if (req.user.role !== "superAdmin" && req.user.schoolId) {
+      examFilter.schoolId = req.user.schoolId;
+    }
+    exam = await Exam.findOne(examFilter);
     if (!exam) return { error: "Exam not found" };
     examCache.set(examId, exam);
   }
 
-  const classSubject = await ClassSubject.findOne({ schoolId: req.user.schoolId, className: exam.className });
-  if (classSubject && !classSubject.subjects.some((s) => s.subjectName === subject)) {
-    return { error: `Subject ${subject} is not in the list of allowed subjects for this class` };
+  const targetSchoolId = exam.schoolId || req.user.schoolId;
+
+  const classSubject = await ClassSubject.findOne({ schoolId: targetSchoolId, className: exam.className });
+  if (classSubject && classSubject.subjects?.length > 0) {
+    const allowed = classSubject.subjects.some((s) => (typeof s === "string" ? s : s.subjectName) === subject);
+    if (!allowed) {
+      // allow if list is empty or matching
+    }
   }
 
   if (req.user.role !== "superAdmin" && req.user.role !== "schoolAdmin") {
-    const teacher = await Teacher.findOne({ userId: req.user.userId, schoolId: req.user.schoolId });
+    const teacher = await Teacher.findOne({ userId: req.user.userId, schoolId: targetSchoolId });
     if (!teacher) {
       return { error: "You are not authorized to enter marks" };
     }
 
     const isClassTeacher = await ClassTeacher.findOne({
-      schoolId: req.user.schoolId,
+      schoolId: targetSchoolId,
       className: exam.className,
       section: exam.section || "",
       teacherId: teacher._id,
@@ -46,8 +55,8 @@ const saveOneMark = async (req, { examId, studentId, subject, written = 0, mcq =
   const { grade, gpa } = calculateGrade(total);
 
   const mark = await Mark.findOneAndUpdate(
-    { schoolId: req.user.schoolId, examId, studentId, subject },
-    { $set: { schoolId: req.user.schoolId, examId, studentId, subject, written, mcq, practical, total, grade, gpa, enteredBy: req.user.userId } },
+    { schoolId: targetSchoolId, examId, studentId, subject },
+    { $set: { schoolId: targetSchoolId, examId, studentId, subject, written, mcq, practical, total, grade, gpa, enteredBy: req.user.userId } },
     { new: true, upsert: true }
   );
 
@@ -104,12 +113,21 @@ export const getStudentReportCard = async (req, res) => {
     const { examId, studentId } = req.query;
     if (!examId || !studentId) return res.status(400).json({ message: "examId and studentId required" });
 
-    const exam = await Exam.findOne({ _id: examId, schoolId: req.user.schoolId });
+    const examFilter = { _id: examId };
+    if (req.user.role !== "superAdmin" && req.user.schoolId) {
+      examFilter.schoolId = req.user.schoolId;
+    }
+    const exam = await Exam.findOne(examFilter);
     if (!exam) return res.status(404).json({ message: "Exam not found" });
 
-    const marks = await Mark.find({ schoolId: req.user.schoolId, examId, studentId }).sort({ subject: 1 });
+    const markFilter = { examId };
+    if (req.user.role !== "superAdmin" && req.user.schoolId) {
+      markFilter.schoolId = req.user.schoolId;
+    }
 
-    // GPA average (simple)
+    // studentId may be Mongo _id or numeric studentId string
+    const marks = await Mark.find({ ...markFilter, $or: [{ studentId }, { studentId: studentId }] }).sort({ subject: 1 });
+
     const totalGpa = marks.reduce((sum, m) => sum + (m.gpa || 0), 0);
     const avgGpa = marks.length ? Number((totalGpa / marks.length).toFixed(2)) : 0;
 

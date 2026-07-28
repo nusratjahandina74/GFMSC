@@ -7,6 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Plus, Loader2, Edit, Trash2 } from "lucide-react";
 import { getTeachers, createTeacher, updateTeacher, deleteTeacher } from "../../api/teachers";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "../../components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+
+const SHIFTS = ["7:00 AM - 11:00 AM", "11:00 AM - 5:00 PM", "7:00 AM - 3:00 PM"];
 
 export default function AdminTeachers() {
   const [teachers, setTeachers] = useState([]);
@@ -21,6 +24,7 @@ export default function AdminTeachers() {
     subject: "",
     email: "",
     phone: "",
+    shift: SHIFTS[2],
     password: "",
   });
 
@@ -70,6 +74,7 @@ export default function AdminTeachers() {
       subject: teacher.subject,
       email: teacher.email,
       phone: teacher.phone || "",
+      shift: teacher.shift || SHIFTS[2],
     });
     setOpen(true);
   };
@@ -95,6 +100,7 @@ export default function AdminTeachers() {
       subject: "",
       email: "",
       phone: "",
+      shift: SHIFTS[2],
       password: "",
     });
   };
@@ -153,6 +159,25 @@ export default function AdminTeachers() {
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Shift</Label>
+                <Select
+                  value={formData.shift}
+                  onValueChange={(val) => setFormData({ ...formData, shift: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select shift" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SHIFTS.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Which shift this teacher works — the routine table and teacher availability grid are grouped by shift.
+                </p>
+              </div>
               {!editingId && (
                 <div className="space-y-2">
                   <Label>Password *</Label>
@@ -204,6 +229,7 @@ export default function AdminTeachers() {
                   <TableHead>Subject</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
+                  <TableHead>Shift</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -214,6 +240,7 @@ export default function AdminTeachers() {
                     <TableCell>{teacher.subject}</TableCell>
                     <TableCell>{teacher.email}</TableCell>
                     <TableCell>{teacher.phone || "-"}</TableCell>
+                    <TableCell className="text-sm">{teacher.shift || "-"}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <button 

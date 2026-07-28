@@ -62,6 +62,20 @@ const SuperAdminPanel = () => {
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsErr, setAnalyticsErr] = useState("");
 
+  // New SuperAdmin features state
+  const [resultsData, setResultsData] = useState([]);
+  const [resultsLoading, setResultsLoading] = useState(false);
+  const [attendanceData, setAttendanceData] = useState(null);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+  const [duesData, setDuesData] = useState([]);
+  const [totalDue, setTotalDue] = useState(0);
+  const [duesLoading, setDuesLoading] = useState(false);
+  const [leavesData, setLeavesData] = useState([]);
+  const [leavesLoading, setLeavesLoading] = useState(false);
+  const [noticeForm, setNoticeForm] = useState({ title: "", body: "", tag: "Notice", targetAudience: "all" });
+  const [noticeSubmitting, setNoticeSubmitting] = useState(false);
+  const [noticeMsg, setNoticeMsg] = useState("");
+
   const loadAnalytics = async () => {
     setAnalyticsLoading(true);
     setAnalyticsErr("");
@@ -75,8 +89,85 @@ const SuperAdminPanel = () => {
     }
   };
 
+  const loadSuperAdminResults = async () => {
+    setResultsLoading(true);
+    try {
+      const res = await api.get("/dashboard/super-admin/results");
+      setResultsData(res.data.results || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setResultsLoading(false);
+    }
+  };
+
+  const loadSuperAdminAttendance = async () => {
+    setAttendanceLoading(true);
+    try {
+      const res = await api.get("/dashboard/super-admin/attendance");
+      setAttendanceData(res.data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAttendanceLoading(false);
+    }
+  };
+
+  const loadSuperAdminDues = async () => {
+    setDuesLoading(true);
+    try {
+      const res = await api.get("/dashboard/super-admin/dues");
+      setDuesData(res.data.invoices || []);
+      setTotalDue(res.data.totalDue || 0);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setDuesLoading(false);
+    }
+  };
+
+  const loadSuperAdminLeaves = async () => {
+    setLeavesLoading(true);
+    try {
+      const res = await api.get("/dashboard/super-admin/leaves");
+      setLeavesData(res.data.leaves || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLeavesLoading(false);
+    }
+  };
+
+  const handleUpdateLeaveStatus = async (id, status) => {
+    try {
+      await api.patch(`/dashboard/super-admin/leaves/${id}`, { status });
+      await loadSuperAdminLeaves();
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to update leave status");
+    }
+  };
+
+  const handleCreateNotice = async (e) => {
+    e.preventDefault();
+    setNoticeSubmitting(true);
+    setNoticeMsg("");
+    try {
+      await api.post("/dashboard/super-admin/notices", noticeForm);
+      setNoticeMsg("✅ Notice/Meeting published successfully");
+      setNoticeForm({ title: "", body: "", tag: "Notice", targetAudience: "all" });
+    } catch (err) {
+      setNoticeMsg("❌ " + (err?.response?.data?.message || err.message));
+    } finally {
+      setNoticeSubmitting(false);
+    }
+  };
+
   useEffect(() => {
     if (tab === "analytics") loadAnalytics();
+    if (tab === "results") loadSuperAdminResults();
+    if (tab === "attendance") loadSuperAdminAttendance();
+    if (tab === "dues") loadSuperAdminDues();
+    if (tab === "leaves") loadSuperAdminLeaves();
   }, [tab]);
 
   const loadUsers = async (role) => {
@@ -203,10 +294,10 @@ const SuperAdminPanel = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-2 border-b border-gray-200 dark:border-gray-800">
+      <div className="flex items-center gap-1 overflow-x-auto border-b border-gray-200 dark:border-gray-800 pb-1">
         <button
           onClick={() => setTab("schools")}
-          className={`px-4 py-2.5 font-semibold text-sm border-b-2 transition-colors ${
+          className={`px-3 py-2 font-semibold text-sm border-b-2 whitespace-nowrap transition-colors ${
             tab === "schools"
               ? "border-emerald-600 text-emerald-700 dark:text-emerald-400"
               : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
@@ -216,7 +307,7 @@ const SuperAdminPanel = () => {
         </button>
         <button
           onClick={() => setTab("accounts")}
-          className={`px-4 py-2.5 font-semibold text-sm border-b-2 flex items-center gap-1.5 transition-colors ${
+          className={`px-3 py-2 font-semibold text-sm border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-colors ${
             tab === "accounts"
               ? "border-emerald-600 text-emerald-700 dark:text-emerald-400"
               : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
@@ -227,14 +318,64 @@ const SuperAdminPanel = () => {
         </button>
         <button
           onClick={() => setTab("analytics")}
-          className={`px-4 py-2.5 font-semibold text-sm border-b-2 flex items-center gap-1.5 transition-colors ${
+          className={`px-3 py-2 font-semibold text-sm border-b-2 flex items-center gap-1.5 whitespace-nowrap transition-colors ${
             tab === "analytics"
               ? "border-emerald-600 text-emerald-700 dark:text-emerald-400"
               : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
           }`}
         >
           <Building2 className="h-4 w-4" />
-          Analytics
+          Analytics & Charts
+        </button>
+        <button
+          onClick={() => setTab("results")}
+          className={`px-3 py-2 font-semibold text-sm border-b-2 whitespace-nowrap transition-colors ${
+            tab === "results"
+              ? "border-emerald-600 text-emerald-700 dark:text-emerald-400"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+          }`}
+        >
+          Class Results
+        </button>
+        <button
+          onClick={() => setTab("attendance")}
+          className={`px-3 py-2 font-semibold text-sm border-b-2 whitespace-nowrap transition-colors ${
+            tab === "attendance"
+              ? "border-emerald-600 text-emerald-700 dark:text-emerald-400"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+          }`}
+        >
+          Attendance Check
+        </button>
+        <button
+          onClick={() => setTab("dues")}
+          className={`px-3 py-2 font-semibold text-sm border-b-2 whitespace-nowrap transition-colors ${
+            tab === "dues"
+              ? "border-emerald-600 text-emerald-700 dark:text-emerald-400"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+          }`}
+        >
+          Fee Dues Check
+        </button>
+        <button
+          onClick={() => setTab("leaves")}
+          className={`px-3 py-2 font-semibold text-sm border-b-2 whitespace-nowrap transition-colors ${
+            tab === "leaves"
+              ? "border-emerald-600 text-emerald-700 dark:text-emerald-400"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+          }`}
+        >
+          Leave Approvals
+        </button>
+        <button
+          onClick={() => setTab("notices")}
+          className={`px-3 py-2 font-semibold text-sm border-b-2 whitespace-nowrap transition-colors ${
+            tab === "notices"
+              ? "border-emerald-600 text-emerald-700 dark:text-emerald-400"
+              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+          }`}
+        >
+          Notice & Meeting
         </button>
       </div>
 
@@ -384,7 +525,7 @@ const SuperAdminPanel = () => {
               <div>
                 <CardTitle>All Accounts</CardTitle>
                 <CardDescription>
-                  Every School Admin, Teacher and Staff account on the platform — hold an account to instantly block its login.
+                  Every account on the platform — School Admin, Teacher, Staff, Student and Guardian — hold an account to instantly block its login.
                 </CardDescription>
               </div>
               <Select value={roleFilter} onValueChange={setRoleFilter}>
@@ -396,6 +537,8 @@ const SuperAdminPanel = () => {
                   <SelectItem value="schoolAdmin">School Admin</SelectItem>
                   <SelectItem value="teacher">Teacher</SelectItem>
                   <SelectItem value="staff">Staff</SelectItem>
+                  <SelectItem value="student">Student</SelectItem>
+                  <SelectItem value="guardian">Guardian</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -585,6 +728,273 @@ const SuperAdminPanel = () => {
             </>
           ) : null}
         </div>
+      )}
+
+      {tab === "results" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Class-Wise Student Results</CardTitle>
+            <CardDescription>View latest examination marks entered across schools</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {resultsLoading ? (
+              <div className="p-6 text-center text-gray-500"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" /> Loading results...</div>
+            ) : resultsData.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">No examination marks recorded yet.</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Class & Section</TableHead>
+                    <TableHead>Exam Name</TableHead>
+                    <TableHead>Subject</TableHead>
+                    <TableHead>Marks</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {resultsData.map((resItem) => (
+                    <TableRow key={resItem._id}>
+                      <TableCell className="font-medium">{resItem.studentId?.studentName} ({resItem.studentId?.studentId})</TableCell>
+                      <TableCell>{resItem.studentId?.className} - {resItem.studentId?.section}</TableCell>
+                      <TableCell>{resItem.examId?.name} ({resItem.examId?.term})</TableCell>
+                      <TableCell>{resItem.subject}</TableCell>
+                      <TableCell className="font-bold text-emerald-600 dark:text-emerald-400">{resItem.marksObtained}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === "attendance" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Attendance Check</CardTitle>
+            <CardDescription>Daily attendance record overview across all roles</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {attendanceLoading ? (
+              <div className="p-6 text-center text-gray-500"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" /> Loading attendance...</div>
+            ) : !attendanceData || !attendanceData.records || attendanceData.records.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">No attendance sessions submitted for today ({new Date().toLocaleDateString()}).</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Class & Section</TableHead>
+                    <TableHead>Taken By</TableHead>
+                    <TableHead>Total Students</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {attendanceData.records.map((att) => (
+                    <TableRow key={att._id}>
+                      <TableCell>{att.date}</TableCell>
+                      <TableCell>{att.className} - {att.section}</TableCell>
+                      <TableCell>{att.takenBy?.name} ({att.takenBy?.role})</TableCell>
+                      <TableCell className="font-semibold">{att.students?.length || 0} students recorded</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === "dues" && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Fee & Due Collection Check</CardTitle>
+              <CardDescription>View outstanding dues for all students</CardDescription>
+            </div>
+            <div className="text-right bg-emerald-50 dark:bg-emerald-950 p-3 rounded-lg border border-emerald-200 dark:border-emerald-800">
+              <span className="text-xs text-gray-500 dark:text-gray-400 block">Total Due Amount</span>
+              <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">৳ {totalDue.toLocaleString()}</span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {duesLoading ? (
+              <div className="p-6 text-center text-gray-500"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" /> Loading dues...</div>
+            ) : duesData.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">No due invoices found.</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Student</TableHead>
+                    <TableHead>Class</TableHead>
+                    <TableHead>Invoice #</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Paid</TableHead>
+                    <TableHead>Due Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {duesData.map((inv) => (
+                    <TableRow key={inv._id}>
+                      <TableCell className="font-medium">{inv.studentId?.studentName} ({inv.studentId?.studentId})</TableCell>
+                      <TableCell>{inv.studentId?.className}</TableCell>
+                      <TableCell className="font-mono text-xs">{inv.invoiceNumber}</TableCell>
+                      <TableCell>৳ {inv.totalAmount}</TableCell>
+                      <TableCell className="text-green-600">৳ {inv.paidAmount}</TableCell>
+                      <TableCell className="font-bold text-red-600">৳ {inv.dueAmount}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${inv.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                          {inv.status}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === "leaves" && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Teacher & Staff Leave Approvals</CardTitle>
+            <CardDescription>Approve or reject leave applications submitted by teachers or staff</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {leavesLoading ? (
+              <div className="p-6 text-center text-gray-500"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" /> Loading leave applications...</div>
+            ) : leavesData.length === 0 ? (
+              <div className="p-6 text-center text-gray-500">No leave applications submitted yet.</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Applicant</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Dates</TableHead>
+                    <TableHead>Days</TableHead>
+                    <TableHead>Reason</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Action</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {leavesData.map((lv) => (
+                    <TableRow key={lv._id}>
+                      <TableCell className="font-medium">{lv.applicantId?.name || "N/A"}</TableCell>
+                      <TableCell className="capitalize">{lv.role}</TableCell>
+                      <TableCell className="text-xs">{new Date(lv.startDate).toLocaleDateString()} - {new Date(lv.endDate).toLocaleDateString()}</TableCell>
+                      <TableCell>{lv.durationDays} day(s)</TableCell>
+                      <TableCell>{lv.reason}</TableCell>
+                      <TableCell>
+                        <span className={`px-2 py-1 rounded text-xs font-semibold ${lv.status === 'Approved' ? 'bg-green-100 text-green-800' : lv.status === 'Rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                          {lv.status}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        {lv.status === "Pending" && (
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleUpdateLeaveStatus(lv._id, "Approved")}
+                              className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold hover:bg-green-700 transition-all"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleUpdateLeaveStatus(lv._id, "Rejected")}
+                              className="bg-red-600 text-white px-2 py-1 rounded text-xs font-bold hover:bg-red-700 transition-all"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === "notices" && (
+        <Card className="max-w-2xl mx-auto">
+          <CardHeader>
+            <CardTitle>Publish Platform Notice or Meeting</CardTitle>
+            <CardDescription>Broadcast announcements, exam routines, or meeting links to all schools</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {noticeMsg && (
+              <div className="p-3 mb-4 rounded border text-sm bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200">
+                {noticeMsg}
+              </div>
+            )}
+            <form onSubmit={handleCreateNotice} className="space-y-4">
+              <div className="space-y-2">
+                <Label>Title / Subject *</Label>
+                <Input
+                  value={noticeForm.title}
+                  onChange={(e) => setNoticeForm({ ...noticeForm, title: e.target.value })}
+                  placeholder="e.g., General Emergency Staff Meeting / Exam Announcement"
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Category Tag</Label>
+                <Select
+                  value={noticeForm.tag}
+                  onValueChange={(val) => setNoticeForm({ ...noticeForm, tag: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Tag" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Notice">Notice</SelectItem>
+                    <SelectItem value="Meeting">Meeting</SelectItem>
+                    <SelectItem value="Event">Event</SelectItem>
+                    <SelectItem value="Holiday">Holiday</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Target Audience</Label>
+                <Select
+                  value={noticeForm.targetAudience}
+                  onValueChange={(val) => setNoticeForm({ ...noticeForm, targetAudience: val })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Audience" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All (Teachers, Students, Staff, Admins)</SelectItem>
+                    <SelectItem value="teachers">Teachers Only</SelectItem>
+                    <SelectItem value="students">Students & Guardians Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Details / Content / Meeting Link *</Label>
+                <textarea
+                  className="w-full min-h-[120px] p-3 rounded-md border border-input bg-transparent text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  value={noticeForm.body}
+                  onChange={(e) => setNoticeForm({ ...noticeForm, body: e.target.value })}
+                  placeholder="Enter notice description or Zoom/Google Meet link details..."
+                  required
+                />
+              </div>
+              <Button type="submit" disabled={noticeSubmitting} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
+                {noticeSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                Publish Notice / Meeting
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
       )}
 
       <CredentialsModal

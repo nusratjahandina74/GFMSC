@@ -25,6 +25,7 @@ import GuardianDashboard from "./pages/GuardianDashboard";
 import AdminClassSubjects from "./pages/admin/ClassSubjects";
 import AdminClassTeachers from "./pages/admin/ClassTeachers";
 import ExamsPage from "./pages/ExamsPage";
+import ExamDuties from "./pages/admin/ExamDuties";
 import MarksEntry from "./pages/MarksEntry";
 import ReportCard from "./pages/ReportCard";
 import Payments from "./pages/student/Payments";
@@ -229,6 +230,14 @@ export default function App() {
               element={
                 <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
                   <AdminExams />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="exam-duties"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <ExamDuties />
                 </RequireRole>
               }
             />

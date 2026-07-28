@@ -6,23 +6,11 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { Loader2, Printer } from "lucide-react";
 import { listExams, getReportCard } from "../api/results";
-
-const CLASSES = [
-  "Nursery",
-  "Class 1",
-  "Class 2",
-  "Class 3",
-  "Class 4",
-  "Class 5",
-  "Class 6",
-  "Class 7",
-  "Class 8",
-  "Class 9",
-  "Class 10"
-];
+import { getStudents } from "../api/students";
 
 export default function ReportCard() {
   const [exams, setExams] = useState([]);
+  const [students, setStudents] = useState([]);
   const [examId, setExamId] = useState("");
   const [studentId, setStudentId] = useState("");
   const [data, setData] = useState(null);
@@ -31,24 +19,39 @@ export default function ReportCard() {
   const [fetching, setFetching] = useState(false);
 
   useEffect(() => {
-    const fetchExams = async () => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const paramStudentId = searchParams.get("studentId");
+    if (paramStudentId) {
+      setStudentId(paramStudentId);
+    }
+  }, []);
+
+  useEffect(() => {
+    const initData = async () => {
       setLoading(true);
       try {
-        const res = await listExams({ page: 1, limit: 50 });
-        setExams(res?.data?.exams || []);
-        if ((res?.data?.exams || []).length) setExamId(res.data.exams[0]._id);
+        const [exRes, stRes] = await Promise.all([
+          listExams({ page: 1, limit: 50 }),
+          getStudents({ limit: 200 }),
+        ]);
+        setExams(exRes?.data?.exams || []);
+        setStudents(stRes?.students || []);
+
+        if ((exRes?.data?.exams || []).length) {
+          setExamId(exRes.data.exams[0]._id);
+        }
       } catch (err) {
         setMsg(err?.response?.data?.message || err.message);
       } finally {
         setLoading(false);
       }
     };
-    fetchExams();
+    initData();
   }, []);
 
   const load = async () => {
     if (!examId || !studentId) {
-      setMsg("Please select exam and enter student ID");
+      setMsg("Please select exam and select or enter student ID");
       return;
     }
     setMsg("");
@@ -63,6 +66,12 @@ export default function ReportCard() {
       setFetching(false);
     }
   };
+
+  useEffect(() => {
+    if (examId && studentId) {
+      load();
+    }
+  }, [examId, studentId]);
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
@@ -116,12 +125,27 @@ export default function ReportCard() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Student ID</Label>
-                <Input
-                  placeholder="Enter student ID"
-                  value={studentId}
-                  onChange={(e) => setStudentId(e.target.value)}
-                />
+                <Label>Select Student</Label>
+                {students.length > 0 ? (
+                  <Select value={studentId} onValueChange={setStudentId}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a student" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {students.map((st) => (
+                        <SelectItem key={st._id} value={st.studentId}>
+                          {st.studentName} ({st.studentId}) - {st.className} ({st.section}) Roll: {st.classRoll}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    placeholder="Enter student ID"
+                    value={studentId}
+                    onChange={(e) => setStudentId(e.target.value)}
+                  />
+                )}
               </div>
               <div className="flex items-end">
                 <Button

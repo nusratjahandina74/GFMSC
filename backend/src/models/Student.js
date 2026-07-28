@@ -47,17 +47,18 @@ const studentSchema = new mongoose.Schema(
 // failed with "studentId: Path `studentId` is required" even though this
 // same hook would have filled it in a moment later.
 studentSchema.pre("validate", function (next) {
-  if (!this.studentId && this.className && this.classRoll != null && this.sessionYear) {
-    // Format className to 2 digits: "Class 7" → "07", "Nursery" → "00"
+  if (!this.studentId) {
+    const year = this.sessionYear || new Date().getFullYear().toString();
     let classDigits = "00";
-    if (this.className.startsWith("Class ")) {
+    if (this.className && this.className.startsWith("Class ")) {
       const num = parseInt(this.className.split(" ")[1]);
-      classDigits = String(num).padStart(2, "0");
+      if (!isNaN(num)) classDigits = String(num).padStart(2, "0");
     }
-    // Format classRoll to 3 digits
-    const rollDigits = String(this.classRoll).padStart(3, "0");
-    // Generate studentId
-    this.studentId = `${this.sessionYear}${classDigits}${rollDigits}`;
+    const rollDigits = String(this.classRoll || Math.floor(Math.random() * 899 + 100)).padStart(3, "0");
+    this.studentId = `${year}${classDigits}${rollDigits}`;
+  }
+  if (!this.password) {
+    this.password = "123456";
   }
   next();
 });

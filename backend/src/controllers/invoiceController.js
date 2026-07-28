@@ -139,7 +139,7 @@ export const getInvoices = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum)
-      .populate("studentId", "name roll className section");
+      .populate("studentId", "studentName classRoll className section");
 
     res.json({
       invoices,
@@ -164,7 +164,7 @@ export const getStudentInvoices = async (req, res) => {
       studentId,
     })
       .sort({ createdAt: -1 })
-      .populate("studentId", "name roll");
+      .populate("studentId", "studentName classRoll");
 
     res.json({ invoices });
   } catch (err) {

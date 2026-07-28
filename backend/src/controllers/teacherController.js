@@ -4,9 +4,13 @@ import User from "../models/User.js";
 // Create Teacher (SchoolAdmin only)
 export const createTeacher = async (req, res) => {
   try {
-    const { name, email, phone, subject, password } = req.body;
+    const { name, email, phone, subject, shift, password, schoolId } = req.body;
+    const targetSchoolId = schoolId || req.user.schoolId;
     if (!name || !email || !password) {
       return res.status(400).json({ message: "Name, email, and password are required" });
+    }
+    if (!targetSchoolId) {
+      return res.status(400).json({ message: "School ID is required to create a teacher." });
     }
 
     // Check if User already exists
@@ -21,7 +25,7 @@ export const createTeacher = async (req, res) => {
       email,
       password,
       role: "teacher",
-      schoolId: req.user.schoolId,
+      schoolId: targetSchoolId,
       emailVerified: true,
     });
 
@@ -31,7 +35,8 @@ export const createTeacher = async (req, res) => {
       email,
       phone,
       subject,
-      schoolId: req.user.schoolId,
+      shift: shift || undefined,
+      schoolId: targetSchoolId,
       userId: user._id,
     });
 

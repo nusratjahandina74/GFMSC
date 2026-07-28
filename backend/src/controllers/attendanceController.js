@@ -140,7 +140,7 @@ export const getAttendance = async (req, res) => {
       date,
       className,
       section: section || "",
-    }).populate("records.studentId", "name roll");
+    }).populate("records.studentId", "studentName classRoll");
 
     res.json({ attendance });
   } catch (err) {

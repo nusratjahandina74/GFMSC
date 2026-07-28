@@ -54,7 +54,7 @@ export const getGuardians = async (req, res) => {
 
     const total = await Guardian.countDocuments(filter);
     const guardians = await Guardian.find(filter)
-      .populate("children", "name studentId className section")
+      .populate("children", "studentName studentId className section")
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum);
@@ -81,7 +81,7 @@ export const getGuardianById = async (req, res) => {
 
     const guardian = await Guardian.findOne(filter).populate(
       "children",
-      "name studentId className section"
+      "studentName studentId className section"
     );
     if (!guardian) {
       return res.status(404).json({ message: "Guardian not found" });

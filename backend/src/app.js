@@ -29,6 +29,8 @@ import classSubjectRoutes from "./routes/classSubjectRoutes.js";
 import classTeacherRoutes from "./routes/classTeacherRoutes.js";
 import leaveRoutes from "./routes/leaveRoutes.js";
 import guardianRoutes from "./routes/guardianRoutes.js";
+import shiftTemplateRoutes from "./routes/shiftTemplateRoutes.js";
+import examDutyRoutes from "./routes/examDutyRoutes.js";
 
 const app = express();
 
@@ -90,6 +92,8 @@ app.use("/api/class-subjects", classSubjectRoutes);
 app.use("/api/class-teachers", classTeacherRoutes);
 app.use("/api/leaves", leaveRoutes);
 app.use("/api/guardians", guardianRoutes);
+app.use("/api/shift-templates", shiftTemplateRoutes);
+app.use("/api/exam-duties", examDutyRoutes);
 
 
 app.get("/", (req, res) => {

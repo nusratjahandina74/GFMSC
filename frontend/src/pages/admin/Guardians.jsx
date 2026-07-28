@@ -187,7 +187,7 @@ export default function AdminGuardians() {
                   <SelectContent>
                     {students.map((student) => (
                       <SelectItem key={student._id} value={student._id}>
-                        {student.name} ({student.className} {student.section})
+                        {student.studentName} ({student.className} {student.section})
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -201,7 +201,7 @@ export default function AdminGuardians() {
                           key={id}
                           className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm flex items-center gap-1"
                         >
-                          {student?.name}
+                          {student?.studentName}
                           <button
                             type="button"
                             onClick={() => setFormData({ ...formData, children: formData.children.filter(c => c !== id) })}
@@ -282,7 +282,7 @@ export default function AdminGuardians() {
                               key={child._id}
                               className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs"
                             >
-                              {child.name}
+                              {child.studentName}
                             </span>
                           ))}
                         </div>

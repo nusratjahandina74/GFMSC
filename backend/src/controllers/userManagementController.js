@@ -1,5 +1,7 @@
 import User from "../models/User.js";
 import School from "../models/School.js";
+import Student from "../models/Student.js";
+import Guardian from "../models/Guardian.js";
 
 // SchoolAdmin -> Create Teacher User
 export const createTeacherUser = async (req, res) => {
@@ -95,17 +97,101 @@ export const createSchoolAdmin = async (req, res) => {
 export const getAllUsers = async (req, res) => {
   try {
     const { role, schoolId, isActive, isSuspended } = req.query;
-    const query = {};
-    if (role) query.role = role;
-    if (schoolId) query.schoolId = schoolId;
-    if (isActive !== undefined) query.isActive = isActive === "true";
-    if (isSuspended !== undefined) query.isSuspended = isSuspended === "true";
+    const effectiveSchoolId = req.user.role !== "superAdmin" ? req.user.schoolId : schoolId;
 
-    const users = await User.find(query).select("-password -verificationToken -verificationTokenExpires -resetPasswordToken -resetPasswordExpires").populate("schoolId", "name email");
-    res.json({ users });
+    let combined = [];
+
+    // 1) Accounts stored in the User collection (superAdmin/schoolAdmin/teacher/staff)
+    if (!role || role !== "student" && role !== "guardian") {
+      const query = {};
+      if (role) query.role = role;
+      if (effectiveSchoolId) query.schoolId = effectiveSchoolId;
+      if (isActive !== undefined) query.isActive = isActive === "true";
+      if (isSuspended !== undefined) query.isSuspended = isSuspended === "true";
+
+      const users = await User.find(query)
+        .select("-password -verificationToken -verificationTokenExpires -resetPasswordToken -resetPasswordExpires")
+        .populate("schoolId", "name email")
+        .lean();
+
+      combined = combined.concat(users);
+    }
+
+    // 2) Students live in their own collection, not User — normalize to the same shape
+    if (!role || role === "student") {
+      const studentQuery = {};
+      if (effectiveSchoolId) studentQuery.schoolId = effectiveSchoolId;
+      if (isSuspended !== undefined) studentQuery.isSuspended = isSuspended === "true";
+
+      const students = await Student.find(studentQuery)
+        .select("studentName studentId className section schoolId isSuspended createdAt")
+        .populate("schoolId", "name email")
+        .lean();
+
+      combined = combined.concat(
+        students.map((s) => ({
+          _id: s._id,
+          name: s.studentName,
+          email: s.studentId, // students log in with studentId, not a real email
+          role: "student",
+          schoolId: s.schoolId,
+          isSuspended: !!s.isSuspended,
+          createdAt: s.createdAt,
+          className: s.className,
+          section: s.section,
+        }))
+      );
+    }
+
+    // 3) Guardians also live in their own collection, and have no schoolId of
+    // their own — derive it from their linked children for filtering/display.
+    if (!role || role === "guardian") {
+      const guardians = await Guardian.find({})
+        .select("name email phone children isSuspended createdAt")
+        .populate("children", "schoolId")
+        .lean();
+
+      let normalizedGuardians = guardians.map((g) => ({
+        _id: g._id,
+        name: g.name,
+        email: g.email,
+        role: "guardian",
+        schoolId: g.children?.[0]?.schoolId || null,
+        isSuspended: !!g.isSuspended,
+        createdAt: g.createdAt,
+      }));
+
+      if (effectiveSchoolId) {
+        normalizedGuardians = normalizedGuardians.filter(
+          (g) => g.schoolId && g.schoolId.toString() === effectiveSchoolId.toString()
+        );
+      }
+      if (isSuspended !== undefined) {
+        const want = isSuspended === "true";
+        normalizedGuardians = normalizedGuardians.filter((g) => g.isSuspended === want);
+      }
+
+      combined = combined.concat(normalizedGuardians);
+    }
+
+    combined.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    res.json({ users: combined });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
+};
+
+// Shared helper: find an account by id across all three account collections,
+// since Students and Guardians aren't in the User collection.
+const findAccountAnywhere = async (id) => {
+  const user = await User.findById(id);
+  if (user) return { account: user, kind: "user" };
+  const student = await Student.findById(id);
+  if (student) return { account: student, kind: "student" };
+  const guardian = await Guardian.findById(id);
+  if (guardian) return { account: guardian, kind: "guardian" };
+  return { account: null, kind: null };
 };
 
 // Super Admin/School Admin: Update user status (suspend/activate)
@@ -114,24 +200,32 @@ export const updateUserStatus = async (req, res) => {
     const { userId } = req.params;
     const { isActive, isSuspended } = req.body;
 
-    // Find user
-    const user = await User.findById(userId);
+    const { account: user, kind } = await findAccountAnywhere(userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
 
-    // Check permissions: super admin can update any user; school admin can only update users in their school
+    // Check permissions: super admin can update any account; school admin can
+    // only update accounts belonging to their own school.
     if (req.user.role !== "superAdmin") {
-      if (!user.schoolId || user.schoolId.toString() !== req.user.schoolId.toString()) {
-        return res.status(403).json({ message: "You don't have permission to update this user" });
-      }
-      // School admin can't update other school admins or super admins
-      if (user.role === "superAdmin" || (user.role === "schoolAdmin" && user._id.toString() !== req.user.userId.toString())) {
-        return res.status(403).json({ message: "You don't have permission to update this user" });
+      if (kind === "user") {
+        if (!user.schoolId || user.schoolId.toString() !== req.user.schoolId.toString()) {
+          return res.status(403).json({ message: "You don't have permission to update this user" });
+        }
+        if (user.role === "superAdmin" || (user.role === "schoolAdmin" && user._id.toString() !== req.user.userId.toString())) {
+          return res.status(403).json({ message: "You don't have permission to update this user" });
+        }
+      } else if (kind === "student") {
+        if (!user.schoolId || user.schoolId.toString() !== req.user.schoolId.toString()) {
+          return res.status(403).json({ message: "You don't have permission to update this student" });
+        }
+      } else if (kind === "guardian") {
+        // Guardians have no schoolId of their own; only superAdmin may manage them directly.
+        return res.status(403).json({ message: "You don't have permission to update this account" });
       }
     }
 
-    if (isActive !== undefined) user.isActive = isActive;
+    if (isActive !== undefined && kind === "user") user.isActive = isActive;
     if (isSuspended !== undefined) user.isSuspended = isSuspended;
     await user.save();
 
@@ -167,45 +261,89 @@ export const updateSchoolAdmin = async (req, res) => {
 export const deleteUser = async (req, res) => {
   try {
     const { userId } = req.params;
-    const user = await User.findById(userId);
-    if (!user) {
+    const { account, kind } = await findAccountAnywhere(userId);
+    if (!account) {
       return res.status(404).json({ message: "User not found" });
     }
-    if (user.role === "superAdmin") {
+    if (kind === "user" && account.role === "superAdmin") {
       return res.status(403).json({ message: "Cannot delete Super Admin" });
     }
-    await User.findByIdAndDelete(userId);
+
+    if (kind === "user") await User.findByIdAndDelete(userId);
+    else if (kind === "student") await Student.findByIdAndDelete(userId);
+    else if (kind === "guardian") await Guardian.findByIdAndDelete(userId);
+
     res.json({ message: "User deleted successfully" });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Get current user profile
+// Get current user profile (supports all roles)
 export const getMyProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select("-password -verificationToken -verificationTokenExpires -resetPasswordToken -resetPasswordExpires").populate("schoolId", "name email");
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    let account;
+    if (req.user.role === "student") {
+      account = await Student.findById(req.user.userId).select("-password");
+    } else if (req.user.role === "guardian") {
+      account = await Guardian.findById(req.user.userId).select("-password");
+    } else {
+      account = await User.findById(req.user.userId)
+        .select("-password -verificationToken -verificationTokenExpires -resetPasswordToken -resetPasswordExpires")
+        .populate("schoolId", "name email");
     }
-    res.json({ user });
+
+    if (!account) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+
+    const userData = {
+      _id: account._id,
+      name: req.user.role === "student" ? account.studentName : account.name,
+      email: account.email || "",
+      role: req.user.role,
+      studentId: account.studentId || undefined,
+      schoolId: account.schoolId || undefined,
+    };
+
+    res.json({ user: userData });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// Update my profile (cannot change email or role)
+// Update my profile (supports all roles, cannot change email or role)
 export const updateMyProfile = async (req, res) => {
   try {
     const { name, password } = req.body;
-    const user = await User.findById(req.user.userId);
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
+    let account;
+    if (req.user.role === "student") {
+      account = await Student.findById(req.user.userId);
+      if (account && name) account.studentName = name;
+    } else if (req.user.role === "guardian") {
+      account = await Guardian.findById(req.user.userId);
+      if (account && name) account.name = name;
+    } else {
+      account = await User.findById(req.user.userId);
+      if (account && name) account.name = name;
     }
-    if (name) user.name = name;
-    if (password) user.password = password;
-    await user.save();
-    res.json({ message: "Profile updated successfully", user });
+
+    if (!account) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+    if (password && password.trim() !== "") account.password = password;
+    await account.save();
+
+    const updatedUser = {
+      id: account._id,
+      name: req.user.role === "student" ? account.studentName : account.name,
+      email: account.email || "",
+      role: req.user.role,
+      studentId: account.studentId || undefined,
+      schoolId: account.schoolId || undefined,
+    };
+
+    res.json({ message: "Profile updated successfully", user: updatedUser });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

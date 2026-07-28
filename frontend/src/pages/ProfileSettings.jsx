@@ -1,12 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Button } from "../components/ui/button";
 import { Loader2, User, Lock } from "lucide-react";
 import API from "../services/api";
+import { AuthContext } from "../App";
 
 export default function ProfileSettings() {
+  const { user, setUser } = useContext(AuthContext) || {};
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
@@ -29,11 +31,18 @@ export default function ProfileSettings() {
     setLoading(true);
     try {
       const res = await API.get("/manage/profile");
+      const fetchedUser = res.data.user || {};
       setProfileData({
-        name: res.data.user?.name || "",
-        email: res.data.user?.email || "",
-        studentId: res.data.user?.studentId || "",
+        name: fetchedUser.name || "",
+        email: fetchedUser.email || "",
+        studentId: fetchedUser.studentId || "",
       });
+      if (setUser && fetchedUser.name) {
+        const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+        const updated = { ...currentUser, ...fetchedUser };
+        localStorage.setItem("user", JSON.stringify(updated));
+        setUser(updated);
+      }
     } catch (err) {
       setMsgType("error");
       setMsg(err?.response?.data?.message || "Failed to load profile");
@@ -58,7 +67,13 @@ export default function ProfileSettings() {
     e.preventDefault();
     setSaving(true);
     try {
-      await API.patch("/manage/profile", { name: profileData.name });
+      const res = await API.patch("/manage/profile", { name: profileData.name });
+      const updatedUser = res.data?.user || { ...user, name: profileData.name };
+      const currentUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const nextUser = { ...currentUser, name: profileData.name };
+      localStorage.setItem("user", JSON.stringify(nextUser));
+      if (setUser) setUser(nextUser);
+
       setMsg("✅ Profile updated successfully");
       setMsgType("success");
     } catch (err) {

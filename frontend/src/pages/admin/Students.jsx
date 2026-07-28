@@ -261,17 +261,15 @@ export default function AdminStudents() {
                 </div>
               </div>
 
-              {!editingId && (
-                <div className="space-y-2">
-                  <Label>Password *</Label>
-                  <Input
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    required
-                  />
-                </div>
-              )}
+              <div className="space-y-2">
+                <Label>Password (Optional - default is 123456)</Label>
+                <Input
+                  type="password"
+                  placeholder="Set login password or leave blank for default"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                />
+              </div>
 
               <div className="flex justify-end gap-2 pt-4">
                 <DialogClose asChild>
@@ -338,6 +336,13 @@ export default function AdminStudents() {
                     <TableCell>{student.classRoll}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
+                        <a
+                          href={`/dashboard/report-card?studentId=${encodeURIComponent(student.studentId)}`}
+                          title="View Report Card"
+                          className="text-emerald-600 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-200 font-bold p-2 rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-all"
+                        >
+                          Report Card
+                        </a>
                         <button
                           onClick={() => handleEdit(student)}
                           className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200 font-bold p-2 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all"

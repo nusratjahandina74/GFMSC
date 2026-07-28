@@ -257,8 +257,8 @@ export default function AttendancePage() {
                           const status = getAttendanceStatus(student?._id);
                           return (
                             <TableRow key={student?._id || Math.random()}>
-                              <TableCell className="font-medium">{student?.roll || "-"}</TableCell>
-                              <TableCell>{student?.name || "Unknown Student"}</TableCell>
+                              <TableCell className="font-medium">{student?.classRoll || "-"}</TableCell>
+                              <TableCell>{student?.studentName || "Unknown Student"}</TableCell>
                               <TableCell>
                                 <Checkbox
                                   checked={status === "present"}

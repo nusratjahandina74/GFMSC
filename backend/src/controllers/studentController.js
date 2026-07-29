@@ -1,18 +1,26 @@
+import mongoose from "mongoose";
 import Student from "../models/Student.js";
 
 // ➕ Create Student (SchoolAdmin only)
 export const createStudent = async (req, res) => {
   try {
-    const targetSchoolId = req.body.schoolId || req.user.schoolId;
+    const targetSchoolId = req.body.schoolId || (req.user && req.user.schoolId);
+    
     if (!targetSchoolId) {
       return res.status(400).json({ message: "School ID is required to create a student." });
     }
-    const studentData = { ...req.body, schoolId: targetSchoolId };
+
+    if (!mongoose.Types.ObjectId.isValid(targetSchoolId)) {
+      return res.status(400).json({ message: "Invalid School ID format." });
+    }
+    const studentData = { ...req.body, schoolId: new mongoose.Types.ObjectId(targetSchoolId) };
+
     if (!studentData.password || studentData.password.trim() === "") {
       studentData.password = "123456";
     }
-    const student = await Student.create(studentData);
 
+    const student = await Student.create(studentData);
+    
     res.status(201).json({
       message: "Student created successfully",
       student,
@@ -21,6 +29,7 @@ export const createStudent = async (req, res) => {
     if (error.code === 11000) {
       return res.status(409).json({
         message: "This Student ID or class/roll combination already exists.",
+        error: error.keyValue
       });
     }
     res.status(500).json({ message: error.message });

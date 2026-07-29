@@ -327,34 +327,34 @@ export default function ExamsPage() {
                       onChange={(e) => setSearch(e.target.value)}
                     />
                   </div>
-                  <Select value={filterTerm} onValueChange={setFilterTerm}>
+                  <Select value={filterTerm || "__all__"} onValueChange={(val) => setFilterTerm(val === "__all__" ? "" : val)}>
                     <SelectTrigger className="w-[120px]">
                       <SelectValue placeholder="Term" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All</SelectItem>
+                      <SelectItem value="__all__">All</SelectItem>
                       <SelectItem value="2024">2024</SelectItem>
                       <SelectItem value="2025">2025</SelectItem>
                       <SelectItem value="2026">2026</SelectItem>
                     </SelectContent>
                   </Select>
-                  <Select value={filterClass} onValueChange={setFilterClass}>
+                  <Select value={filterClass || "__all__"} onValueChange={(val) => setFilterClass(val === "__all__" ? "" : val)}>
                     <SelectTrigger className="w-[140px]">
                       <SelectValue placeholder="Class" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All</SelectItem>
+                      <SelectItem value="__all__">All</SelectItem>
                       {CLASS_LIST.map((cls) => (
                         <SelectItem key={cls} value={cls}>{cls}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Select value={filterSection} onValueChange={setFilterSection}>
+                  <Select value={filterSection || "__all__"} onValueChange={(val) => setFilterSection(val === "__all__" ? "" : val)}>
                     <SelectTrigger className="w-[120px]">
                       <SelectValue placeholder="Section" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All</SelectItem>
+                      <SelectItem value="__all__">All</SelectItem>
                       {SECTION_LIST.map((sec) => (
                         <SelectItem key={sec} value={sec}>{sec}</SelectItem>
                       ))}

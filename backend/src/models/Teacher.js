@@ -6,10 +6,12 @@ const teacherSchema = new mongoose.Schema(
     email: { type: String, required: true },
     phone: String,
     subject: String,
+    // Shift is now a free-text name matching a ShiftTemplate the school has
+    // created (e.g. "Morning Shift"), not a fixed enum of 3 time ranges.
     shift: {
       type: String,
-      enum: ["7:00 AM - 11:00 AM", "11:00 AM - 5:00 PM", "7:00 AM - 3:00 PM"],
-      default: "7:00 AM - 3:00 PM",
+      trim: true,
+      default: "",
     },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // linked login account, if created
 

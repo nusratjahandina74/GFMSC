@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Clock, MapPin, Plus, Edit, Trash2, Loader2, Printer, Check, X, Save, Table2 } from "lucide-react";
 import { getClassRoutine, getTeacherRoutine, createRoutine, updateRoutine, deleteRoutine } from "../api/routines";
 import { getRoutineMatrix } from "../api/routineMatrix";
-import { getShiftTemplates, saveShiftTemplate } from "../api/shiftTemplates";
+import { getShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate } from "../api/shiftTemplates";
 import { getTeachers } from "../api/teachers";
 import { getClassSubjects } from "../api/classSubjects";
 import { CLASS_LIST, SECTION_LIST } from "../lib/constants";
@@ -34,8 +34,9 @@ const dayNames = {
   wednesday: "Wednesday",
   thursday: "Thursday",
 };
-// The school runs 3 shifts, Saturday to Thursday
-export const SHIFTS = ["7:00 AM - 11:00 AM", "11:00 AM - 5:00 PM", "7:00 AM - 3:00 PM"];
+// Shifts are no longer hardcoded — each school creates its own shifts
+// (e.g. "Morning Shift", "Day Shift") on the "Shift Time Slots" tab below.
+// This component fetches the school's live shift list from the backend.
 
 export default function RoutinePage() {
   const { user } = useContext(AuthContext);
@@ -48,6 +49,8 @@ export default function RoutinePage() {
   const [routine, setRoutine] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [classSubjects, setClassSubjects] = useState([]);
+  const [shiftTemplates, setShiftTemplates] = useState([]); // live list of shifts created for this school
+  const shiftNames = shiftTemplates.map((s) => s.shift);
   const [loading, setLoading] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -58,11 +61,21 @@ export default function RoutinePage() {
     teacherId: "",
     period: 1,
     day: "saturday",
-    shift: SHIFTS[2],
+    shift: "",
     startTime: "09:00",
     endTime: "09:45",
     room: "",
   });
+
+  const fetchShiftTemplates = async () => {
+    try {
+      const list = await getShiftTemplates();
+      setShiftTemplates(list);
+      setFormData((prev) => (prev.shift ? prev : { ...prev, shift: list[0]?.shift || "" }));
+    } catch (err) {
+      console.error("Fetch shift templates error:", err);
+    }
+  };
 
   const fetchRoutine = async () => {
     setLoading(true);
@@ -107,6 +120,7 @@ export default function RoutinePage() {
   useEffect(() => {
     fetchTeachers();
     fetchClassSubjects();
+    fetchShiftTemplates();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -138,7 +152,7 @@ export default function RoutinePage() {
       teacherId: item.teacherId?._id || item.teacherId,
       period: item.period || 1,
       day: item.day,
-      shift: item.shift || SHIFTS[2],
+      shift: item.shift || shiftNames[0] || "",
       startTime: item.startTime,
       endTime: item.endTime,
       room: item.room,
@@ -168,7 +182,7 @@ export default function RoutinePage() {
       teacherId: "",
       period: 1,
       day: "saturday",
-      shift: SHIFTS[2],
+      shift: shiftNames[0] || "",
       startTime: "09:00",
       endTime: "09:45",
       room: "",
@@ -200,7 +214,7 @@ export default function RoutinePage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Class Routine</h1>
           <p className="text-muted-foreground mt-1">
-            {role === "teacher" ? "Your teaching schedule" : "Weekly class schedule — 3 shifts, Saturday to Thursday"}
+            {role === "teacher" ? "Your teaching schedule" : "Weekly class schedule — Saturday to Thursday (Friday is a holiday)"}
           </p>
         </div>
         <div className="flex gap-2">
@@ -240,7 +254,10 @@ export default function RoutinePage() {
                       <SelectValue placeholder="Select shift" />
                     </SelectTrigger>
                     <SelectContent>
-                      {SHIFTS.map((s) => (
+                      {shiftNames.length === 0 && (
+                        <div className="px-3 py-2 text-xs text-muted-foreground">No shifts yet — create one on the "Shift Time Slots" tab first.</div>
+                      )}
+                      {shiftNames.map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
                       ))}
                     </SelectContent>
@@ -547,20 +564,32 @@ export default function RoutinePage() {
 // many periods/classes a shift has while the admin edits it.
 // ---------------------------------------------------------------------------
 function ShiftSetupPanel() {
-  const [shift, setShift] = useState(SHIFTS[2]);
-  const [templates, setTemplates] = useState([]); // all 3, from backend
-  const [periods, setPeriods] = useState([]); // periods for the currently selected shift
+  const NEW_SHIFT = "__new__";
+  const [templates, setTemplates] = useState([]); // every shift the school has created
+  const [selectedId, setSelectedId] = useState(""); // _id of the shift being edited, or NEW_SHIFT
+  const [shiftName, setShiftName] = useState(""); // editable name box (for both new + rename)
+  const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [msg, setMsg] = useState("");
 
-  const load = async () => {
+  const load = async (keepSelection) => {
     setLoading(true);
     try {
       const list = await getShiftTemplates();
       setTemplates(list);
-      const current = list.find((t) => t.shift === shift);
-      setPeriods((current?.periods || []).slice().sort((a, b) => a.period - b.period));
+      if (!keepSelection) {
+        if (list.length > 0) {
+          setSelectedId(list[0]._id);
+          setShiftName(list[0].shift);
+          setPeriods((list[0].periods || []).slice().sort((a, b) => a.period - b.period));
+        } else {
+          setSelectedId(NEW_SHIFT);
+          setShiftName("");
+          setPeriods([]);
+        }
+      }
     } catch (err) {
       setMsg(err?.response?.data?.message || err.message);
     } finally {
@@ -569,14 +598,22 @@ function ShiftSetupPanel() {
   };
 
   useEffect(() => {
-    load();
+    load(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const current = templates.find((t) => t.shift === shift);
-    setPeriods((current?.periods || []).slice().sort((a, b) => a.period - b.period));
-  }, [shift, templates]);
+  const handleSelectShift = (id) => {
+    setMsg("");
+    setSelectedId(id);
+    if (id === NEW_SHIFT) {
+      setShiftName("");
+      setPeriods([]);
+    } else {
+      const current = templates.find((t) => t._id === id);
+      setShiftName(current?.shift || "");
+      setPeriods((current?.periods || []).slice().sort((a, b) => a.period - b.period));
+    }
+  };
 
   const addPeriod = () => {
     const nextNum = periods.length > 0 ? Math.max(...periods.map((p) => p.period)) + 1 : 1;
@@ -592,16 +629,47 @@ function ShiftSetupPanel() {
   };
 
   const handleSave = async () => {
+    if (!shiftName.trim()) {
+      setMsg("Shift name is required (e.g. 'Morning Shift').");
+      return;
+    }
+    if (periods.length === 0) {
+      setMsg("Add at least one period with a start and end time.");
+      return;
+    }
     setSaving(true);
     setMsg("");
     try {
-      await saveShiftTemplate(shift, periods);
-      setMsg("✅ Time slots saved for this shift");
-      await load();
+      if (selectedId === NEW_SHIFT) {
+        const res = await createShiftTemplate(shiftName.trim(), periods);
+        setMsg("✅ Shift created successfully");
+        await load(false);
+        if (res?.shiftTemplate?._id) setSelectedId(res.shiftTemplate._id);
+      } else {
+        await updateShiftTemplate(selectedId, { shift: shiftName.trim(), periods });
+        setMsg("✅ Shift updated successfully");
+        await load(true);
+      }
     } catch (err) {
       setMsg(err?.response?.data?.message || err.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (selectedId === NEW_SHIFT) return;
+    if (!window.confirm(`Delete the shift "${shiftName}"? This cannot be undone.`)) return;
+    setDeleting(true);
+    setMsg("");
+    try {
+      await deleteShiftTemplate(selectedId);
+      setMsg("✅ Shift deleted");
+      await load(false);
+    } catch (err) {
+      setMsg(err?.response?.data?.message || err.message);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -610,20 +678,21 @@ function ShiftSetupPanel() {
       <CardHeader>
         <CardTitle>Shift Time Slots</CardTitle>
         <CardDescription>
-          Set how many periods each shift has and their clock times. Saturday–Thursday, 3 shifts: 7:00–11:00, 11:00–5:00, 7:00–3:00.
+          Create as many shifts as your school runs (e.g. Morning, Day, Evening), then set each one's periods and clock times. Saturday–Thursday; Friday is a holiday.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="max-w-md space-y-2">
           <Label>Shift</Label>
-          <Select value={shift} onValueChange={setShift}>
+          <Select value={selectedId} onValueChange={handleSelectShift}>
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue placeholder="Select a shift" />
             </SelectTrigger>
             <SelectContent>
-              {SHIFTS.map((s) => (
-                <SelectItem key={s} value={s}>{s}</SelectItem>
+              {templates.map((t) => (
+                <SelectItem key={t._id} value={t._id}>{t.shift}</SelectItem>
               ))}
+              <SelectItem value={NEW_SHIFT}>+ Create New Shift</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -632,6 +701,15 @@ function ShiftSetupPanel() {
           <div className="p-8 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
         ) : (
           <>
+            <div className="max-w-md space-y-2">
+              <Label>Shift Name</Label>
+              <Input
+                placeholder="e.g. Morning Shift"
+                value={shiftName}
+                onChange={(e) => setShiftName(e.target.value)}
+              />
+            </div>
+
             <div className="flex items-center justify-between">
               <div className="text-sm font-semibold">
                 {periods.length} period{periods.length !== 1 ? "s" : ""} in this shift
@@ -677,14 +755,26 @@ function ShiftSetupPanel() {
               </div>
             )}
 
-            <button
-              onClick={handleSave}
-              disabled={saving || periods.length === 0}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 disabled:opacity-50"
-            >
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              Save Time Slots
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 disabled:opacity-50"
+              >
+                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                {selectedId === NEW_SHIFT ? "Create Shift" : "Save Changes"}
+              </button>
+              {selectedId !== NEW_SHIFT && (
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="bg-red-50 hover:bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 disabled:opacity-50"
+                >
+                  {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  Delete Shift
+                </button>
+              )}
+            </div>
           </>
         )}
       </CardContent>
@@ -697,12 +787,23 @@ function ShiftSetupPanel() {
 // columns = periods, cell = tick if they have a class that period that day.
 // ---------------------------------------------------------------------------
 function TeacherAvailabilityGrid() {
-  const [shift, setShift] = useState(SHIFTS[2]);
+  const [shiftOptions, setShiftOptions] = useState([]);
+  const [shift, setShift] = useState("");
   const [day, setDay] = useState("saturday");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    getShiftTemplates()
+      .then((list) => {
+        setShiftOptions(list.map((t) => t.shift));
+        setShift((prev) => prev || list[0]?.shift || "");
+      })
+      .catch((err) => console.error("Fetch shift templates error:", err));
+  }, []);
+
   const load = async () => {
+    if (!shift) return;
     setLoading(true);
     try {
       const res = await getRoutineMatrix(shift, day);
@@ -735,9 +836,9 @@ function TeacherAvailabilityGrid() {
           <div className="space-y-2">
             <Label>Shift</Label>
             <Select value={shift} onValueChange={setShift}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Select shift" /></SelectTrigger>
               <SelectContent>
-                {SHIFTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {shiftOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -752,7 +853,11 @@ function TeacherAvailabilityGrid() {
           </div>
         </div>
 
-        {loading ? (
+        {shiftOptions.length === 0 ? (
+          <div className="text-center text-muted-foreground py-8 text-sm">
+            No shifts created yet. Go to "Shift Time Slots" and create one first.
+          </div>
+        ) : loading ? (
           <div className="p-8 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
         ) : periods.length === 0 ? (
           <div className="text-center text-muted-foreground py-8 text-sm">
@@ -817,12 +922,23 @@ function TeacherAvailabilityGrid() {
 // a routine entry that day/shift, cell = subject + teacher.
 // ---------------------------------------------------------------------------
 function ClassPeriodSubjectGrid() {
-  const [shift, setShift] = useState(SHIFTS[2]);
+  const [shiftOptions, setShiftOptions] = useState([]);
+  const [shift, setShift] = useState("");
   const [day, setDay] = useState("saturday");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    getShiftTemplates()
+      .then((list) => {
+        setShiftOptions(list.map((t) => t.shift));
+        setShift((prev) => prev || list[0]?.shift || "");
+      })
+      .catch((err) => console.error("Fetch shift templates error:", err));
+  }, []);
+
   const load = async () => {
+    if (!shift) return;
     setLoading(true);
     try {
       const res = await getRoutineMatrix(shift, day);
@@ -854,9 +970,9 @@ function ClassPeriodSubjectGrid() {
           <div className="space-y-2">
             <Label>Shift</Label>
             <Select value={shift} onValueChange={setShift}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger><SelectValue placeholder="Select shift" /></SelectTrigger>
               <SelectContent>
-                {SHIFTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                {shiftOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

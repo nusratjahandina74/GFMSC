@@ -39,8 +39,6 @@ export const assignClassTeacher = async (req, res) => {
 
     const { teacherId, className, section, schoolId, isFirstPeriodTeacher } = req.body;
 
-    const { teacherId, className, section, schoolId } = req.body;
-
     const targetSchoolId = schoolId || req.user.schoolId;
     if (!teacherId || !className) {
       return res.status(400).json({ message: "teacherId and className are required" });
@@ -79,8 +77,6 @@ export const assignClassTeacher = async (req, res) => {
         section: section || "",
         isFirstPeriodTeacher: !!isFirstPeriodTeacher,
       });
-
-      classTeacher = await ClassTeacher.create({ schoolId: targetSchoolId, teacherId, className, section: section || "" });
     }
 
     res.json({ message: "Class teacher assigned successfully", classTeacher });

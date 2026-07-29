@@ -7,10 +7,13 @@ import mongoose from "mongoose";
 const shiftTemplateSchema = new mongoose.Schema(
   {
     schoolId: { type: mongoose.Schema.Types.ObjectId, ref: "School", required: true },
+    // Shift name is now free text (e.g. "Morning Shift", "Day Shift",
+    // "Evening Shift") so admins can create as many shifts as their school
+    // needs, instead of being locked to 3 hardcoded time ranges.
     shift: {
       type: String,
-      enum: ["7:00 AM - 11:00 AM", "11:00 AM - 5:00 PM", "7:00 AM - 3:00 PM"],
       required: true,
+      trim: true,
     },
     periods: [
       {

@@ -7,8 +7,6 @@ export const createTeacher = async (req, res) => {
 
     const { name, email, phone, subject, shift, password, schoolId } = req.body;
 
-    const { name, email, phone, subject, password, schoolId } = req.body;
-
     const targetSchoolId = schoolId || req.user.schoolId;
     if (!name || !email || !password) {
       return res.status(400).json({ message: "Name, email, and password are required" });

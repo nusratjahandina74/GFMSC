@@ -10,9 +10,12 @@ export const createRoutine = async (req, res) => {
   try {
     const { className, section, subject, teacherId, period, day, startTime, endTime, room, shift } = req.body;
 
-    const SHIFTS = ["7:00 AM - 11:00 AM", "11:00 AM - 5:00 PM", "7:00 AM - 3:00 PM"];
-    if (!shift || !SHIFTS.includes(shift)) {
-      return res.status(400).json({ message: `shift is required and must be one of: ${SHIFTS.join(", ")}` });
+    if (!shift || !shift.trim()) {
+      return res.status(400).json({ message: "Shift is required." });
+    }
+    const shiftExists = await ShiftTemplate.findOne({ schoolId: req.user.schoolId, shift: shift.trim() });
+    if (!shiftExists) {
+      return res.status(400).json({ message: `Shift "${shift}" doesn't exist yet. Create it first on the Shift Time Slots tab.` });
     }
 
     // Validate required fields

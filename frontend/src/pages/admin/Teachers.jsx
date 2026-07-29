@@ -6,13 +6,13 @@ import { Label } from "../../components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Plus, Loader2, Edit, Trash2 } from "lucide-react";
 import { getTeachers, createTeacher, updateTeacher, deleteTeacher } from "../../api/teachers";
+import { getShiftTemplates } from "../../api/shiftTemplates";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 
-const SHIFTS = ["7:00 AM - 11:00 AM", "11:00 AM - 5:00 PM", "7:00 AM - 3:00 PM"];
-
 export default function AdminTeachers() {
   const [teachers, setTeachers] = useState([]);
+  const [shifts, setShifts] = useState([]); // live shift names from the school's Shift Time Slots setup
   const [loading, setLoading] = useState(true);
   const [loadingForm, setLoadingForm] = useState(false);
   const [msg, setMsg] = useState("");
@@ -24,7 +24,7 @@ export default function AdminTeachers() {
     subject: "",
     email: "",
     phone: "",
-    shift: SHIFTS[2],
+    shift: "",
     password: "",
   });
 
@@ -40,8 +40,20 @@ export default function AdminTeachers() {
     }
   };
 
+  const loadShifts = async () => {
+    try {
+      const list = await getShiftTemplates();
+      const names = list.map((s) => s.shift);
+      setShifts(names);
+      setFormData((prev) => (prev.shift ? prev : { ...prev, shift: names[0] || "" }));
+    } catch (err) {
+      console.error("Fetch shift templates error:", err);
+    }
+  };
+
   useEffect(() => {
     loadTeachers();
+    loadShifts();
   }, []);
 
   const handleSubmit = async (e) => {
@@ -74,7 +86,7 @@ export default function AdminTeachers() {
       subject: teacher.subject,
       email: teacher.email,
       phone: teacher.phone || "",
-      shift: teacher.shift || SHIFTS[2],
+      shift: teacher.shift || shifts[0] || "",
     });
     setOpen(true);
   };
@@ -100,7 +112,7 @@ export default function AdminTeachers() {
       subject: "",
       email: "",
       phone: "",
-      shift: SHIFTS[2],
+      shift: shifts[0] || "",
       password: "",
     });
   };
@@ -169,7 +181,10 @@ export default function AdminTeachers() {
                     <SelectValue placeholder="Select shift" />
                   </SelectTrigger>
                   <SelectContent>
-                    {SHIFTS.map((s) => (
+                    {shifts.length === 0 && (
+                      <div className="px-3 py-2 text-xs text-muted-foreground">No shifts yet — create one first on the Routine page's "Shift Time Slots" tab.</div>
+                    )}
+                    {shifts.map((s) => (
                       <SelectItem key={s} value={s}>{s}</SelectItem>
                     ))}
                   </SelectContent>

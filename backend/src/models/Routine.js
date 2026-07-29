@@ -3,10 +3,12 @@ import mongoose from "mongoose";
 const routineSchema = new mongoose.Schema(
   {
     schoolId: { type: mongoose.Schema.Types.ObjectId, ref: "School", required: true },
+    // Shift is a free-text name that must match a ShiftTemplate the school
+    // has already created (validated in the controller), not a fixed enum.
     shift: {
       type: String,
-      enum: ["7:00 AM - 11:00 AM", "11:00 AM - 5:00 PM", "7:00 AM - 3:00 PM"],
       required: true,
+      trim: true,
     },
     className: { 
       type: String, 

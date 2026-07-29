@@ -5,7 +5,17 @@ export const getShiftTemplates = async () => {
   return res.data?.shiftTemplates || [];
 };
 
-export const saveShiftTemplate = async (shift, periods) => {
+export const createShiftTemplate = async (shift, periods) => {
   const res = await api.post("/shift-templates", { shift, periods });
+  return res.data;
+};
+
+export const updateShiftTemplate = async (id, { shift, periods }) => {
+  const res = await api.put(`/shift-templates/${id}`, { shift, periods });
+  return res.data;
+};
+
+export const deleteShiftTemplate = async (id) => {
+  const res = await api.delete(`/shift-templates/${id}`);
   return res.data;
 };

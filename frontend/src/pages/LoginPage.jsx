@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import API from '../services/api';
+import { AuthContext } from '../App';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { setUser } = useContext(AuthContext);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -35,7 +37,10 @@ export default function LoginPage() {
 
         localStorage.setItem('token', token);
         localStorage.setItem('role', role);
-        if (user) localStorage.setItem('user', JSON.stringify(user));
+        if (user) {
+          localStorage.setItem('user', JSON.stringify(user));
+          setUser(user);
+        }
 
         // Route to the correct landing page for this user's actual role.
         // Hardcoding '/admin/dashboard' here would send teachers/students
@@ -102,7 +107,7 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-3 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
-              placeholder="example@gmail.com or GFMSC-2026-10-05"
+              placeholder="example@gmail.com or your numeric Student ID"
               autoComplete="username"
               required
             />

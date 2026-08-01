@@ -42,13 +42,13 @@ export default function AdminLeaves() {
 
   const getStatusBadge = (status) => {
     switch (status) {
-      case "approved":
+      case "Approved":
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
             <CheckCircle className="h-3 w-3" /> Approved
           </span>
         );
-      case "rejected":
+      case "Rejected":
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
             <XCircle className="h-3 w-3" /> Rejected
@@ -111,25 +111,25 @@ export default function AdminLeaves() {
                 {leaves.map((leave) => (
                   <TableRow key={leave._id}>
                     <TableCell className="font-medium">
-                      <div>{leave.userId?.name || "Unknown"}</div>
-                      <div className="text-xs text-muted-foreground">{leave.userId?.email} ({leave.userId?.role})</div>
+                      <div>{leave.applicantId?.name || leave.applicantId?.studentName || "Unknown"}</div>
+                      <div className="text-xs text-muted-foreground">{leave.applicantId?.email} ({leave.role})</div>
                     </TableCell>
                     <TableCell className="max-w-xs truncate">{leave.reason}</TableCell>
                     <TableCell>{new Date(leave.startDate).toLocaleDateString()}</TableCell>
                     <TableCell>{new Date(leave.endDate).toLocaleDateString()}</TableCell>
                     <TableCell>{getStatusBadge(leave.status)}</TableCell>
                     <TableCell className="text-right">
-                      {leave.status === "pending" ? (
+                      {leave.status === "Pending" ? (
                         <div className="flex justify-end gap-2">
                           <button
-                            onClick={() => handleStatusChange(leave._id, "approved")}
+                            onClick={() => handleStatusChange(leave._id, "Approved")}
                             disabled={updatingId === leave._id}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded shadow-sm transition-all"
                           >
                             Approve
                           </button>
                           <button
-                            onClick={() => handleStatusChange(leave._id, "rejected")}
+                            onClick={() => handleStatusChange(leave._id, "Rejected")}
                             disabled={updatingId === leave._id}
                             className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded shadow-sm transition-all"
                           >

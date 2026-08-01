@@ -16,6 +16,8 @@ import {
   Settings as SettingsIcon,
   UserCog,
   ShieldCheck,
+  CalendarDays,
+  DollarSign,
 } from "lucide-react";
 import { getRole, logout, getUser } from "../../api/auth";
 import { useContext } from "react";
@@ -105,6 +107,18 @@ export default function AdminSidebar() {
       name: "Exam Duties",
       path: "/admin/exam-duties",
       icon: ShieldCheck,
+      roles: ["schoolAdmin", "superAdmin"],
+    },
+    {
+      name: "Leaves",
+      path: "/admin/leaves",
+      icon: CalendarDays,
+      roles: ["schoolAdmin", "superAdmin"],
+    },
+    {
+      name: "Fees & Dues",
+      path: "/admin/fees-dues",
+      icon: DollarSign,
       roles: ["schoolAdmin", "superAdmin"],
     },
     {

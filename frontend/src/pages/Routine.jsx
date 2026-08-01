@@ -283,14 +283,14 @@ export default function RoutinePage() {
                   <div className="space-y-2">
                     <Label>Section</Label>
                     <Select
-                      value={formData.section || "__all__"}
-                      onValueChange={(val) => setFormData({ ...formData, section: val === "__all__" ? "" : val })}
+                      value={formData.section}
+                      onValueChange={(val) => setFormData({ ...formData, section: val })}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select section" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="__all__">All</SelectItem>
+                        <SelectItem value="">All</SelectItem>
                         {SECTION_LIST.map((sec) => (
                           <SelectItem key={sec} value={sec}>{sec}</SelectItem>
                         ))}
@@ -460,12 +460,12 @@ export default function RoutinePage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="section">Section</Label>
-                  <Select value={section || "__all__"} onValueChange={(val) => setSection(val === "__all__" ? "" : val)}>
+                  <Select value={section} onValueChange={setSection}>
                     <SelectTrigger id="section">
                       <SelectValue placeholder="Select section" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="__all__">All</SelectItem>
+                      <SelectItem value="">All</SelectItem>
                       {SECTION_LIST.map((sec) => (
                         <SelectItem key={sec} value={sec}>{sec}</SelectItem>
                       ))}

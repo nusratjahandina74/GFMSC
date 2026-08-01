@@ -274,7 +274,9 @@ export const getSuperAdminDues = async (req, res) => {
       ? invoices.filter((i) => i.studentId?.className === className)
       : invoices;
 
-    const totalDue = filtered.reduce((acc, inv) => acc + (inv.dueAmount || 0), 0);
+    const totalDue = filtered
+      .filter((inv) => inv.status !== "paid")
+      .reduce((acc, inv) => acc + (inv.amount || 0), 0);
 
     res.status(200).json({ invoices: filtered, totalDue });
   } catch (err) {

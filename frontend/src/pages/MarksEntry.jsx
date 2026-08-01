@@ -245,12 +245,12 @@ export default function MarksEntry() {
               </div>
               <div className="space-y-2">
                 <Label>Section</Label>
-                <Select value={section || "__all__"} onValueChange={(val) => setSection(val === "__all__" ? "" : val)}>
+                <Select value={section} onValueChange={setSection}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select section" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">All Sections</SelectItem>
+                    <SelectItem value="">All Sections</SelectItem>
                     {SECTION_LIST.map((sec) => (
                       <SelectItem key={sec} value={sec}>{sec}</SelectItem>
                     ))}

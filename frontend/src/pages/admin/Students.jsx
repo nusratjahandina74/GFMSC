@@ -8,6 +8,7 @@ import { Plus, Loader2, Edit, Trash2, Users } from "lucide-react";
 import { getStudents, createStudent, updateStudent, deleteStudent } from "../../api/students";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+
 const CLASSES = [
   "Nursery",
   "Class 1",
@@ -21,7 +22,9 @@ const CLASSES = [
   "Class 9",
   "Class 10"
 ];
+
 const SECTIONS = ["A", "B", "C", "D"];
+
 export default function AdminStudents() {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -29,6 +32,7 @@ export default function AdminStudents() {
   const [msg, setMsg] = useState("");
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+
   const [formData, setFormData] = useState({
     studentName: "",
     classRoll: "",
@@ -41,6 +45,7 @@ export default function AdminStudents() {
     mothersPhone: "",
     password: "",
   });
+
   const loadStudents = async () => {
     setLoading(true);
     try {
@@ -56,6 +61,7 @@ export default function AdminStudents() {
   useEffect(() => {
     loadStudents();
   }, []);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoadingForm(true);
@@ -65,8 +71,12 @@ export default function AdminStudents() {
         await updateStudent(editingId, formData);
         setMsg("✅ Student updated successfully");
       } else {
-        await createStudent(formData);
-        setMsg("✅ Student created successfully");
+        const res = await createStudent(formData);
+        const created = res?.student;
+        const effectivePassword = formData.password?.trim() || "123456";
+        setMsg(
+          `✅ Student created! Login ID: ${created?.studentId || "(see table below)"}  ·  Password: ${effectivePassword}`
+        );
       }
       setOpen(false);
       resetForm();
@@ -77,6 +87,7 @@ export default function AdminStudents() {
       setLoadingForm(false);
     }
   };
+
   const handleEdit = (student) => {
     setEditingId(student._id);
     setFormData({
@@ -93,6 +104,7 @@ export default function AdminStudents() {
     });
     setOpen(true);
   };
+
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this student?")) return;
     setLoading(true);
@@ -106,6 +118,7 @@ export default function AdminStudents() {
       setLoading(false);
     }
   };
+
   const resetForm = () => {
     setEditingId(null);
     setFormData({
@@ -121,6 +134,7 @@ export default function AdminStudents() {
       password: "",
     });
   };
+
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
       <div className="flex items-center justify-between">
@@ -162,6 +176,7 @@ export default function AdminStudents() {
                   />
                 </div>
               </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label>Class *</Label>
@@ -211,6 +226,7 @@ export default function AdminStudents() {
                   />
                 </div>
               </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Father's Name *</Label>
@@ -229,6 +245,7 @@ export default function AdminStudents() {
                   />
                 </div>
               </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Father's Phone *</Label>
@@ -247,6 +264,7 @@ export default function AdminStudents() {
                   />
                 </div>
               </div>
+
               <div className="space-y-2">
                 <Label>Password (Optional - default is 123456)</Label>
                 <Input
@@ -256,6 +274,7 @@ export default function AdminStudents() {
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 />
               </div>
+
               <div className="flex justify-end gap-2 pt-4">
                 <DialogClose asChild>
                   <button type="button" className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-bold px-5 py-2.5 rounded-lg shadow-md transition-all">
@@ -275,6 +294,7 @@ export default function AdminStudents() {
           </DialogContent>
         </Dialog>
       </div>
+
       {msg && (
         <div
           className={`p-4 rounded-lg border ${
@@ -286,6 +306,7 @@ export default function AdminStudents() {
           {msg}
         </div>
       )}
+
       <Card>
         <CardHeader>
           <CardTitle>Student List</CardTitle>

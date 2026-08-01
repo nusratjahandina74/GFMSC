@@ -9,16 +9,7 @@ import axios from "axios";
 // "https://gfmsc-backend.onrender.com" without the trailing "/api").
 const rawBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
 const normalizedBase = rawBase.replace(/\/+$/, "");
-const ENV_API_BASE_URL = normalizedBase.endsWith("/api") ? normalizedBase : `${normalizedBase}/api`;
-
-// 🚀 SMART AUTOMATIC GATEWAY SWITCH
-// ব্রাউজার যদি লোকালহোস্টে চলে, তবে ভাইট ক্যাশ বাইপাস করে সরাসরি লোকাল ব্যাকএন্ড অ্যান্ডপয়েন্ট সেট করবে।
-// অন্যথায় (Vercel বা প্রোডাকশনে) এটি স্বয়ংক্রিয়ভাবে পরিবেশ ভ্যারিয়েবল (Environment Variable) ব্যবহার করবে।
-const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
-
-const API_BASE_URL = isLocalhost 
-  ? "http://localhost:5000/api" 
-  : ENV_API_BASE_URL;
+const API_BASE_URL = normalizedBase.endsWith("/api") ? normalizedBase : `${normalizedBase}/api`;
 
 console.log(`[GFMSC System Engine] Active Network Gateway Bound To: ${API_BASE_URL}`);
 

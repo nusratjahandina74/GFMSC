@@ -26,11 +26,14 @@ import AdminClassSubjects from "./pages/admin/ClassSubjects";
 import AdminClassTeachers from "./pages/admin/ClassTeachers";
 import ExamsPage from "./pages/ExamsPage";
 import ExamDuties from "./pages/admin/ExamDuties";
+import AdminLeaves from "./pages/admin/Leaves";
+import AdminFeesDues from "./pages/admin/FeesDues";
 import MarksEntry from "./pages/MarksEntry";
 import ReportCard from "./pages/ReportCard";
 import Payments from "./pages/student/Payments";
 import Attendance from "./pages/teacher/Attendance";
 import Routine from "./pages/Routine";
+import MyLeaves from "./pages/MyLeaves";
 import Unauthorized from "./pages/Unauthorized";
 import { getRole, isLoggedIn, getUser } from "./api/auth";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -242,6 +245,54 @@ export default function App() {
               }
             />
             <Route
+              path="leaves"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <AdminLeaves />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="fees-dues"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <AdminFeesDues />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="leaves"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <AdminLeaves />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="fees-dues"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <AdminFeesDues />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="leaves"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <AdminLeaves />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="fees-dues"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <AdminFeesDues />
+                </RequireRole>
+              }
+            />
+            <Route
               path="marks-entry"
               element={
                 <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
@@ -430,6 +481,14 @@ export default function App() {
               }
             />
             <Route path="routine" element={<Routine />} />
+            <Route
+              path="my-leaves"
+              element={
+                <RequireRole allowedRoles={["teacher", "staff"]}>
+                  <MyLeaves />
+                </RequireRole>
+              }
+            />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

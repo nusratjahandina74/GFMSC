@@ -358,6 +358,12 @@ export const createSuperAdmin = async (req, res) => {
 };
 
 // Login
+// Case-insensitive EXACT match on email — used so login works regardless of
+// whether an account's email was stored before or after the lowercase
+// normalization was added (no DB migration needed for existing accounts).
+const escapeRegex = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const emailExact = (email) => new RegExp(`^${escapeRegex(email)}$`, "i");
+
 export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -374,12 +380,12 @@ export const login = async (req, res) => {
 
     // If not studentId, check regular User
     if (!account) {
-      account = await User.findOne({ email });
+      account = await User.findOne({ email: emailExact(email) });
       if (account) {
         role = account.role;
       } else {
         // Check Guardian
-        account = await Guardian.findOne({ email });
+        account = await Guardian.findOne({ email: emailExact(email) });
         if (account) {
           role = "guardian";
         }

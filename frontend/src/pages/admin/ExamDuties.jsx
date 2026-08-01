@@ -215,14 +215,14 @@ export default function ExamDuties() {
                     <div className="space-y-2">
                       <Label>Section</Label>
                       <Select
-                        value={formData.section || "__all__"}
-                        onValueChange={(val) => setFormData({ ...formData, section: val === "__all__" ? "" : val })}
+                        value={formData.section}
+                        onValueChange={(val) => setFormData({ ...formData, section: val })}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select section" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__all__">All</SelectItem>
+                          <SelectItem value="">All</SelectItem>
                           {SECTION_LIST.map((s) => (
                             <SelectItem key={s} value={s}>{s}</SelectItem>
                           ))}

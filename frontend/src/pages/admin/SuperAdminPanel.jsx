@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
-import { Button } from "../../components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
@@ -830,10 +829,9 @@ const SuperAdminPanel = () => {
                   <TableRow>
                     <TableHead>Student</TableHead>
                     <TableHead>Class</TableHead>
-                    <TableHead>Invoice #</TableHead>
-                    <TableHead>Total</TableHead>
-                    <TableHead>Paid</TableHead>
-                    <TableHead>Due Amount</TableHead>
+                    <TableHead>Month</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -842,12 +840,11 @@ const SuperAdminPanel = () => {
                     <TableRow key={inv._id}>
                       <TableCell className="font-medium">{inv.studentId?.studentName} ({inv.studentId?.studentId})</TableCell>
                       <TableCell>{inv.studentId?.className}</TableCell>
-                      <TableCell className="font-mono text-xs">{inv.invoiceNumber}</TableCell>
-                      <TableCell>৳ {inv.totalAmount}</TableCell>
-                      <TableCell className="text-green-600">৳ {inv.paidAmount}</TableCell>
-                      <TableCell className="font-bold text-red-600">৳ {inv.dueAmount}</TableCell>
+                      <TableCell>{inv.month}</TableCell>
+                      <TableCell className="capitalize">{inv.type}</TableCell>
+                      <TableCell className="font-bold text-red-600">৳ {inv.amount}</TableCell>
                       <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs font-semibold ${inv.status === 'Paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        <span className={`px-2 py-1 rounded text-xs font-semibold capitalize ${inv.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                           {inv.status}
                         </span>
                       </TableCell>

@@ -4,7 +4,7 @@ const staffSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
     phone: { type: String, trim: true },
-    email: { type: String, trim: true },
+    email: { type: String, lowercase: true, trim: true },
     designation: { type: String, default: "Staff" },
     department: { type: String, default: "General" },
     address: { type: String, default: "" },

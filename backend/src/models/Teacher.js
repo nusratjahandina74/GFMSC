@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const teacherSchema = new mongoose.Schema(
   {
     name: { type: String, required: true },
-    email: { type: String, required: true },
+    email: { type: String, required: true, lowercase: true, trim: true },
     phone: String,
     subject: String,
     // Shift is now a free-text name matching a ShiftTemplate the school has

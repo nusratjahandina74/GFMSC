@@ -74,3 +74,130 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   filter: invert(1);
   opacity: 1;
 }
+
+/* ---------------------------------------------------------------------
+ * Dark mode text-color safety net
+ * ---------------------------------------------------------------------
+ * Body text already flips to a light color automatically via the
+ * `--foreground` CSS variable (see `body { @apply bg-background
+ * text-foreground; }` above). But a lot of individual components hardcode
+ * a fixed Tailwind gray/slate color (e.g. `text-gray-900`) with no
+ * `dark:` counterpart, so that text stayed dark-on-dark and became
+ * unreadable in dark mode. This forces all such text back to the theme's
+ * light foreground color whenever `.dark` is active.
+ * ------------------------------------------------------------------- */
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700,
+.dark .text-zinc-900,
+.dark .text-zinc-800,
+.dark .text-neutral-900,
+.dark .text-neutral-800,
+.dark .text-black {
+  color: hsl(var(--foreground));
+}
+
+/* ---------------------------------------------------------------------
+ * Dark mode button text-color
+ * ---------------------------------------------------------------------
+ * Solid, colored action buttons across the app (Add/Save/Submit etc.)
+ * use a hardcoded `text-white` label with no dark: variant. In dark mode
+ * those buttons should keep black text instead of white. This targets
+ * only real <button> elements that have both a background-color utility
+ * and `text-white` in their class list — icon-only/ghost buttons (which
+ * already carry their own `dark:text-...` color and have no `bg-*`
+ * utility) are left untouched.
+ * ------------------------------------------------------------------- */
+.dark button[class*="bg-"][class*="text-white"] {
+  color: #111827 !important; /* gray-900 — readable black on any button color */
+}
+.dark button[class*="bg-"][class*="text-white"] svg {
+  color: #111827 !important;
+}
+/* ---------------------------------------------------------------------
+ * Dark mode text-color safety net
+ * ---------------------------------------------------------------------
+ * Body text already flips to a light color automatically via the
+ * `--foreground` CSS variable (see `body { @apply bg-background
+ * text-foreground; }` above). But a lot of individual components hardcode
+ * a fixed Tailwind gray/slate color (e.g. `text-gray-900`) with no
+ * `dark:` counterpart, so that text stayed dark-on-dark and became
+ * unreadable in dark mode. This forces all such text back to the theme's
+ * light foreground color whenever `.dark` is active.
+ * ------------------------------------------------------------------- */
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700,
+.dark .text-zinc-900,
+.dark .text-zinc-800,
+.dark .text-neutral-900,
+.dark .text-neutral-800,
+.dark .text-black {
+  color: hsl(var(--foreground));
+}
+
+/* ---------------------------------------------------------------------
+ * Dark mode button text-color
+ * ---------------------------------------------------------------------
+ * Solid, colored action buttons across the app (Add/Save/Submit etc.)
+ * use a hardcoded `text-white` label with no dark: variant. In dark mode
+ * those buttons should keep black text instead of white. This targets
+ * only real <button> elements that have both a background-color utility
+ * and `text-white` in their class list — icon-only/ghost buttons (which
+ * already carry their own `dark:text-...` color and have no `bg-*`
+ * utility) are left untouched.
+ * ------------------------------------------------------------------- */
+.dark button[class*="bg-"][class*="text-white"] {
+  color: #111827 !important; /* gray-900 — readable black on any button color */
+}
+.dark button[class*="bg-"][class*="text-white"] svg {
+  color: #111827 !important;
+}
+/* ---------------------------------------------------------------------
+ * Dark mode text-color safety net
+ * ---------------------------------------------------------------------
+ * Body text already flips to a light color automatically via the
+ * `--foreground` CSS variable (see `body { @apply bg-background
+ * text-foreground; }` above). But a lot of individual components hardcode
+ * a fixed Tailwind gray/slate color (e.g. `text-gray-900`) with no
+ * `dark:` counterpart, so that text stayed dark-on-dark and became
+ * unreadable in dark mode. This forces all such text back to the theme's
+ * light foreground color whenever `.dark` is active.
+ * ------------------------------------------------------------------- */
+.dark .text-gray-900,
+.dark .text-gray-800,
+.dark .text-gray-700,
+.dark .text-slate-900,
+.dark .text-slate-800,
+.dark .text-slate-700,
+.dark .text-zinc-900,
+.dark .text-zinc-800,
+.dark .text-neutral-900,
+.dark .text-neutral-800,
+.dark .text-black {
+  color: hsl(var(--foreground));
+}
+
+/* ---------------------------------------------------------------------
+ * Dark mode button text-color
+ * ---------------------------------------------------------------------
+ * Solid, colored action buttons across the app (Add/Save/Submit etc.)
+ * use a hardcoded `text-white` label with no dark: variant. In dark mode
+ * those buttons should keep black text instead of white. This targets
+ * only real <button> elements that have both a background-color utility
+ * and `text-white` in their class list — icon-only/ghost buttons (which
+ * already carry their own `dark:text-...` color and have no `bg-*`
+ * utility) are left untouched.
+ * ------------------------------------------------------------------- */
+.dark button[class*="bg-"][class*="text-white"] {
+  color: #111827 !important; /* gray-900 — readable black on any button color */
+}
+.dark button[class*="bg-"][class*="text-white"] svg {
+  color: #111827 !important;
+}

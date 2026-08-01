@@ -13,6 +13,7 @@ import {
   CreditCard,
   Bell,
   Calendar,
+  CalendarDays,
   Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -88,6 +89,11 @@ function DashboardLayout() {
           icon: Bell,
         },
         {
+          name: "My Leaves",
+          path: "/dashboard/my-leaves",
+          icon: CalendarDays,
+        },
+        {
           name: "My Profile",
           path: "/dashboard/profile",
           icon: Settings,
@@ -122,6 +128,11 @@ function DashboardLayout() {
           name: "Report Card",
           path: "/dashboard/report-card",
           icon: FileCheck,
+        },
+        {
+          name: "My Leaves",
+          path: "/dashboard/my-leaves",
+          icon: CalendarDays,
         },
         {
           name: "My Profile",
@@ -201,6 +212,11 @@ function DashboardLayout() {
           icon: Bell,
         },
         {
+          name: "My Leaves",
+          path: "/dashboard/my-leaves",
+          icon: CalendarDays,
+        },
+        {
           name: "My Profile",
           path: "/dashboard/profile",
           icon: Settings,
@@ -215,6 +231,11 @@ function DashboardLayout() {
           name: "Notices",
           path: "/notices",
           icon: Bell,
+        },
+        {
+          name: "My Leaves",
+          path: "/dashboard/my-leaves",
+          icon: CalendarDays,
         },
         {
           name: "My Profile",

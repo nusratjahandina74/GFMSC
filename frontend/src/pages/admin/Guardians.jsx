@@ -63,7 +63,7 @@ export default function AdminGuardians() {
         setMsg("✅ Guardian updated successfully");
       } else {
         await createGuardian(formData);
-        setMsg("✅ Guardian created successfully");
+        setMsg(`✅ Guardian created! Login email: ${formData.email}  ·  Password: ${formData.password}`);
       }
       setOpen(false);
       resetForm();

@@ -26,4 +26,16 @@ export const logout = () => {
 
 export const isLoggedIn = () => !!localStorage.getItem("token");
 export const getRole = () => localStorage.getItem("role");
-export const getUser = () => JSON.parse(localStorage.getItem("user") || "null");
+export const getUser = () => {
+  const raw = localStorage.getItem("user");
+  if (!raw || raw === "undefined" || raw === "null") return null;
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    // Corrupted/stale value from an older session — clear it instead of
+    // crashing the whole app on every page load.
+    console.warn("Corrupted 'user' data in localStorage, clearing it:", e);
+    localStorage.removeItem("user");
+    return null;
+  }
+};

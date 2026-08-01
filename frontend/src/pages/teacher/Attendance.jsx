@@ -198,12 +198,12 @@ export default function AttendancePage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="section">Section</Label>
-                <Select value={section || "__all__"} onValueChange={(val) => setSection(val === "__all__" ? "" : val)}>
+                <Select value={section} onValueChange={setSection}>
                   <SelectTrigger id="section">
                     <SelectValue placeholder="Select section" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__all__">All Sections</SelectItem>
+                    <SelectItem value="">All Sections</SelectItem>
                     {SECTION_LIST.map((sec) => (
                       <SelectItem key={sec} value={sec}>{sec}</SelectItem>
                     ))}

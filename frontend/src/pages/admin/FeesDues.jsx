@@ -48,7 +48,7 @@ export default function AdminFeesDues() {
     setLoading(true);
     setMsg("");
     try {
-      await api.post("/fees/set-monthly", {
+      await api.post("/fees/set", {
         className,
         month,
         amount: Number(feeAmount),
@@ -68,7 +68,7 @@ export default function AdminFeesDues() {
     try {
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 15);
-      const res = await api.post("/invoices/bulk-generate", {
+      const res = await api.post("/invoices/bulk", {
         className,
         section,
         month,

@@ -62,6 +62,21 @@ app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Email addresses are case-insensitive by convention (RFC 5321 says the
+// local part technically isn't, but in practice every major provider treats
+// it that way, and users type casing inconsistently). Nothing in this app
+// normalized email casing anywhere — not on the schemas, not on lookups —
+// so an account created with "John@Gmail.com" could never log back in with
+// "john@gmail.com": MongoDB does an exact string match. This normalizes
+// req.body.email on every request so creation and login always agree,
+// without having to patch every individual controller.
+app.use((req, res, next) => {
+  if (req.body && typeof req.body.email === "string") {
+    req.body.email = req.body.email.trim().toLowerCase();
+  }
+  next();
+});
+
 app.use((req, res, next) => {
   console.log(`[API LOG] REQ: ${req.method} ${req.url}`);
   next();

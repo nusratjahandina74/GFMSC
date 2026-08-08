@@ -6,7 +6,6 @@ import ClassTeacher from "../models/ClassTeacher.js";
 import Routine from "../models/Routine.js";
 import { sendSMS } from "../utils/smsSender.js";
 
-// Take attendance
 export const takeAttendance = async (req, res) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -14,14 +13,13 @@ export const takeAttendance = async (req, res) => {
   try {
     const { date, className, section, records } = req.body;
 
-    // Validate required fields
     if (!date || !className || !Array.isArray(records)) {
       await session.abortTransaction();
       session.endSession();
       return res.status(400).json({ message: "Missing required fields: date, className, records are required" });
     }
 
-    // Validate records
+
     const validStatuses = ["present", "absent", "late"];
     for (const record of records) {
       if (!record.studentId) {
@@ -36,49 +34,39 @@ export const takeAttendance = async (req, res) => {
       }
     }
 
-    // Permission check
     if (req.user.role !== "superAdmin" && req.user.role !== "schoolAdmin") {
-      // Check if user is a teacher
-      const teacher = await Teacher.findOne({ userId: req.user.userId, schoolId: req.user.schoolId });
+      
+      if (req.user.role !== "teacher") {
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({ message: "Access denied. Unauthorized role." });
+      }
+
+      const teacher = await Teacher.findOne({ userId: req.user.userId, schoolId: req.user.schoolId }).session(session);
       if (!teacher) {
         await session.abortTransaction();
         session.endSession();
-        return res.status(403).json({ message: "You are not authorized to take attendance" });
+        return res.status(403).json({ message: "You are not authorized to take attendance. Teacher profile not found." });
       }
 
-      // Check if user is class teacher for this class and section
       const isClassTeacher = await ClassTeacher.findOne({
         schoolId: req.user.schoolId,
         className,
         section: section || "",
         teacherId: teacher._id,
-      });
+        isFirstPeriodTeacher: true
+      }).session(session);
 
+    
       if (!isClassTeacher) {
-        // Check if user has first period on that day
-        const dateObj = new Date(date);
-        const dayNumber = dateObj.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-        const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-        const dayName = days[dayNumber];
-
-        // Get all routines for that class/section/day
-        const routines = await Routine.find({
-          schoolId: req.user.schoolId,
-          className,
-          section: section || "",
-          day: dayName,
-        }).sort({ startTime: 1 });
-
-        // If no routines, or first routine is not this teacher
-        if (routines.length === 0 || routines[0].teacherId.toString() !== teacher._id.toString()) {
-          await session.abortTransaction();
-          session.endSession();
-          return res.status(403).json({ message: "Only the Class Teacher or the teacher taking the first period can take attendance" });
-        }
+        await session.abortTransaction();
+        session.endSession();
+        return res.status(403).json({ 
+          message: `Access denied. Only the assigned 1st period Class Teacher of ${className}${section ? "-" + section : ""} can take or edit attendance.` 
+        });
       }
     }
 
-    // Upsert attendance
     const attendance = await Attendance.findOneAndUpdate(
       {
         schoolId: req.user.schoolId,
@@ -100,12 +88,14 @@ export const takeAttendance = async (req, res) => {
     await session.commitTransaction();
     session.endSession();
 
-    // Send SMS for absent students
     for (const record of records) {
       if (record.status === "absent") {
+
         const student = await Student.findById(record.studentId);
         if (student) {
-          const message = `Dear Parent, your child ${student.name} (ID: ${student.studentId}) is absent today (${date}) from school. - GFMSC`;
+          const studentNameDisplay = student.studentName || student.name;
+          const message = `Dear Parent, your child ${studentNameDisplay} (ID: ${student.studentId}) is absent today (${date}) from school. - GFMSC`;
+          
           if (student.fathersPhone) sendSMS(student.fathersPhone, message);
           if (student.mothersPhone && student.mothersPhone !== student.fathersPhone) {
             sendSMS(student.mothersPhone, message);
@@ -126,7 +116,7 @@ export const takeAttendance = async (req, res) => {
   }
 };
 
-// Get attendance
+// 📄 Get attendance
 export const getAttendance = async (req, res) => {
   try {
     const { date, className, section } = req.query;
@@ -149,7 +139,6 @@ export const getAttendance = async (req, res) => {
   }
 };
 
-// Get student attendance summary
 export const getStudentAttendanceSummary = async (req, res) => {
   try {
     const { studentId, month } = req.query;
@@ -196,5 +185,31 @@ export const getStudentAttendanceSummary = async (req, res) => {
   } catch (err) {
     console.error("Get attendance summary error:", err);
     res.status(500).json({ message: err.message || "Failed to get attendance summary" });
+  }
+};
+
+export const deleteAttendance = async (req, res) => {
+  try {
+    if (req.user.role !== "superAdmin" && req.user.role !== "schoolAdmin") {
+      return res.status(403).json({ message: "Access denied. Only SuperAdmin or SchoolAdmin can delete attendance records." });
+    }
+
+    const { id } = req.params;
+    const filter = { _id: id };
+    
+    if (req.user.role !== "superAdmin") {
+      filter.schoolId = req.user.schoolId;
+    }
+
+    const record = await Attendance.findOne(filter);
+    if (!record) {
+      return res.status(404).json({ message: "Attendance record not found" });
+    }
+
+    await record.deleteOne();
+    res.status(200).json({ message: "Attendance record deleted successfully" });
+  } catch (err) {
+    console.error("Delete attendance error:", err);
+    res.status(500).json({ message: err.message || "Failed to delete attendance record" });
   }
 };

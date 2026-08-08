@@ -2,7 +2,7 @@ import ClassTeacher from "../models/ClassTeacher.js";
 import User from "../models/User.js";
 import Routine from "../models/Routine.js";
 
-// Get all class teachers for a school
+
 export const getClassTeachers = async (req, res) => {
   try {
     const filter = {};
@@ -17,11 +17,12 @@ export const getClassTeachers = async (req, res) => {
   }
 };
 
-// Get class teacher for a specific class and section
 export const getClassTeacher = async (req, res) => {
   try {
     const { className, section } = req.params;
-    const filter = { className, section };
+    const targetSection = section === "undefined" || !section ? "" : section;
+    
+    const filter = { className, section: targetSection };
     const targetSchoolId = req.query.schoolId || req.user.schoolId;
     if (targetSchoolId) filter.schoolId = targetSchoolId;
 
@@ -33,10 +34,8 @@ export const getClassTeacher = async (req, res) => {
   }
 };
 
-// Assign class teacher
 export const assignClassTeacher = async (req, res) => {
   try {
-
     const { teacherId, className, section, schoolId, isFirstPeriodTeacher } = req.body;
 
     const targetSchoolId = schoolId || req.user.schoolId;
@@ -47,35 +46,38 @@ export const assignClassTeacher = async (req, res) => {
       return res.status(400).json({ message: "School ID is required to assign a class teacher" });
     }
 
+    const targetSection = section || "";
 
-    if (isFirstPeriodTeacher) {
+    const checkFirstPeriod = isFirstPeriodTeacher === "true" || isFirstPeriodTeacher === true;
+
+    if (checkFirstPeriod) {
+
       const hasFirstPeriod = await Routine.findOne({
         schoolId: targetSchoolId,
         teacherId,
         className,
-        section: section || "",
+        section: targetSection,
         period: 1,
       });
       if (!hasFirstPeriod) {
         return res.status(400).json({
-          message: `This teacher doesn't have a 1st-period class for ${className}${section ? "-" + section : ""} in the routine yet. Add that routine entry first, or leave "Is First Period Teacher" unchecked.`,
+          message: `This teacher doesn't have a 1st-period class for ${className}${targetSection ? "-" + targetSection : ""} in the routine yet. Add that routine entry first, or leave "Is First Period Teacher" unchecked.`,
         });
       }
     }
 
-    let classTeacher = await ClassTeacher.findOne({ schoolId: targetSchoolId, className, section: section || "" });
+    let classTeacher = await ClassTeacher.findOne({ schoolId: targetSchoolId, className, section: targetSection });
     if (classTeacher) {
       classTeacher.teacherId = teacherId;
-      classTeacher.isFirstPeriodTeacher = !!isFirstPeriodTeacher;
+      classTeacher.isFirstPeriodTeacher = checkFirstPeriod;
       await classTeacher.save();
     } else {
-
       classTeacher = await ClassTeacher.create({
         schoolId: targetSchoolId,
         teacherId,
         className,
-        section: section || "",
-        isFirstPeriodTeacher: !!isFirstPeriodTeacher,
+        section: targetSection,
+        isFirstPeriodTeacher: checkFirstPeriod,
       });
     }
 
@@ -85,9 +87,6 @@ export const assignClassTeacher = async (req, res) => {
   }
 };
 
-// Update an existing class-teacher assignment by its _id (used by the
-// admin edit form, which calls PUT /class-teachers/:id — this route was
-// missing before and always returned 404).
 export const updateClassTeacherById = async (req, res) => {
   try {
     const filter = { _id: req.params.id };
@@ -97,19 +96,23 @@ export const updateClassTeacherById = async (req, res) => {
     if (!classTeacher) return res.status(404).json({ message: "Class teacher assignment not found" });
 
     const { teacherId, className, section, isFirstPeriodTeacher } = req.body;
+    
     const nextTeacherId = teacherId ?? classTeacher.teacherId;
     const nextClassName = className ?? classTeacher.className;
-    const nextSection = section ?? classTeacher.section;
-    const nextIsFirstPeriodTeacher = isFirstPeriodTeacher !== undefined ? !!isFirstPeriodTeacher : classTeacher.isFirstPeriodTeacher;
+    
+    let nextIsFirstPeriodTeacher = classTeacher.isFirstPeriodTeacher;
+    if (isFirstPeriodTeacher !== undefined) {
+      nextIsFirstPeriodTeacher = isFirstPeriodTeacher === "true" || isFirstPeriodTeacher === true;
+    }
 
     if (nextIsFirstPeriodTeacher) {
       const hasFirstPeriod = await Routine.findOne({
         schoolId: classTeacher.schoolId,
         teacherId: nextTeacherId,
         className: nextClassName,
-        section: nextSection || "",
-        period: 1,
+        section: nextSection, 
       });
+      
       if (!hasFirstPeriod) {
         return res.status(400).json({
           message: `This teacher doesn't have a 1st-period class for ${nextClassName}${nextSection ? "-" + nextSection : ""} in the routine. Add that routine entry first, or uncheck "Is First Period Teacher".`,
@@ -129,7 +132,6 @@ export const updateClassTeacherById = async (req, res) => {
   }
 };
 
-// Delete class teacher assignment
 export const deleteClassTeacher = async (req, res) => {
   try {
     const { id } = req.params;

@@ -8,30 +8,20 @@ const classTeacherSchema = new mongoose.Schema({
   },
   teacherId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Teacher",
+    ref: "User", 
     required: true
   },
   className: {
     type: String,
     required: true,
     enum: [
-      "Nursery",
-      "Class 1",
-      "Class 2",
-      "Class 3",
-      "Class 4",
-      "Class 5",
-      "Class 6",
-      "Class 7",
-      "Class 8",
-      "Class 9",
-      "Class 10"
+      "Nursery", "Class 1", "Class 2", "Class 3", "Class 4", 
+      "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10"
     ]
   },
   section: {
     type: String,
-    enum: ["A", "B", "C", "D"],
-    required: true
+    default: "" 
   },
   isFirstPeriodTeacher: { type: Boolean, default: false }
 }, { timestamps: true });

@@ -1,8 +1,15 @@
 import Student from "../models/Student.js";
+import ClassTeacher from "../models/classTeacher.js"; 
+import Teacher from "../models/Teacher.js";
 
-// ➕ Create Student (SchoolAdmin only)
+
 export const createStudent = async (req, res) => {
   try {
+
+    if (req.user.role === "teacher" || req.user.role === "student") {
+      return res.status(403).json({ message: "Access denied. You do not have permission to create students." });
+    }
+
     const targetSchoolId = req.body.schoolId || req.user.schoolId;
     if (!targetSchoolId) {
       return res.status(400).json({ message: "School ID is required to create a student." });
@@ -27,7 +34,6 @@ export const createStudent = async (req, res) => {
   }
 };
 
-// 📄 Get All Students (school-wise) with pagination, search, and filtering
 export const getStudents = async (req, res) => {
   try {
     const { page = 1, limit = 20, search, className, section } = req.query;
@@ -36,11 +42,43 @@ export const getStudents = async (req, res) => {
     const skip = (pageNum - 1) * limitNum;
 
     const filter = {};
+
     if (req.user.role !== "superAdmin") {
       filter.schoolId = req.user.schoolId;
+
+      if (req.user.role === "teacher") {
+        const teacherProfile = await Teacher.findOne({ userId: req.user.userId });
+        
+        if (!teacherProfile) {
+          return res.status(200).json({
+            total: 0,
+            page: pageNum,
+            limit: limitNum,
+            totalPages: 0,
+            students: [],
+          });
+        }
+
+        const assignedClass = await ClassTeacher.findOne({
+          teacherId: teacherProfile._id, 
+          schoolId: req.user.schoolId,
+          isFirstPeriodTeacher: true
+        });
+
+        if (!assignedClass) {
+          return res.status(200).json({
+            total: 0,
+            page: pageNum,
+            limit: limitNum,
+            totalPages: 0,
+            students: [],
+          });
+        }
+        filter.className = assignedClass.className;
+        filter.section = assignedClass.section;
+      }
     }
 
-    // Search filter (case-insensitive)
     if (search) {
       filter.$or = [
         { studentName: { $regex: search, $options: "i" } },
@@ -48,14 +86,14 @@ export const getStudents = async (req, res) => {
       ];
     }
 
-    // Class/section filter
-    if (className) filter.className = className;
-    if (section) filter.section = section;
+  
+    if (req.user.role !== "teacher") {
+      if (className) filter.className = className;
+      if (section) filter.section = section;
+    }
 
-    // Get total count
     const total = await Student.countDocuments(filter);
 
-    // Get paginated students
     const students = await Student.find(filter)
       .sort({ className: 1, section: 1, classRoll: 1 })
       .skip(skip)
@@ -73,13 +111,35 @@ export const getStudents = async (req, res) => {
   }
 };
 
-// 🔍 Get single student by ID
 export const getStudentById = async (req, res) => {
   try {
     const filter = { _id: req.params.id };
+    
     if (req.user.role !== "superAdmin") {
       filter.schoolId = req.user.schoolId;
+
+      if (req.user.role === "teacher") {
+        const teacherProfile = await Teacher.findOne({ userId: req.user.userId });
+        
+        if (!teacherProfile) {
+          return res.status(404).json({ message: "Student not found" });
+        }
+
+        const assignedClass = await ClassTeacher.findOne({
+          teacherId: teacherProfile._id,
+          schoolId: req.user.schoolId,
+          isFirstPeriodTeacher: true
+        });
+
+        if (!assignedClass) {
+          return res.status(404).json({ message: "Student not found" });
+        }
+
+        filter.className = assignedClass.className;
+        filter.section = assignedClass.section;
+      }
     }
+
     const student = await Student.findOne(filter);
     if (!student) return res.status(404).json({ message: "Student not found" });
     res.status(200).json(student);
@@ -88,9 +148,14 @@ export const getStudentById = async (req, res) => {
   }
 };
 
-// ✏️ Update Student (SchoolAdmin only)
+
 export const updateStudent = async (req, res) => {
   try {
+
+    if (req.user.role === "teacher") {
+      return res.status(403).json({ message: "Access denied. Teachers cannot update student details." });
+    }
+
     const filter = { _id: req.params.id };
     if (req.user.role !== "superAdmin") {
       filter.schoolId = req.user.schoolId;
@@ -114,9 +179,14 @@ export const updateStudent = async (req, res) => {
   }
 };
 
-// 🗑️ Delete Student (SchoolAdmin only)
+
 export const deleteStudent = async (req, res) => {
   try {
+
+    if (req.user.role === "teacher") {
+      return res.status(403).json({ message: "Access denied. Teachers cannot delete students." });
+    }
+
     const filter = { _id: req.params.id };
     if (req.user.role !== "superAdmin") {
       filter.schoolId = req.user.schoolId;
@@ -131,13 +201,35 @@ export const deleteStudent = async (req, res) => {
   }
 };
 
-// 📋 Lightweight student list for dropdown/select options
 export const getStudentOptions = async (req, res) => {
   try {
     const filter = {};
+    
     if (req.user.role !== "superAdmin") {
       filter.schoolId = req.user.schoolId;
+
+      if (req.user.role === "teacher") {
+        const teacherProfile = await Teacher.findOne({ userId: req.user.userId });
+        
+        if (!teacherProfile) {
+          return res.status(200).json([]);
+        }
+
+        const assignedClass = await ClassTeacher.findOne({
+          teacherId: teacherProfile._id,
+          schoolId: req.user.schoolId,
+          isFirstPeriodTeacher: true
+        });
+
+        if (!assignedClass) {
+          return res.status(200).json([]);
+        }
+
+        filter.className = assignedClass.className;
+        filter.section = assignedClass.section;
+      }
     }
+
     const students = await Student.find(filter)
       .select("_id studentName studentId className section")
       .sort({ className: 1, section: 1, classRoll: 1 });

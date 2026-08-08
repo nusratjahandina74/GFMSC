@@ -1,5 +1,5 @@
 import Student from "../models/Student.js";
-import ClassTeacher from "../models/classTeacher.js"; 
+import ClassTeacher from "../models/ClassTeacher.js"; 
 import Teacher from "../models/Teacher.js";
 
 

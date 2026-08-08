@@ -118,7 +118,7 @@ const resetForm = () => {
   });
 };
 
-  return (
+return (
   <div className="space-y-6 p-4 md:p-6 lg:p-8">
     <div className="flex items-center justify-between">
       <div>
@@ -203,17 +203,14 @@ const resetForm = () => {
             <div className="flex items-center gap-2 py-2 select-none">
               <Checkbox
                 id="firstPeriod"
-                checked={!!formData.isFirstPeriodTeacher} 
+                checked={formData.isFirstPeriodTeacher === true} 
                 onCheckedChange={(checked) =>
-                  setFormData({ ...formData, isFirstPeriodTeacher: !!checked })
+                  setFormData((prev) => ({ ...prev, isFirstPeriodTeacher: checked === true }))
                 }
               />
               <Label 
                 htmlFor="firstPeriod" 
                 className="cursor-pointer text-sm font-medium leading-none"
-                onClick={() => 
-                  setFormData({ ...formData, isFirstPeriodTeacher: !formData.isFirstPeriodTeacher })
-                }
               >
                 Is First Period Teacher
               </Label>
@@ -311,5 +308,6 @@ const resetForm = () => {
     </Card>
   </div>
 );
+
 
 }

@@ -82,4 +82,12 @@ studentSchema.methods.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
+// Compound index for the most common query pattern across this app:
+// "give me students in this school, this class, this section" (used by
+// Students list, Attendance, Marks Entry, Tabulation Sheet, Attendance
+// Report). Without this, every one of those queries does a full collection
+// scan once a school has thousands of students.
+studentSchema.index({ schoolId: 1, className: 1, section: 1 });
+studentSchema.index({ schoolId: 1, studentId: 1 });
+
 export default mongoose.model("Student", studentSchema);

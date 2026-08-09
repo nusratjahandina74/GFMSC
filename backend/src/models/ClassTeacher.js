@@ -8,7 +8,7 @@ const classTeacherSchema = new mongoose.Schema({
   },
   teacherId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "User", 
+    ref: "Teacher", // stores Teacher document IDs (confirmed by every query site) — was incorrectly labeled "User" here, which made .populate('teacherId') look in the wrong collection and silently return null
     required: true
   },
   className: {

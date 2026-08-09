@@ -60,7 +60,7 @@ export const assignClassTeacher = async (req, res) => {
      
       const hasFirstPeriod = await Routine.findOne({
         schoolId: targetSchoolId,
-        teacherId: teacherProfile.userId, 
+        teacherId: teacherProfile._id, // Routine.teacherId refs the Teacher collection, not the linked User account — using userId here always returned false, permanently blocking the first-period eligibility check
         className,
         section: targetSection,
         period: 1,
@@ -121,7 +121,7 @@ export const updateClassTeacherById = async (req, res) => {
 
       const hasFirstPeriod = await Routine.findOne({
         schoolId: classTeacher.schoolId,
-        teacherId: teacherProfile.userId, 
+        teacherId: teacherProfile._id, // Routine.teacherId refs the Teacher collection, not the linked User account — using userId here always returned false, permanently blocking the first-period eligibility check
         className: nextClassName,
         section: nextSection,
         period: 1,

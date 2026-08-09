@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
-import { Loader2, Users, Calendar, BookOpen, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, Users, Calendar, BookOpen, CheckCircle2, XCircle, DollarSign, Clock } from "lucide-react";
 import api from "../api/client";
 
 export default function GuardianDashboard() {
@@ -150,6 +150,80 @@ export default function GuardianDashboard() {
                   <p className="text-muted-foreground">No marks records available</p>
                 )}
               </div>
+              {/* Fees / Dues */}
+              {child.dues && (
+                <div>
+                  <h4 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Fees &amp; Dues
+                  </h4>
+                  <p className={`font-medium mb-2 ${child.dues.totalDue > 0 ? "text-red-600" : "text-green-600"}`}>
+                    {child.dues.totalDue > 0
+                      ? `Total Due: ৳${child.dues.totalDue}`
+                      : "No outstanding dues"}
+                  </p>
+                  {child.dues.invoices?.length > 0 && (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Month/Item</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {child.dues.invoices.map((inv) => (
+                            <TableRow key={inv._id}>
+                              <TableCell>{inv.title || inv.month || "-"}</TableCell>
+                              <TableCell>৳{inv.amount}</TableCell>
+                              <TableCell className="capitalize">
+                                <span className={inv.status === "paid" ? "text-green-600" : "text-red-600"}>
+                                  {inv.status}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Class Routine */}
+              {child.routine?.length > 0 && (
+                <div>
+                  <h4 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Class Routine
+                  </h4>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Day</TableHead>
+                          <TableHead>Period</TableHead>
+                          <TableHead>Subject</TableHead>
+                          <TableHead>Teacher</TableHead>
+                          <TableHead>Time</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {child.routine.map((r) => (
+                          <TableRow key={r._id}>
+                            <TableCell>{r.day}</TableCell>
+                            <TableCell>{r.period}</TableCell>
+                            <TableCell>{r.subject}</TableCell>
+                            <TableCell>{r.teacherId?.name || "-"}</TableCell>
+                            <TableCell>{r.startTime} - {r.endTime}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         ))

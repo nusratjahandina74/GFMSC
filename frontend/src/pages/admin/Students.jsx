@@ -4,10 +4,11 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
-import { Plus, Loader2, Edit, Trash2, Users } from "lucide-react";
+import { Plus, Loader2, Edit, Trash2, Users, Search } from "lucide-react";
 import { getStudents, createStudent, updateStudent, deleteStudent } from "../../api/students";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { CLASS_LIST, SECTION_LIST } from "../../lib/constants";
 
 const CLASSES = [
   "Nursery",
@@ -46,10 +47,19 @@ export default function AdminStudents() {
     password: "",
   });
 
+  const [filterClass, setFilterClass] = useState("");
+  const [filterSection, setFilterSection] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+
   const loadStudents = async () => {
     setLoading(true);
     try {
-      const res = await getStudents();
+      const res = await getStudents({
+        limit: 300, // avoid the default 20-per-page cap silently hiding students
+        ...(filterClass ? { className: filterClass } : {}),
+        ...(filterSection ? { section: filterSection } : {}),
+        ...(searchTerm ? { search: searchTerm } : {}),
+      });
       setStudents(res.students || []);
     } catch (err) {
       setMsg(err?.response?.data?.message || err.message);
@@ -60,7 +70,8 @@ export default function AdminStudents() {
 
   useEffect(() => {
     loadStudents();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterClass, filterSection]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -311,6 +322,42 @@ export default function AdminStudents() {
         <CardHeader>
           <CardTitle>Student List</CardTitle>
           <CardDescription>All registered students</CardDescription>
+          <div className="flex flex-col md:flex-row gap-3 pt-3">
+            <Select value={filterClass} onValueChange={(v) => setFilterClass(v === "__all" ? "" : v)}>
+              <SelectTrigger className="md:w-48">
+                <SelectValue placeholder="All Classes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all">All Classes</SelectItem>
+                {CLASS_LIST.map((c) => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterSection} onValueChange={(v) => setFilterSection(v === "__all" ? "" : v)}>
+              <SelectTrigger className="md:w-40">
+                <SelectValue placeholder="All Sections" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all">All Sections</SelectItem>
+                {SECTION_LIST.map((s) => (
+                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex gap-2 flex-1">
+              <Input
+                placeholder="Search by name or Student ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && loadStudents()}
+                className="flex-1"
+              />
+              <Button variant="outline" onClick={loadStudents}>
+                <Search className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="p-0">
           {loading ? (

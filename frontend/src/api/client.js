@@ -32,20 +32,77 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+let isRefreshing = false;
+let refreshQueue = [];
+
+const processQueue = (error, token = null) => {
+  refreshQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token)));
+  refreshQueue = [];
+};
+
 api.interceptors.response.use(
   (response) => {
     console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, response.status, response.data);
     return response;
   },
-  (error) => {
+  async (error) => {
     console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, error.response?.status, error.response?.data || error.message);
-    if (error.response?.status === 401) {
+
+    const originalRequest = error.config;
+    const isAuthRoute = originalRequest?.url?.includes("/auth/login") || originalRequest?.url?.includes("/auth/refresh");
+
+    // Access tokens are short-lived (15 min) by design — the server pairs
+    // them with a long-lived httpOnly refresh cookie. On a 401 (not from
+    // the login/refresh calls themselves), try exactly once to silently
+    // renew the access token before falling back to a full logout, so a
+    // 15-minute token lifetime doesn't feel like a 15-minute session to
+    // the user.
+    if (error.response?.status === 401 && !isAuthRoute && !originalRequest?._retry) {
+      if (isRefreshing) {
+        return new Promise((resolve, reject) => {
+          refreshQueue.push({ resolve, reject });
+        })
+          .then((newToken) => {
+            originalRequest._retry = true;
+            originalRequest.headers.Authorization = `Bearer ${newToken}`;
+            return api(originalRequest);
+          })
+          .catch((err) => Promise.reject(err));
+      }
+
+      originalRequest._retry = true;
+      isRefreshing = true;
+
+      try {
+        const { data } = await api.post("/auth/refresh");
+        const newToken = data.token;
+        localStorage.setItem("token", newToken);
+        processQueue(null, newToken);
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return api(originalRequest);
+      } catch (refreshError) {
+        processQueue(refreshError, null);
+        console.warn("[API Client] Refresh failed - clearing session");
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("role");
+        window.location.href = "/login";
+        return Promise.reject(refreshError);
+      } finally {
+        isRefreshing = false;
+      }
+    }
+
+    if (error.response?.status === 401 && (isAuthRoute || originalRequest?._retry)) {
       console.warn("[API Client] 401 Unauthorized - clearing session");
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("role");
-      window.location.href = "/login";
+      if (!originalRequest?.url?.includes("/auth/login")) {
+        window.location.href = "/login";
+      }
     }
+
     return Promise.reject(error);
   }
 );

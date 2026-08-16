@@ -44,7 +44,13 @@ export const getStudents = async (req, res) => {
     const filter = {};
 
     if (req.user.role !== "superAdmin") {
-      filter.schoolId = req.user.schoolId;
+      const scopedSchoolId = req.user.schoolId;
+      if (!scopedSchoolId) {
+        return res.status(400).json({
+          message: "Your account is not linked to a school. Please log in again or contact super admin support.",
+        });
+      }
+      filter.schoolId = scopedSchoolId;
 
       if (req.user.role === "teacher") {
         const teacherProfile = await Teacher.findOne({ userId: req.user.userId });
@@ -59,13 +65,16 @@ export const getStudents = async (req, res) => {
           });
         }
 
-        const assignedClass = await ClassTeacher.findOne({
-          teacherId: teacherProfile._id, 
-          schoolId: req.user.schoolId,
-          isFirstPeriodTeacher: true
-        });
+        // A teacher sees students for ALL class/sections they are
+        // assigned to as Class Teacher (regardless of isFirstPeriodTeacher flag).
+        // The old code only checked isFirstPeriodTeacher:true, which effectively
+        // made the students list empty for 90% of class teachers.
+        const assignments = await ClassTeacher.find({
+          teacherId: teacherProfile._id,
+          schoolId: scopedSchoolId,
+        }).select("className section");
 
-        if (!assignedClass) {
+        if (!assignments || assignments.length === 0) {
           return res.status(200).json({
             total: 0,
             page: pageNum,
@@ -74,19 +83,40 @@ export const getStudents = async (req, res) => {
             students: [],
           });
         }
-        filter.className = assignedClass.className;
-        filter.section = assignedClass.section;
+
+        // Build a $or query so a teacher assigned to multiple sections
+        // (e.g. Class 5-A + Class 6-B) sees all of them at once.
+        filter.$or = assignments.map((a) => ({
+          className: a.className,
+          section: a.section || "",
+        }));
+        // Teachers MUST NOT have global/class/section search (per requirement).
+        // Any search/className/section params from the frontend are IGNORED.
       }
     }
 
-    if (search) {
-      filter.$or = [
-        { studentName: { $regex: search, $options: "i" } },
-        { studentId: { $regex: search, $options: "i" } },
-      ];
+    // Teachers must NEVER have global search (per requirement).
+    // Their scope is already locked to assigned class/sections via the $or
+    // we built above; append search only for admin/super/guardian roles and
+    // carefully merge it so we don't accidentally nuke the teacher $or.
+    if (search && req.user.role !== "teacher") {
+      const nameClause = { studentName: { $regex: search, $options: "i" } };
+      const idClause = { studentId: { $regex: search, $options: "i" } };
+      if (filter.$or) {
+        // existing $or, AND our search terms into each branch
+        filter.$and = [
+          { $or: filter.$or },
+          { $or: [nameClause, idClause] },
+        ];
+        delete filter.$or;
+      } else {
+        filter.$or = [nameClause, idClause];
+      }
     }
 
-  
+    // Class/section filters: only honored for non-teacher roles.
+    // A teacher's assigned classes are already the full scope; letting
+    // them narrow further (or widen) via query params breaks the isolation.
     if (req.user.role !== "teacher") {
       if (className) filter.className = className;
       if (section) filter.section = section;
@@ -116,7 +146,13 @@ export const getStudentById = async (req, res) => {
     const filter = { _id: req.params.id };
     
     if (req.user.role !== "superAdmin") {
-      filter.schoolId = req.user.schoolId;
+      const scopedSchoolId = req.user.schoolId;
+      if (!scopedSchoolId) {
+        return res.status(400).json({
+          message: "Your account is not linked to a school. Please log in again or contact super admin support.",
+        });
+      }
+      filter.schoolId = scopedSchoolId;
 
       if (req.user.role === "teacher") {
         const teacherProfile = await Teacher.findOne({ userId: req.user.userId });
@@ -125,18 +161,19 @@ export const getStudentById = async (req, res) => {
           return res.status(404).json({ message: "Student not found" });
         }
 
-        const assignedClass = await ClassTeacher.findOne({
+        const assignments = await ClassTeacher.find({
           teacherId: teacherProfile._id,
-          schoolId: req.user.schoolId,
-          isFirstPeriodTeacher: true
-        });
+          schoolId: scopedSchoolId,
+        }).select("className section");
 
-        if (!assignedClass) {
+        if (!assignments || assignments.length === 0) {
           return res.status(404).json({ message: "Student not found" });
         }
 
-        filter.className = assignedClass.className;
-        filter.section = assignedClass.section;
+        filter.$or = assignments.map((a) => ({
+          className: a.className,
+          section: a.section || "",
+        }));
       }
     }
 

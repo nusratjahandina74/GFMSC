@@ -10,6 +10,8 @@ import {
   changePassword,
   mailConfigStatus,
   adminVerifyUser,
+  refreshAccessToken,
+  logout,
 } from "../controllers/authController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
@@ -31,6 +33,10 @@ router.post("/superadmin", createSuperAdmin);
 router.post("/register", register);
 // Login
 router.post("/login", login);
+
+// Silently renew the access token using the httpOnly refresh cookie
+router.post("/refresh", refreshAccessToken);
+router.post("/logout", logout);
 
 // Email verification
 router.get("/verify-email", verifyEmail);

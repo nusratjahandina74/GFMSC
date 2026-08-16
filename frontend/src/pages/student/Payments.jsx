@@ -26,7 +26,7 @@ import {
   TableRow,
 } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
-import { CreditCard, CheckCircle, Clock, AlertCircle } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, AlertCircle, Loader2 } from "lucide-react";
 import { getStudentInvoices } from "../../api/invoices";
 import { AuthContext } from "../../App";
 
@@ -37,50 +37,22 @@ export default function Payments() {
   const [msg, setMsg] = useState("");
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState("bkash");
+  const [paying, setPaying] = useState(false);
 
   useEffect(() => {
     const fetchInvoices = async () => {
       setLoading(true);
       try {
-        // TODO: Replace with actual student ID from user context
-        // const studentId = user?.studentId;
-        // const res = await getStudentInvoices(studentId);
-        // setInvoices(res.data?.invoices || []);
-
-        // Mock data for now
-        setInvoices([
-          {
-            _id: "1",
-            month: "2026-02",
-            type: "tuition",
-            amount: 2500,
-            status: "pending",
-            dueDate: "2026-02-15",
-            description: "February 2026 Tuition Fee",
-          },
-          {
-            _id: "2",
-            month: "2026-01",
-            type: "tuition",
-            amount: 2500,
-            status: "paid",
-            dueDate: "2026-01-15",
-            paidDate: "2026-01-05",
-            description: "January 2026 Tuition Fee",
-          },
-          {
-            _id: "3",
-            month: "2025-12",
-            type: "tuition",
-            amount: 2500,
-            status: "paid",
-            dueDate: "2025-12-15",
-            paidDate: "2025-12-03",
-            description: "December 2025 Tuition Fee",
-          },
-        ]);
+        const studentId = user?.id || user?.userId || user?.studentId;
+        if (studentId) {
+          const res = await getStudentInvoices(studentId);
+          const list = res?.invoices || res?.data?.invoices || [];
+          setInvoices(list);
+        } else {
+          setInvoices([]);
+        }
       } catch (err) {
-        setMsg("Failed to load invoices");
+        setMsg(err?.response?.data?.message || "Failed to load invoices");
         console.error("Fetch invoices error:", err);
       } finally {
         setLoading(false);
@@ -88,6 +60,33 @@ export default function Payments() {
     };
     fetchInvoices();
   }, [user]);
+
+  const handlePayNow = async () => {
+    if (!selectedInvoice) return;
+    setPaying(true);
+    try {
+      const { default: API } = await import("../../services/api");
+      const res = await API.post("/payments/initiate", {
+        invoiceId: selectedInvoice._id,
+        gateway: paymentMethod,
+        amount: selectedInvoice.amount,
+      });
+      if (res.data?.checkoutUrl) {
+        window.location.href = res.data.checkoutUrl;
+      } else if (res.data?.demoMode || res.data?.mode === "SANDBOX-DEMO") {
+        setMsg("✅ Demo mode: " + (res.data?.message || res.data?.sandboxInstructions || "Payment simulated successfully"));
+        const refresh = await getStudentInvoices(user?.id || user?.userId || user?.studentId);
+        setInvoices(refresh?.invoices || refresh?.data?.invoices || []);
+        setSelectedInvoice(null);
+      } else {
+        setMsg(res.data?.message || "Payment initiated");
+      }
+    } catch (err) {
+      setMsg(err?.response?.data?.message || "Payment initiation failed");
+    } finally {
+      setPaying(false);
+    }
+  };
 
   const getStatusBadge = (status) => {
     switch (status) {
@@ -240,10 +239,12 @@ export default function Payments() {
           </CardContent>
           <CardFooter>
             <Button
-              className="w-full"
-              disabled={!selectedInvoice}
+              className="w-full bg-emerald-600 hover:bg-emerald-700"
+              disabled={!selectedInvoice || paying}
+              onClick={handlePayNow}
             >
-              Pay Now
+              {paying && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {paying ? "Processing..." : "Pay Now"}
             </Button>
           </CardFooter>
         </Card>

@@ -27,19 +27,24 @@ const parsePagination = (page, limit) => {
   };
 };
 
-// ✅ 1) Create Exam (SchoolAdmin/Teacher)
+// ✅ 1) Create Exam (SchoolAdmin/Teacher/SuperAdmin)
 export const createExam = async (req, res) => {
   try {
-    const { name, term, className, section, date } = req.body;
+    const { name, term, className, section, date, schoolId } = req.body;
     if (!name || !term || !className) {
       return res.status(400).json({ message: "name, term, className required" });
     }
 
-    const schoolId = req.user.schoolId;
-    if (!schoolId) return res.status(403).json({ message: "schoolId missing in token" });
+    const targetSchoolId = schoolId || req.user.schoolId;
+    if (!targetSchoolId) {
+      if (req.user.role === "superAdmin") {
+        return res.status(400).json({ message: "Please pass schoolId in the request body to create an exam for a specific school." });
+      }
+      return res.status(403).json({ message: "schoolId missing in token. Please log in again." });
+    }
 
     const exam = await Exam.create({
-      schoolId,
+      schoolId: targetSchoolId,
       name,
       term,
       className,
@@ -60,10 +65,20 @@ export const createExam = async (req, res) => {
 // ✅ 2) List Exams (school-wise) with pagination and filtering
 export const listExams = async (req, res) => {
   try {
-    const { page = 1, limit = 20, term, className, section, search } = req.query;
+    const { page = 1, limit = 20, term, className, section, search, schoolId } = req.query;
     const { pageNum, limitNum, skip } = parsePagination(page, limit);
 
-    const filter = { schoolId: req.user.schoolId };
+    const targetSchoolId = schoolId || req.user.schoolId;
+    const filter = {};
+    if (req.user.role === "superAdmin") {
+      if (schoolId) filter.schoolId = schoolId;
+    } else {
+      if (!targetSchoolId) {
+        return res.status(400).json({ message: "Your account is not linked to a school. Please log in again or contact super admin support." });
+      }
+      filter.schoolId = targetSchoolId;
+    }
+
     if (term) filter.term = term;
     if (className) filter.className = className;
     if (section != null) filter.section = section;
@@ -97,8 +112,16 @@ export const listExams = async (req, res) => {
 export const updateExam = async (req, res) => {
   try {
     if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid exam id" });
-    const schoolId = req.user.schoolId;
-    const exam = await Exam.findOne({ _id: req.params.id, schoolId });
+    const targetSchoolId = req.body.schoolId || req.user.schoolId;
+
+    const exam = req.user.role === "superAdmin"
+      ? (targetSchoolId
+          ? await Exam.findOne({ _id: req.params.id, schoolId: targetSchoolId })
+          : await Exam.findById(req.params.id))
+      : (targetSchoolId
+          ? await Exam.findOne({ _id: req.params.id, schoolId: targetSchoolId })
+          : null);
+
     if (!exam) return res.status(404).json({ message: "Exam not found" });
 
     const { name, term, className, section, date } = req.body;
@@ -122,11 +145,20 @@ export const updateExam = async (req, res) => {
 export const deleteExam = async (req, res) => {
   try {
     if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid exam id" });
-    const schoolId = req.user.schoolId;
-    const exam = await Exam.findOne({ _id: req.params.id, schoolId });
+    const targetSchoolId = req.query.schoolId || req.user.schoolId;
+
+    const exam = req.user.role === "superAdmin"
+      ? (targetSchoolId
+          ? await Exam.findOne({ _id: req.params.id, schoolId: targetSchoolId })
+          : await Exam.findById(req.params.id))
+      : (targetSchoolId
+          ? await Exam.findOne({ _id: req.params.id, schoolId: targetSchoolId })
+          : null);
+
     if (!exam) return res.status(404).json({ message: "Exam not found" });
 
-    await Mark.deleteMany({ examId: exam._id, schoolId });
+    const examSchoolId = exam.schoolId;
+    await Mark.deleteMany({ examId: exam._id, schoolId: examSchoolId });
     await exam.deleteOne();
 
     res.json({ message: "Exam and its marks deleted" });
@@ -135,34 +167,61 @@ export const deleteExam = async (req, res) => {
   }
 };
 
-// ✅ 3) Upsert Mark (create/update) (Teacher/SchoolAdmin)
+// Helper: resolve a student identifier (Mongo ObjectId or string studentId)
+// into the matching Student's Mongo _id. Returns null if no match.
+const resolveStudentId = async (schoolId, studentIdentifier) => {
+  if (!studentIdentifier) return null;
+  if (isValidId(studentIdentifier)) {
+    // It's a valid Mongo ObjectId shape — verify it actually belongs to this school
+    const s = await Student.findOne({ _id: studentIdentifier, schoolId }).select("_id");
+    if (s) return s._id;
+  }
+  // Try as the human-readable string studentId (e.g. "202607001")
+  const s = await Student.findOne({ studentId: studentIdentifier, schoolId }).select("_id");
+  return s ? s._id : null;
+};
+
+// ✅ 3) Upsert Mark (create/update) (Teacher/SchoolAdmin/SuperAdmin)
 export const upsertMark = async (req, res) => {
   try {
-    const { examId, studentId, subject, written = 0, mcq = 0, practical = 0 } = req.body;
+    const { examId, studentId, subject, written = 0, mcq = 0, practical = 0, schoolId: bodySchoolId } = req.body;
 
     if (!examId || !studentId || !subject) {
       return res.status(400).json({ message: "examId, studentId, subject required" });
     }
     if (!isValidId(examId)) return res.status(400).json({ message: "Invalid examId (must be ObjectId)" });
-    if (!isValidId(studentId)) return res.status(400).json({ message: "Invalid studentId (must be ObjectId)" });
 
-    const schoolId = req.user.schoolId;
-    if (!schoolId) return res.status(403).json({ message: "schoolId missing in token" });
+    const targetSchoolId = bodySchoolId || req.user.schoolId;
+    if (req.user.role === "superAdmin") {
+      if (!targetSchoolId) {
+        return res.status(400).json({ message: "Please pass schoolId when upserting marks as super admin." });
+      }
+    } else {
+      if (!targetSchoolId) {
+        return res.status(403).json({ message: "schoolId missing in token. Please log in again." });
+      }
+    }
+
+    // Resolve studentIdentifier (ObjectId OR string studentId) to real Mongo _id
+    const resolvedStudentId = await resolveStudentId(targetSchoolId, studentId);
+    if (!resolvedStudentId) {
+      return res.status(404).json({ message: "Student not found for this school — check studentId (or Mongo _id)." });
+    }
 
     // ✅ ensure exam belongs to same school
-    const exam = await Exam.findOne({ _id: examId, schoolId });
+    const exam = await Exam.findOne({ _id: examId, schoolId: targetSchoolId });
     if (!exam) return res.status(404).json({ message: "Exam not found for this school" });
 
     const total = Number(written || 0) + Number(mcq || 0) + Number(practical || 0);
     const { grade, gpa } = calcGradeGpa(total);
 
     const mark = await Mark.findOneAndUpdate(
-      { schoolId, examId, studentId, subject },
+      { schoolId: targetSchoolId, examId, studentId: resolvedStudentId, subject },
       {
         $set: {
-          schoolId,
+          schoolId: targetSchoolId,
           examId,
-          studentId,
+          studentId: resolvedStudentId,
           subject,
           written,
           mcq,
@@ -186,11 +245,17 @@ export const bulkUpsertMarks = async (req, res) => {
   const session = await mongoose.startSession();
 
   try {
-    const schoolId = req.user.schoolId;
+    const targetSchoolId = req.body.schoolId || req.user.schoolId;
     const { examId, marks = [] } = req.body;
 
-    if (!schoolId) {
-      return res.status(403).json({ message: "schoolId missing in token" });
+    if (req.user.role === "superAdmin") {
+      if (!targetSchoolId) {
+        return res.status(400).json({ message: "Please pass schoolId when saving marks as super admin." });
+      }
+    } else {
+      if (!targetSchoolId) {
+        return res.status(403).json({ message: "schoolId missing in token. Please log in again." });
+      }
     }
     if (!examId || !isValidId(examId)) {
       return res.status(400).json({ message: "Valid examId required" });
@@ -199,30 +264,34 @@ export const bulkUpsertMarks = async (req, res) => {
       return res.status(400).json({ message: "marks array is required" });
     }
 
-    const exam = await Exam.findOne({ _id: examId, schoolId });
+    const exam = await Exam.findOne({ _id: examId, schoolId: targetSchoolId });
     if (!exam) {
       return res.status(404).json({ message: "Exam not found for this school" });
     }
 
-    const invalidRow = marks.find(
-      (row) => !row.studentId || !isValidId(row.studentId) || !row.subject
-    );
-    if (invalidRow) {
-      return res.status(400).json({ message: "Each mark must include valid studentId and subject" });
+    // Resolve every row's studentId to a real Mongo _id (accept both ObjectId and string studentId)
+    const resolvedRows = [];
+    const failures = [];
+    for (let i = 0; i < marks.length; i++) {
+      const row = marks[i];
+      if (!row?.studentId || !row?.subject) {
+        failures.push({ row: i, error: "studentId and subject required" });
+        continue;
+      }
+      const sid = await resolveStudentId(targetSchoolId, row.studentId);
+      if (!sid) {
+        failures.push({ row: i, studentId: row.studentId, error: "Student not found in this school" });
+        continue;
+      }
+      resolvedRows.push({ ...row, resolvedStudentId: sid });
     }
 
-    const studentIds = [...new Set(marks.map((row) => row.studentId))];
-    const validStudents = await Student.find({
-      _id: { $in: studentIds },
-      schoolId,
-    }).select("_id");
-
-    if (validStudents.length !== studentIds.length) {
-      return res.status(400).json({ message: "One or more students do not belong to this school" });
+    if (resolvedRows.length === 0) {
+      return res.status(400).json({ message: "No valid student rows to save.", failures });
     }
 
     await session.withTransaction(async () => {
-      const operations = marks.map((row) => {
+      const operations = resolvedRows.map((row) => {
         const written = Number(row.written || 0);
         const mcq = Number(row.mcq || 0);
         const practical = Number(row.practical || 0);
@@ -232,16 +301,16 @@ export const bulkUpsertMarks = async (req, res) => {
         return {
           updateOne: {
             filter: {
-              schoolId,
+              schoolId: targetSchoolId,
               examId,
-              studentId: row.studentId,
+              studentId: row.resolvedStudentId,
               subject: row.subject,
             },
             update: {
               $set: {
-                schoolId,
+                schoolId: targetSchoolId,
                 examId,
-                studentId: row.studentId,
+                studentId: row.resolvedStudentId,
                 subject: row.subject,
                 written,
                 mcq,
@@ -262,7 +331,9 @@ export const bulkUpsertMarks = async (req, res) => {
 
     res.status(200).json({
       message: "Marks saved successfully",
-      totalProcessed: marks.length,
+      totalProcessed: resolvedRows.length,
+      totalFailed: failures.length,
+      failures: failures.length ? failures : undefined,
     });
   } catch (error) {
     if (error?.code === 11000) {
@@ -285,11 +356,21 @@ export const listMarks = async (req, res) => {
       className,
       section,
       search,
+      schoolId: qSchoolId,
     } = req.query;
     const { pageNum, limitNum, skip } = parsePagination(page, limit);
-    const schoolId = req.user.schoolId;
+    const targetSchoolId = qSchoolId || req.user.schoolId;
 
-    const filter = { schoolId };
+    const filter = {};
+    if (req.user.role === "superAdmin") {
+      if (qSchoolId) filter.schoolId = qSchoolId;
+    } else {
+      if (!targetSchoolId) {
+        return res.status(400).json({ message: "Your account is not linked to a school. Please log in again or contact super admin support." });
+      }
+      filter.schoolId = targetSchoolId;
+    }
+
     if (examId) {
       if (!isValidId(examId)) {
         return res.status(400).json({ message: "Invalid examId" });
@@ -297,17 +378,20 @@ export const listMarks = async (req, res) => {
       filter.examId = examId;
     }
     if (studentId) {
-      if (!isValidId(studentId)) {
-        return res.status(400).json({ message: "Invalid studentId" });
+      const resolvedSid = await resolveStudentId(targetSchoolId, studentId);
+      if (resolvedSid) {
+        filter.studentId = resolvedSid;
+      } else {
+        return res.json({ total: 0, page: pageNum, limit: limitNum, totalPages: 0, marks: [] });
       }
-      filter.studentId = studentId;
     }
     if (subject) {
       filter.subject = { $regex: subject, $options: "i" };
     }
 
     if (className || section || search) {
-      const studentFilter = { schoolId };
+      const studentFilter = {};
+      if (targetSchoolId) studentFilter.schoolId = targetSchoolId;
       if (className) studentFilter.className = className;
       if (section) studentFilter.section = section;
       if (search) {
@@ -357,8 +441,16 @@ export const listMarks = async (req, res) => {
 export const deleteMark = async (req, res) => {
   try {
     if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid mark id" });
-    const schoolId = req.user.schoolId;
-    const mark = await Mark.findOne({ _id: req.params.id, schoolId });
+    const targetSchoolId = req.query.schoolId || req.user.schoolId;
+
+    const mark = req.user.role === "superAdmin"
+      ? (targetSchoolId
+          ? await Mark.findOne({ _id: req.params.id, schoolId: targetSchoolId })
+          : await Mark.findById(req.params.id))
+      : (targetSchoolId
+          ? await Mark.findOne({ _id: req.params.id, schoolId: targetSchoolId })
+          : null);
+
     if (!mark) return res.status(404).json({ message: "Mark not found" });
 
     await mark.deleteOne();
@@ -368,24 +460,40 @@ export const deleteMark = async (req, res) => {
   }
 };
 
-// ✅ 4) Get Report Card (Student/Admin/Teacher)
+// ✅ 4) Get Report Card (Student/Admin/Teacher/SuperAdmin/Guardian)
 export const getReportCard = async (req, res) => {
   try {
-    const { examId, studentId } = req.query;
+    const { examId, studentId, schoolId: qSchoolId } = req.query;
 
     if (!examId || !studentId) {
       return res.status(400).json({ message: "examId and studentId required" });
     }
     if (!isValidId(examId)) return res.status(400).json({ message: "Invalid examId" });
-    if (!isValidId(studentId)) return res.status(400).json({ message: "Invalid studentId" });
 
-    const schoolId = req.user.schoolId;
-    if (!schoolId) return res.status(403).json({ message: "schoolId missing in token" });
+    const targetSchoolId = qSchoolId || req.user.schoolId;
+    if (req.user.role === "superAdmin") {
+      if (!targetSchoolId) {
+        return res.status(400).json({ message: "Please pass schoolId in query string when loading report card as super admin." });
+      }
+    } else {
+      if (!targetSchoolId) {
+        return res.status(403).json({ message: "schoolId missing in token. Please log in again." });
+      }
+    }
 
-    const exam = await Exam.findOne({ _id: examId, schoolId });
+    const exam = await Exam.findOne({ _id: examId, schoolId: targetSchoolId });
     if (!exam) return res.status(404).json({ message: "Exam not found for this school" });
 
-    const marks = await Mark.find({ schoolId, examId, studentId }).sort({ subject: 1 });
+    // Support both Mongo _id and string studentId for the student identifier
+    const resolvedStudentId = await resolveStudentId(targetSchoolId, studentId);
+    if (!resolvedStudentId) {
+      return res.status(404).json({ message: "Student not found for this school — check studentId." });
+    }
+
+    const student = await Student.findOne({ _id: resolvedStudentId, schoolId: targetSchoolId });
+    if (!student) return res.status(404).json({ message: "Student not found for this school" });
+
+    const marks = await Mark.find({ schoolId: targetSchoolId, examId, studentId: resolvedStudentId }).sort({ subject: 1 });
 
     if (!marks.length) {
       return res.status(404).json({ message: "No marks found for this student in this exam" });
@@ -403,7 +511,14 @@ export const getReportCard = async (req, res) => {
     res.json({
       message: "Report card fetched",
       exam,
-      studentId,
+      student: {
+        _id: student._id,
+        studentId: student.studentId,
+        studentName: student.studentName,
+        className: student.className,
+        section: student.section,
+        classRoll: student.classRoll,
+      },
       summary: {
         totalSubjects,
         totalMarks,
@@ -421,18 +536,26 @@ export const getReportCard = async (req, res) => {
 // one exam, plus every section of every class for the "whole school" view.
 export const getExamStats = async (req, res) => {
   try {
-    const { examId } = req.query;
+    const { examId, schoolId: qSchoolId } = req.query;
     if (!examId || !isValidId(examId)) {
       return res.status(400).json({ message: "Valid examId required" });
     }
 
-    const schoolId = req.user.schoolId;
-    if (!schoolId) return res.status(403).json({ message: "schoolId missing in token" });
+    const targetSchoolId = qSchoolId || req.user.schoolId;
+    if (req.user.role === "superAdmin") {
+      if (!targetSchoolId) {
+        return res.status(400).json({ message: "Please pass schoolId in query when loading stats as super admin." });
+      }
+    } else {
+      if (!targetSchoolId) {
+        return res.status(403).json({ message: "schoolId missing in token" });
+      }
+    }
 
-    const exam = await Exam.findOne({ _id: examId, schoolId });
+    const exam = await Exam.findOne({ _id: examId, schoolId: targetSchoolId });
     if (!exam) return res.status(404).json({ message: "Exam not found for this school" });
 
-    const marks = await Mark.find({ schoolId, examId }).select("studentId subject grade total");
+    const marks = await Mark.find({ schoolId: targetSchoolId, examId }).select("studentId subject grade total");
     if (!marks.length) {
       return res.json({
         message: "Exam stats fetched",

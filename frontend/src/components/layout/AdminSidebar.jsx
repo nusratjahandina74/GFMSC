@@ -18,6 +18,11 @@ import {
   ShieldCheck,
   CalendarDays,
   DollarSign,
+  Library,
+  Bus,
+  Wallet,
+  UserPlus,
+  IdCard,
 } from "lucide-react";
 import { getRole, logout, getUser } from "../../api/auth";
 import { useContext } from "react";
@@ -131,6 +136,36 @@ export default function AdminSidebar() {
       name: "Report Cards",
       path: "/admin/report-cards",
       icon: Award,
+      roles: ["schoolAdmin", "superAdmin"],
+    },
+    {
+      name: "Library",
+      path: "/admin/library",
+      icon: Library,
+      roles: ["schoolAdmin", "superAdmin"],
+    },
+    {
+      name: "Transport",
+      path: "/admin/transport",
+      icon: Bus,
+      roles: ["schoolAdmin", "superAdmin"],
+    },
+    {
+      name: "Payroll",
+      path: "/admin/payroll",
+      icon: Wallet,
+      roles: ["schoolAdmin", "superAdmin"],
+    },
+    {
+      name: "Admissions",
+      path: "/admin/admissions",
+      icon: UserPlus,
+      roles: ["schoolAdmin", "superAdmin"],
+    },
+    {
+      name: "ID Cards",
+      path: "/admin/id-cards",
+      icon: IdCard,
       roles: ["schoolAdmin", "superAdmin"],
     },
     {

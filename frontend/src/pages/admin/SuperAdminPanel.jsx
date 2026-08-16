@@ -5,6 +5,7 @@ import { Label } from "../../components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
+import { Button } from "../../components/ui/button";
 import { Plus, Loader2, Building2, Pencil, Trash2, Lock, Unlock, Users2 } from "lucide-react";
 import { listSchools, createSchool, updateSchool, deleteSchool } from "../../api/schools";
 import { listAllUsers, updateUserStatus, deleteUserAccount } from "../../api/userManagement";

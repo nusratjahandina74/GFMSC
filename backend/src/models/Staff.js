@@ -10,6 +10,9 @@ const staffSchema = new mongoose.Schema(
     address: { type: String, default: "" },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" }, // linked login account, if created
     schoolId: { type: mongoose.Schema.Types.ObjectId, ref: "School", required: false },
+
+    mpoIndexNumber: { type: String, trim: true, default: "" },
+    basicSalary: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

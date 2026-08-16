@@ -68,8 +68,18 @@ export const getTeachers = async (req, res) => {
     const skip = (pageNum - 1) * limitNum;
 
     const filter = {};
-    if (req.user.role !== "superAdmin") {
-      filter.schoolId = req.user.schoolId;
+    if (req.user.role === "superAdmin") {
+      // superAdmin can list all teachers; filter by schoolId if passed
+      const qSchoolId = req.query.schoolId;
+      if (qSchoolId) filter.schoolId = qSchoolId;
+    } else {
+      const scoped = req.user.schoolId;
+      if (!scoped) {
+        return res.status(400).json({
+          message: "Your account is not linked to a school. Please log in again or contact super admin support.",
+        });
+      }
+      filter.schoolId = scoped;
     }
 
     if (search) {

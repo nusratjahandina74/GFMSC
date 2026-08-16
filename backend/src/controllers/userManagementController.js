@@ -284,9 +284,9 @@ export const getMyProfile = async (req, res) => {
   try {
     let account;
     if (req.user.role === "student") {
-      account = await Student.findById(req.user.userId).select("-password");
+      account = await Student.findById(req.user.userId).select("-password -resetPasswordToken -resetPasswordExpires");
     } else if (req.user.role === "guardian") {
-      account = await Guardian.findById(req.user.userId).select("-password");
+      account = await Guardian.findById(req.user.userId).select("-password -resetPasswordToken -resetPasswordExpires");
     } else {
       account = await User.findById(req.user.userId)
         .select("-password -verificationToken -verificationTokenExpires -resetPasswordToken -resetPasswordExpires")
@@ -301,6 +301,7 @@ export const getMyProfile = async (req, res) => {
       _id: account._id,
       name: req.user.role === "student" ? account.studentName : account.name,
       email: account.email || "",
+      phone: account.phone || "",
       role: req.user.role,
       studentId: account.studentId || undefined,
       schoolId: account.schoolId || undefined,
@@ -308,36 +309,61 @@ export const getMyProfile = async (req, res) => {
 
     res.json({ user: userData });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("[getMyProfile Error]:", error);
+    res.status(500).json({ message: error.message || "Failed to load profile" });
   }
 };
 
-// Update my profile (supports all roles, cannot change email or role)
+// Update my profile (supports all roles, cannot change email, role, schoolId or password here).
+// Password changes MUST go through POST /api/auth/change-password which requires the current password.
 export const updateMyProfile = async (req, res) => {
   try {
-    const { name, password } = req.body;
+    const rawName = req.body?.name;
+    const rawPhone = req.body?.phone;
+
+    const name = typeof rawName === "string" ? rawName.trim() : "";
+    const phone = typeof rawPhone === "string" ? rawPhone.trim() : "";
+
+    if (!name) {
+      return res.status(400).json({ message: "Name is required." });
+    }
+
     let account;
     if (req.user.role === "student") {
       account = await Student.findById(req.user.userId);
-      if (account && name) account.studentName = name;
+      if (account) {
+        account.studentName = name;
+      }
     } else if (req.user.role === "guardian") {
       account = await Guardian.findById(req.user.userId);
-      if (account && name) account.name = name;
+      if (account) {
+        account.name = name;
+        if (account.phone !== undefined) {
+          account.phone = phone;
+        }
+      }
     } else {
       account = await User.findById(req.user.userId);
-      if (account && name) account.name = name;
+      if (account) {
+        account.name = name;
+        if (account.phone !== undefined) {
+          account.phone = phone;
+        }
+      }
     }
 
     if (!account) {
       return res.status(404).json({ message: "Account not found" });
     }
-    if (password && password.trim() !== "") account.password = password;
+
     await account.save();
 
     const updatedUser = {
       id: account._id,
+      _id: account._id,
       name: req.user.role === "student" ? account.studentName : account.name,
       email: account.email || "",
+      phone: account.phone || "",
       role: req.user.role,
       studentId: account.studentId || undefined,
       schoolId: account.schoolId || undefined,
@@ -345,6 +371,7 @@ export const updateMyProfile = async (req, res) => {
 
     res.json({ message: "Profile updated successfully", user: updatedUser });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("[updateMyProfile Error]:", error);
+    res.status(500).json({ message: error.message || "Failed to update profile" });
   }
 };

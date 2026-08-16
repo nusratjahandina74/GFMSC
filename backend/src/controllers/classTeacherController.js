@@ -9,9 +9,12 @@ export const getClassTeachers = async (req, res) => {
     const filter = {};
     const targetSchoolId = req.query.schoolId || req.user.schoolId;
     if (targetSchoolId) filter.schoolId = targetSchoolId;
+    if (req.query.className) filter.className = req.query.className;
+    if (req.query.section !== undefined) filter.section = req.query.section === "" ? "" : req.query.section;
+    if (req.query.shift !== undefined) filter.shift = req.query.shift === "" ? "" : req.query.shift;
 
     const classTeachers = await ClassTeacher.find(filter)
-      .populate("teacherId", "name email");
+      .populate("teacherId", "name email shift");
     res.json({ classTeachers });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -21,9 +24,11 @@ export const getClassTeachers = async (req, res) => {
 export const getClassTeacher = async (req, res) => {
   try {
     const { className, section } = req.params;
+    const { shift } = req.query;
     const targetSection = section === "undefined" || !section ? "" : section;
+    const targetShift = shift === "undefined" || !shift ? "" : shift;
     
-    const filter = { className, section: targetSection };
+    const filter = { className, section: targetSection, shift: targetShift };
     const targetSchoolId = req.query.schoolId || req.user.schoolId;
     if (targetSchoolId) filter.schoolId = targetSchoolId;
 
@@ -37,8 +42,10 @@ export const getClassTeacher = async (req, res) => {
 
 export const assignClassTeacher = async (req, res) => {
   try {
-    const { teacherId, className, section, schoolId, isFirstPeriodTeacher } = req.body;
+    const { teacherId, className, section, schoolId, isFirstPeriodTeacher, shift } = req.body;
     const targetSchoolId = schoolId || req.user.schoolId;
+    const targetSection = section || "";
+    const targetShift = shift || "";
 
     if (!teacherId || !className) {
       return res.status(400).json({ message: "teacherId and className are required" });
@@ -47,36 +54,32 @@ export const assignClassTeacher = async (req, res) => {
       return res.status(400).json({ message: "School ID is required to assign a class teacher" });
     }
 
-    const targetSection = section || "";
     const checkFirstPeriod = isFirstPeriodTeacher === "true" || isFirstPeriodTeacher === true;
 
     if (checkFirstPeriod) {
-     
       const teacherProfile = await Teacher.findById(teacherId);
       if (!teacherProfile || !teacherProfile.userId) {
         return res.status(400).json({ message: "Linked user login account not found for this teacher." });
       }
-
-     
-      const hasFirstPeriod = await Routine.findOne({
-        schoolId: targetSchoolId,
-        teacherId: teacherProfile._id, // Routine.teacherId refs the Teacher collection, not the linked User account — using userId here always returned false, permanently blocking the first-period eligibility check
-        className,
-        section: targetSection,
-        period: 1,
-      });
-
-      if (!hasFirstPeriod) {
-        return res.status(400).json({
-          message: `This teacher doesn't have a 1st-period class for ${className}${targetSection ? "-" + targetSection : ""} in the routine yet. Add that routine entry first, or leave "Is First Period Teacher" unchecked.`,
-        });
-      }
+      // NOTE: The 1st-period routine validation check has been intentionally REMOVED
+      // per user request. Previously this blocked class-teacher assignment with:
+      //   "This teacher doesn't have a 1st-period class..."
+      // Admins can now mark any teacher as "Is First Period Teacher" directly,
+      // even before their routine entry exists. The teacher visibility rule in
+      // studentController still restricts them to this assigned class/section.
     }
 
-    let classTeacher = await ClassTeacher.findOne({ schoolId: targetSchoolId, className, section: targetSection });
+    // Upsert by schoolId + className + section + shift — different shifts on the same class get their own class teacher.
+    let classTeacher = await ClassTeacher.findOne({
+      schoolId: targetSchoolId,
+      className,
+      section: targetSection,
+      shift: targetShift,
+    });
     if (classTeacher) {
       classTeacher.teacherId = teacherId;
       classTeacher.isFirstPeriodTeacher = checkFirstPeriod;
+      classTeacher.shift = targetShift;
       await classTeacher.save();
     } else {
       classTeacher = await ClassTeacher.create({
@@ -84,13 +87,18 @@ export const assignClassTeacher = async (req, res) => {
         teacherId,
         className,
         section: targetSection,
+        shift: targetShift,
         isFirstPeriodTeacher: checkFirstPeriod,
       });
     }
 
     res.json({ message: "Class teacher assigned successfully", classTeacher });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    if (error.code === 11000) {
+      res.status(409).json({ message: "A class teacher for this class/section/shift combination already exists." });
+    } else {
+      res.status(500).json({ message: error.message });
+    }
   }
 };
 
@@ -103,10 +111,11 @@ export const updateClassTeacherById = async (req, res) => {
     const classTeacher = await ClassTeacher.findOne(filter);
     if (!classTeacher) return res.status(404).json({ message: "Class teacher assignment not found" });
 
-    const { teacherId, className, section, isFirstPeriodTeacher } = req.body;
+    const { teacherId, className, section, isFirstPeriodTeacher, shift } = req.body;
     const nextTeacherId = teacherId ?? classTeacher.teacherId;
     const nextClassName = className ?? classTeacher.className;
     const nextSection = section !== undefined ? String(section).trim() : classTeacher.section;
+    const nextShift = shift !== undefined ? String(shift).trim() : (classTeacher.shift || "");
     
     let nextIsFirstPeriodTeacher = classTeacher.isFirstPeriodTeacher;
     if (isFirstPeriodTeacher !== undefined) {
@@ -118,25 +127,13 @@ export const updateClassTeacherById = async (req, res) => {
       if (!teacherProfile || !teacherProfile.userId) {
         return res.status(400).json({ message: "Linked user login account not found for this teacher." });
       }
-
-      const hasFirstPeriod = await Routine.findOne({
-        schoolId: classTeacher.schoolId,
-        teacherId: teacherProfile._id, // Routine.teacherId refs the Teacher collection, not the linked User account — using userId here always returned false, permanently blocking the first-period eligibility check
-        className: nextClassName,
-        section: nextSection,
-        period: 1,
-      });
-
-      if (!hasFirstPeriod) {
-        return res.status(400).json({
-          message: `This teacher doesn't have a 1st-period class for ${nextClassName}${nextSection ? "-" + nextSection : ""} in the routine. Add that routine entry first, or uncheck "Is First Period Teacher".`,
-        });
-      }
+      // NOTE: 1st-period routine validation REMOVED (see assignClassTeacher above).
     }
 
     classTeacher.teacherId = nextTeacherId;
     classTeacher.className = nextClassName;
     classTeacher.section = nextSection;
+    classTeacher.shift = nextShift;
     classTeacher.isFirstPeriodTeacher = nextIsFirstPeriodTeacher;
     await classTeacher.save();
 

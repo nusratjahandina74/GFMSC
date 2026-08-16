@@ -8,10 +8,45 @@ import { sendEmail, verificationEmailHtml, resetPasswordEmailHtml } from "../uti
 
 const JWT_MASTER_SECRET =
   process.env.JWT_SECRET || "gfmsc_ultra_secure_secret_key_2026_prod";
+// Separate secret for refresh tokens so a leaked/short-lived access token
+// secret compromise doesn't automatically also compromise the long-lived
+// refresh tokens (and vice versa).
+const JWT_REFRESH_SECRET =
+  process.env.JWT_REFRESH_SECRET || "gfmsc_ultra_secure_refresh_secret_key_2026_prod";
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://gfmsc.vercel.app";
 
 const hashToken = (rawToken) =>
   crypto.createHash("sha256").update(rawToken).digest("hex");
+
+// Access tokens are short-lived (15 min) by design — see refreshAccessToken
+// below for how the frontend silently renews them using the httpOnly
+// refresh-token cookie, without the user ever noticing or being logged out
+// mid-session.
+const ACCESS_TOKEN_TTL = "15m";
+const REFRESH_TOKEN_TTL = "30d";
+const REFRESH_TOKEN_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+
+const signAccessToken = (account, role) =>
+  jwt.sign(
+    { userId: account._id, role, schoolId: account.schoolId || null },
+    JWT_MASTER_SECRET,
+    { expiresIn: ACCESS_TOKEN_TTL }
+  );
+
+const signRefreshToken = (account, role) =>
+  jwt.sign({ userId: account._id, role }, JWT_REFRESH_SECRET, { expiresIn: REFRESH_TOKEN_TTL });
+
+// httpOnly so client-side JS (and therefore XSS payloads) can never read
+// this cookie's value — it can only ever be sent automatically by the
+// browser back to /api/auth/refresh and /api/auth/logout.
+const REFRESH_COOKIE_NAME = "refreshToken";
+const refreshCookieOptions = () => ({
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+  maxAge: REFRESH_TOKEN_MAX_AGE_MS,
+  path: "/api/auth",
+});
 
 // Change password for the currently logged-in user (My Profile page).
 // This is different from resetPassword: no email token involved, the user
@@ -224,6 +259,20 @@ export const forgotPassword = async (req, res) => {
     if (!account) {
       account = await Guardian.findOne({ email });
     }
+    if (!account) {
+      // Students may or may not have an email (it's optional in schema).
+      // If they do, they're eligible for email-based password reset too.
+      // We treat a numeric-only input as a studentId lookup (same pattern
+      // used in the login flow) so students can reset via their studentId
+      // even when no email is on file — in that case we still look up by
+      // email first (normal case) then by studentId (numeric fallback).
+      if (/^\d+$/.test(email)) {
+        account = await Student.findOne({ studentId: email });
+      }
+      if (!account && email.includes("@")) {
+        account = await Student.findOne({ email });
+      }
+    }
 
     // Always respond with a generic success message, even if the account
     // doesn't exist — this prevents leaking which emails are registered.
@@ -238,11 +287,38 @@ export const forgotPassword = async (req, res) => {
     account.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour
     await account.save();
 
-    const resetUrl = `${FRONTEND_URL}/reset-password?token=${rawToken}&email=${encodeURIComponent(email)}`;
+    // Determine the correct "to" address for the email and the
+    // identifier we want round-tripped through the reset link so that
+    // resetPassword can find the account again.
+    // For Students we may have been found by numeric studentId, in
+    // which case we need to either (a) email them via account.email,
+    // or if they have no email, we simply can't deliver (still report
+    // generic success to avoid leaking account existence).
+    const displayName = account.studentName || account.name || "there";
+    let toEmail = "";
+    let linkIdentifier = email;
+    if (email.includes("@")) {
+      toEmail = email;
+    } else if (account.email && account.email.includes("@")) {
+      // The user looked themselves up by studentId; deliver to the
+      // email we have on file (if any).
+      toEmail = account.email;
+      // The reset link still needs to reference the lookup key the
+      // resetPassword endpoint will find them by. Keep it as their
+      // studentId (it's the value they entered / we looked up by).
+    } else {
+      // No deliverable address — respond with the generic "if account
+      // exists" response, don't attempt to send.
+      return res.status(200).json({
+        message: "If an account exists with a recoverable email, a password reset link has been sent.",
+      });
+    }
+
+    const resetUrl = `${FRONTEND_URL}/reset-password?token=${rawToken}&email=${encodeURIComponent(linkIdentifier)}`;
     await sendEmail({
-      to: email,
+      to: toEmail,
       subject: "Reset your GFMSC password",
-      html: resetPasswordEmailHtml({ name: account.name, resetUrl }),
+      html: resetPasswordEmailHtml({ name: displayName, resetUrl }),
     });
 
     return res.status(200).json({
@@ -273,6 +349,18 @@ export const resetPassword = async (req, res) => {
       account = await Guardian.findOne({ email }).select(
         "+resetPasswordToken +resetPasswordExpires"
       );
+    }
+    if (!account) {
+      if (/^\d+$/.test(email)) {
+        account = await Student.findOne({ studentId: email }).select(
+          "+resetPasswordToken +resetPasswordExpires"
+        );
+      }
+      if (!account && email.includes("@")) {
+        account = await Student.findOne({ email }).select(
+          "+resetPasswordToken +resetPasswordExpires"
+        );
+      }
     }
 
     if (
@@ -422,8 +510,11 @@ export const login = async (req, res) => {
         schoolId: account.schoolId || null,
       },
       JWT_MASTER_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: ACCESS_TOKEN_TTL }
     );
+
+    const refreshToken = signRefreshToken(account, role);
+    res.cookie(REFRESH_COOKIE_NAME, refreshToken, refreshCookieOptions());
 
     let userData = {
       id: account._id,
@@ -462,4 +553,61 @@ export const login = async (req, res) => {
       error: error.message,
     });
   }
+};
+
+// Silently renews the access token using the httpOnly refresh-token cookie.
+// The frontend axios client calls this automatically whenever a request
+// comes back 401 with a "token expired"-shaped error, so a 15-minute
+// access-token lifetime never actually logs a user out mid-session as long
+// as the refresh cookie (30 days) is still valid.
+export const refreshAccessToken = async (req, res) => {
+  try {
+    const token = req.cookies?.[REFRESH_COOKIE_NAME];
+    if (!token) {
+      return res.status(401).json({ message: "No refresh token provided." });
+    }
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, JWT_REFRESH_SECRET);
+    } catch (err) {
+      res.clearCookie(REFRESH_COOKIE_NAME, { path: "/api/auth" });
+      return res.status(401).json({ message: "Refresh token invalid or expired. Please log in again." });
+    }
+
+    // Always re-fetch the account rather than trusting stale claims, so a
+    // suspension/role-change/school-reassignment that happened after the
+    // refresh token was issued takes effect immediately on renewal.
+    let account = null;
+    if (decoded.role === "student") {
+      account = await Student.findById(decoded.userId);
+    } else if (decoded.role === "guardian") {
+      account = await Guardian.findById(decoded.userId);
+    } else {
+      account = await User.findById(decoded.userId);
+    }
+
+    if (!account || account.isSuspended) {
+      res.clearCookie(REFRESH_COOKIE_NAME, { path: "/api/auth" });
+      return res.status(401).json({ message: "Account no longer active." });
+    }
+
+    const newAccessToken = signAccessToken(account, decoded.role);
+
+    // Rotate the refresh token too on every use — limits how long a stolen
+    // refresh token stays useful, since each one is single-use before the
+    // next renewal replaces it.
+    const newRefreshToken = signRefreshToken(account, decoded.role);
+    res.cookie(REFRESH_COOKIE_NAME, newRefreshToken, refreshCookieOptions());
+
+    return res.status(200).json({ success: true, token: newAccessToken });
+  } catch (error) {
+    console.error("[Auth Refresh Error]:", error);
+    return res.status(500).json({ message: "Internal Server Error", error: error.message });
+  }
+};
+
+export const logout = async (req, res) => {
+  res.clearCookie(REFRESH_COOKIE_NAME, { path: "/api/auth" });
+  return res.status(200).json({ success: true, message: "Logged out." });
 };

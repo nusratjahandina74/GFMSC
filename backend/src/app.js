@@ -3,6 +3,8 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
+import rateLimit from "express-rate-limit";
+import cookieParser from "cookie-parser";
 
 import authRoutes from "./routes/authRoutes.js";
 import schoolRoutes from "./routes/schoolRoutes.js";
@@ -31,6 +33,11 @@ import leaveRoutes from "./routes/leaveRoutes.js";
 import guardianRoutes from "./routes/guardianRoutes.js";
 import shiftTemplateRoutes from "./routes/shiftTemplateRoutes.js";
 import examDutyRoutes from "./routes/examDutyRoutes.js";
+import libraryRoutes from "./routes/libraryRoutes.js";
+import transportRoutes from "./routes/transportRoutes.js";
+import payrollRoutes from "./routes/payrollRoutes.js";
+import admissionRoutes from "./routes/admissionRoutes.js";
+import idCardRoutes from "./routes/idCardRoutes.js";
 
 const app = express();
 
@@ -61,6 +68,7 @@ app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // Email addresses are case-insensitive by convention (RFC 5321 says the
 // local part technically isn't, but in practice every major provider treats
@@ -81,6 +89,31 @@ app.use((req, res, next) => {
   console.log(`[API LOG] REQ: ${req.method} ${req.url}`);
   next();
 });
+
+// express-rate-limit was already a dependency but was never wired into the
+// app, so nothing actually stopped a single client from hammering the API.
+// A generous global limit protects the whole server from being knocked
+// over; a much tighter limit on /api/auth specifically slows down
+// credential-stuffing / brute-force login attempts without affecting
+// normal dashboard usage.
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 600, // ~40 requests/minute per IP across the whole API
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: "Too many requests, please try again later." },
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20, // 20 login/register/reset attempts per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: "Too many auth attempts, please try again later." },
+});
+
+app.use("/api/", globalLimiter);
+app.use("/api/auth", authLimiter);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/schools", schoolRoutes);
@@ -109,10 +142,71 @@ app.use("/api/leaves", leaveRoutes);
 app.use("/api/guardians", guardianRoutes);
 app.use("/api/shift-templates", shiftTemplateRoutes);
 app.use("/api/exam-duties", examDutyRoutes);
+app.use("/api/library", libraryRoutes);
+app.use("/api/transport", transportRoutes);
+app.use("/api/payroll", payrollRoutes);
+app.use("/api/admissions", admissionRoutes);
+app.use("/api/id-cards", idCardRoutes);
 
 
 app.get("/", (req, res) => {
   res.status(200).json({ success: true, message: "GFMSC School Management Backend Server is Fully Running!" });
+});
+
+app.get("/api/health/status", async (req, res) => {
+  try {
+    const mongoose = await import("mongoose");
+    const dbState = mongoose.default.connection.readyState;
+    const dbStatus = ["disconnected", "connected", "connecting", "disconnecting"][dbState] || "unknown";
+    let queueStatus = { mode: "memory" };
+    let paymentStatus = { mode: "sandbox-demo" };
+    try {
+      const q = await import("./config/queue.js");
+      queueStatus = q.queueConfig;
+    } catch {}
+    try {
+      const p = await import("./utils/paymentGateway.js");
+      paymentStatus = p.paymentConfig;
+    } catch {}
+    let pdfFonts = { banglaEnabled: false };
+    try {
+      const pdf = await import("./controllers/pdfController.js");
+      pdfFonts = pdf.pdfFontConfig;
+    } catch {}
+    res.status(200).json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      database: {
+        status: dbStatus,
+        uriSet: Boolean(process.env.MONGO_URI),
+      },
+      queue: queueStatus,
+      payments: paymentStatus,
+      pdf: {
+        banglaFont: pdfFonts.banglaEnabled,
+        banglaFontPath: pdfFonts.banglaFontPath || null,
+        fontsDir: pdfFonts.fontsDir || null,
+      },
+      memory: {
+        rssMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
+        heapUsedMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+      },
+      nodeVersion: process.version,
+      platform: process.platform,
+    });
+  } catch (err) {
+    res.status(200).json({ success: true, degraded: true, message: err.message });
+  }
+});
+
+app.get("/api/health/payment-config", async (req, res) => {
+  try {
+    const { paymentConfig } = await import("./utils/paymentGateway.js");
+    res.status(200).json({ success: true, config: paymentConfig });
+  } catch (err) {
+    res.status(200).json({ success: true, config: { mode: "sandbox-demo", note: err.message } });
+  }
 });
 
 app.use((err, req, res, next) => {

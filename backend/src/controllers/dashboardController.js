@@ -123,16 +123,84 @@ export const getTeacherDashboard = async (req, res) => {
 export const getStudentDashboard = async (req, res) => {
   try {
     const schoolId = req.user.schoolId;
+    const studentId = req.user.userId;
 
     if (!schoolId) {
       return res.status(200).json({
         message: "Dashboard fetched",
+        student: null,
+        attendanceRate: null,
+        latestGpa: null,
+        totalDue: 0,
+        latestMarks: [],
+        todayRoutine: [],
       });
+    }
+
+    const student = await Student.findById(studentId).lean();
+
+    const attendanceDocs = await Attendance.find({
+      schoolId,
+      className: student?.className,
+      section: student?.section || "",
+      "records.studentId": studentId,
+    }).lean();
+    let presentCount = 0;
+    let totalCount = 0;
+    attendanceDocs.forEach((doc) => {
+      const rec = doc.records?.find((r) => String(r.studentId) === String(studentId));
+      if (rec) {
+        totalCount++;
+        if (rec.status === "present") presentCount++;
+      }
+    });
+    const attendanceRate = totalCount > 0 ? Math.round((presentCount / totalCount) * 100) : null;
+
+    const latestExam = await Exam.findOne({
+      schoolId,
+      className: student?.className,
+      section: student?.section || "",
+    }).sort({ date: -1, createdAt: -1 }).lean();
+
+    const latestMarks = latestExam
+      ? await Mark.find({ examId: latestExam._id, studentId }).lean()
+      : [];
+    let latestGpa = null;
+    if (latestMarks.length > 0) {
+      const totalGpa = latestMarks.reduce((s, m) => s + (Number(m.gpa) || 0), 0);
+      latestGpa = (totalGpa / latestMarks.length).toFixed(2);
+    }
+
+    const unpaidInvoices = await Invoice.find({
+      schoolId,
+      studentId,
+      status: { $ne: "paid" },
+    }).lean();
+    const totalDue = unpaidInvoices.reduce((s, inv) => s + (Number(inv.amount) || 0), 0);
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const dayOfWeek = new Date().toLocaleDateString("en-US", { weekday: "long" });
+    let todayRoutine = [];
+    try {
+      const Routine = (await import("../models/Routine.js")).default;
+      todayRoutine = await Routine.find({
+        schoolId,
+        className: student?.className,
+        section: student?.section || "",
+        $or: [{ day: dayOfWeek }, { date: todayStr }],
+      }).sort({ period: 1 }).populate("teacherId", "name").lean();
+    } catch {
+      todayRoutine = [];
     }
 
     res.status(200).json({
       message: "Dashboard fetched",
-      schoolId,
+      student,
+      attendanceRate,
+      latestGpa,
+      totalDue,
+      latestMarks,
+      todayRoutine,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

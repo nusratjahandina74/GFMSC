@@ -45,19 +45,19 @@ router.get(
 
 router.get(
   "/teacher",
-  authMiddleware(["teacher", "schoolAdmin"]),
+  authMiddleware(["teacher", "schoolAdmin", "superAdmin"]),
   getTeacherDashboard
 );
 
 router.get(
   "/student",
-  authMiddleware(["student", "schoolAdmin"]),
+  authMiddleware(["student", "schoolAdmin", "superAdmin"]),
   getStudentDashboard
 );
 
 router.get(
   "/guardian",
-  authMiddleware(["guardian"]),
+  authMiddleware(["guardian", "schoolAdmin", "superAdmin"]),
   guardianDashboard
 );
 

@@ -5,6 +5,7 @@ const studentSchema = new mongoose.Schema(
   {
     studentName: { type: String, required: true, trim: true },
     studentId: { type: String, unique: true, required: true, index: true, trim: true },
+    email: { type: String, lowercase: true, trim: true, default: "" },
     password: { type: String, required: true },
     className: {
       type: String,
@@ -35,7 +36,10 @@ const studentSchema = new mongoose.Schema(
       ref: "School",
       required: true
     },
-    isSuspended: { type: Boolean, default: false }
+    monthlyFee: { type: Number, default: 0 },
+    isSuspended: { type: Boolean, default: false },
+    resetPasswordToken: { type: String, select: false },
+    resetPasswordExpires: { type: Date, select: false },
   },
   { timestamps: true }
 );

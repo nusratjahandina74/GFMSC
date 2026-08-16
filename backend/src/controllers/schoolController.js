@@ -204,7 +204,7 @@ export const setupMySchool = async (req, res) => {
     const token = jwt.sign(
       { userId: user._id, role: user.role, schoolId: school._id },
       JWT_MASTER_SECRET,
-      { expiresIn: "7d" }
+      { expiresIn: "15m" }
     );
 
     res.status(201).json({
@@ -228,7 +228,18 @@ export const setupMySchool = async (req, res) => {
 // ✏️ Update a school + its school admin (SuperAdmin only)
 export const updateSchoolBySuperAdmin = async (req, res) => {
   try {
-    const { schoolName, schoolEmail, phone, address, isActive, adminName, adminEmail } = req.body;
+    const {
+      schoolName,
+      schoolEmail,
+      phone,
+      address,
+      isActive,
+      adminName,
+      adminEmail,
+      subdomain,
+      plan,
+      subscriptionExpiresAt,
+    } = req.body;
 
     const school = await School.findById(req.params.id);
     if (!school) return res.status(404).json({ message: "School not found." });
@@ -238,6 +249,11 @@ export const updateSchoolBySuperAdmin = async (req, res) => {
     if (phone !== undefined) school.phone = phone;
     if (address !== undefined) school.address = address;
     if (isActive !== undefined) school.isActive = isActive;
+    // Subscription/billing fields — this is the "manage subscription,
+    // toggle modules, track payment" super-admin panel from the spec.
+    if (subdomain !== undefined) school.subdomain = subdomain ? subdomain.toLowerCase().trim() : undefined;
+    if (plan !== undefined) school.plan = plan;
+    if (subscriptionExpiresAt !== undefined) school.subscriptionExpiresAt = subscriptionExpiresAt;
     await school.save();
 
     // Keep the linked schoolAdmin account's name/email in sync if provided

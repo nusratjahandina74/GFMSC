@@ -8,7 +8,7 @@ const classTeacherSchema = new mongoose.Schema({
   },
   teacherId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Teacher", // stores Teacher document IDs (confirmed by every query site) — was incorrectly labeled "User" here, which made .populate('teacherId') look in the wrong collection and silently return null
+    ref: "Teacher",
     required: true
   },
   className: {
@@ -23,8 +23,14 @@ const classTeacherSchema = new mongoose.Schema({
     type: String,
     default: "" 
   },
+  shift: {
+    type: String,
+    default: "",
+  },
   isFirstPeriodTeacher: { type: Boolean, default: false }
 }, { timestamps: true });
+
+classTeacherSchema.index({ schoolId: 1, className: 1, section: 1, shift: 1 }, { unique: true });
 
 const ClassTeacher = mongoose.model("ClassTeacher", classTeacherSchema);
 

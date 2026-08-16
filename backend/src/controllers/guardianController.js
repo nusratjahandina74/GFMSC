@@ -4,12 +4,23 @@ import bcrypt from "bcryptjs";
 // Create Guardian
 export const createGuardian = async (req, res) => {
   try {
-    const { name, email, password, phone, children } = req.body;
+    const { name, email, password, phone, children, schoolId: bodySchoolId } = req.body;
+    const targetSchoolId = bodySchoolId || req.user.schoolId;
+
+    if (req.user.role === "superAdmin") {
+      if (!targetSchoolId) {
+        return res.status(400).json({ message: "Please pass schoolId when creating a guardian as super admin." });
+      }
+    } else if (!targetSchoolId) {
+      return res.status(400).json({
+        message: "Your account is not linked to a school. Please log in again or contact super admin support.",
+      });
+    }
 
     // Check if email already exists
-    const existing = await Guardian.findOne({ email });
+    const existing = await Guardian.findOne({ email, schoolId: targetSchoolId });
     if (existing) {
-      return res.status(400).json({ message: "Email already in use" });
+      return res.status(400).json({ message: "Email already in use for this school" });
     }
 
     const guardian = new Guardian({
@@ -18,7 +29,7 @@ export const createGuardian = async (req, res) => {
       password,
       phone,
       children: children || [],
-      schoolId: req.user.schoolId,
+      schoolId: targetSchoolId,
     });
 
     await guardian.save();
@@ -35,14 +46,22 @@ export const createGuardian = async (req, res) => {
 // Get All Guardians
 export const getGuardians = async (req, res) => {
   try {
-    const { page = 1, limit = 20, search } = req.query;
+    const { page = 1, limit = 20, search, schoolId: qSchoolId } = req.query;
     const pageNum = Math.max(1, parseInt(page));
     const limitNum = Math.min(100, Math.max(1, parseInt(limit)));
     const skip = (pageNum - 1) * limitNum;
 
     const filter = {};
-    if (req.user.role !== "superAdmin") {
-      filter.schoolId = req.user.schoolId;
+    if (req.user.role === "superAdmin") {
+      if (qSchoolId) filter.schoolId = qSchoolId;
+    } else {
+      const scoped = qSchoolId || req.user.schoolId;
+      if (!scoped) {
+        return res.status(400).json({
+          message: "Your account is not linked to a school. Please log in again or contact super admin support.",
+        });
+      }
+      filter.schoolId = scoped;
     }
 
     if (search) {
@@ -75,8 +94,17 @@ export const getGuardians = async (req, res) => {
 export const getGuardianById = async (req, res) => {
   try {
     const filter = { _id: req.params.id };
-    if (req.user.role !== "superAdmin") {
-      filter.schoolId = req.user.schoolId;
+    if (req.user.role === "superAdmin") {
+      const qSchoolId = req.query.schoolId;
+      if (qSchoolId) filter.schoolId = qSchoolId;
+    } else {
+      const scoped = req.user.schoolId;
+      if (!scoped) {
+        return res.status(400).json({
+          message: "Your account is not linked to a school. Please log in again or contact super admin support.",
+        });
+      }
+      filter.schoolId = scoped;
     }
 
     const guardian = await Guardian.findOne(filter).populate(
@@ -97,8 +125,17 @@ export const getGuardianById = async (req, res) => {
 export const updateGuardian = async (req, res) => {
   try {
     const filter = { _id: req.params.id };
-    if (req.user.role !== "superAdmin") {
-      filter.schoolId = req.user.schoolId;
+    if (req.user.role === "superAdmin") {
+      const qSchoolId = req.query.schoolId || req.body.schoolId;
+      if (qSchoolId) filter.schoolId = qSchoolId;
+    } else {
+      const scoped = req.user.schoolId;
+      if (!scoped) {
+        return res.status(400).json({
+          message: "Your account is not linked to a school. Please log in again or contact super admin support.",
+        });
+      }
+      filter.schoolId = scoped;
     }
 
     const guardian = await Guardian.findOne(filter);
@@ -123,8 +160,17 @@ export const updateGuardian = async (req, res) => {
 export const deleteGuardian = async (req, res) => {
   try {
     const filter = { _id: req.params.id };
-    if (req.user.role !== "superAdmin") {
-      filter.schoolId = req.user.schoolId;
+    if (req.user.role === "superAdmin") {
+      const qSchoolId = req.query.schoolId;
+      if (qSchoolId) filter.schoolId = qSchoolId;
+    } else {
+      const scoped = req.user.schoolId;
+      if (!scoped) {
+        return res.status(400).json({
+          message: "Your account is not linked to a school. Please log in again or contact super admin support.",
+        });
+      }
+      filter.schoolId = scoped;
     }
 
     const guardian = await Guardian.findOneAndDelete(filter);

@@ -22,6 +22,12 @@ const teacherSchema = new mongoose.Schema(
     },
 
     isActive: { type: Boolean, default: true },
+
+    // MPO / govt.-reporting + payroll fields. Optional because most schools
+    // in this system are non-MPO or haven't entered payroll data yet; the
+    // Payroll module only requires basicSalary to be set.
+    mpoIndexNumber: { type: String, trim: true, default: "" }, // Govt. MPO index no.
+    basicSalary: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

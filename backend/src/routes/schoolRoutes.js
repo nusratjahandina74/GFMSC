@@ -8,9 +8,27 @@ import {
   updateSchoolBySuperAdmin,
   deleteSchoolBySuperAdmin,
 } from "../controllers/schoolController.js";
+import School from "../models/School.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
+
+// 🌐 Public — resolve a school by its subdomain (e.g. for a public admission
+// page / landing page that needs to know which school it belongs to just
+// from the URL, without requiring login). Returns only non-sensitive
+// branding fields — never anything from inside the school's data.
+router.get("/by-subdomain/:subdomain", async (req, res) => {
+  try {
+    const school = await School.findOne({
+      subdomain: req.params.subdomain.toLowerCase(),
+      isActive: true,
+    }).select("_id name plan");
+    if (!school) return res.status(404).json({ message: "School not found" });
+    res.json({ school });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
 
 // 🏫 List all schools (SuperAdmin only) — overview panel
 router.get("/", authMiddleware(["superAdmin"]), listSchools);

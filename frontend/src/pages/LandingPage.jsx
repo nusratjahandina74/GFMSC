@@ -36,7 +36,8 @@ export default function LandingPage() {
 
   const school = useMemo(() => ({
     name: "GFMSC",
-    whatsapp: "8801711687761", // ✅ replace
+    whatsapp: "8801747947947",
+    whatsappDisplay: "01747947947",
     address: "40/4, Ward No-72, South City Corporation, Manda, Mugdha, Dhaka, Bangladesh",
     mapEmbedUrl: "https://www.google.com/maps/dir//Glory+Future+Model+School+and+College,+Dipa+Kunzo+80+North+Manda,+63,+Dhaka+1214/@23.7273088,90.4429568,14z/data=!4m8!4m7!1m0!1m5!1m1!1s0x3755b83baa8360d3:0xf3b769b38af6c1bb!2m2!1d90.4384285!2d23.7300848?entry=ttu&g_ep=EgoyMDI2MDIwNC4wIKXMDSoKLDEwMDc5MjA2N0gBUAM%3D", // ✅ replace with real map
   }), []);
@@ -454,11 +455,23 @@ const onDemoSubmit = async (e) => {
                 />
               </div>
 
+              <div style={{ marginTop: 12, fontWeight: "bold" }}>
+                💬 WhatsApp / Hotline:{" "}
+                <a
+                  href={`https://wa.me/${school.whatsapp}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ color: "inherit", textDecoration: "underline" }}
+                >
+                  {school.whatsappDisplay}
+                </a>
+              </div>
+
               <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
                 {/* <button className="btn" onClick={() => nav("/login")}>Login</button> */}
                 <a
                   className="btn btnPrimary"
-                  href={`https://wa.me/${school.whatsapp}?text=${encodeURIComponent("Hello, I want to know about admission and scholarship.")}`}
+                  href={`https://wa.me/${school.whatsapp}?text=${encodeURIComponent(`Hello! I saw your website (${school.whatsappDisplay}). I want to know about admission, fees, and scholarship details.`)}`}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -481,7 +494,7 @@ const onDemoSubmit = async (e) => {
       <button
         className="fab"
         title="WhatsApp"
-        onClick={() => window.open(`https://wa.me/${school.whatsapp}`, "_blank")}
+        onClick={() => window.open(`https://wa.me/${school.whatsapp}?text=${encodeURIComponent(`Hello! I saw your website (${school.whatsappDisplay}). I want to know about admission, fees, and scholarship details.`)}`, "_blank")}
       >
         WA
       </button>

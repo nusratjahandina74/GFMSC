@@ -4,9 +4,9 @@ import { createExam, listExams, updateExam, deleteExam } from "../controllers/ex
 
 const router = express.Router();
 
-router.post("/", authMiddleware(["schoolAdmin", "teacher"]), createExam);
-router.get("/", authMiddleware(["schoolAdmin", "teacher"]), listExams);
-router.put("/:id", authMiddleware(["schoolAdmin"]), updateExam);
-router.delete("/:id", authMiddleware(["schoolAdmin"]), deleteExam);
+router.post("/", authMiddleware(["schoolAdmin", "teacher", "superAdmin"]), createExam);
+router.get("/", authMiddleware(["schoolAdmin", "teacher", "superAdmin"]), listExams);
+router.put("/:id", authMiddleware(["schoolAdmin", "superAdmin"]), updateExam);
+router.delete("/:id", authMiddleware(["schoolAdmin", "superAdmin"]), deleteExam);
 
 export default router;

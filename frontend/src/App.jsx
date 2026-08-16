@@ -35,6 +35,13 @@ import Attendance from "./pages/teacher/Attendance";
 import Routine from "./pages/Routine";
 import MyLeaves from "./pages/MyLeaves";
 import Unauthorized from "./pages/Unauthorized";
+import LibraryPage from "./pages/admin/Library";
+import TransportPage from "./pages/admin/Transport";
+import PayrollPage from "./pages/admin/Payroll";
+import AdmissionsPage from "./pages/admin/Admissions";
+import IdCardsPage from "./pages/admin/IdCards";
+import PublicAdmissionApply from "./pages/PublicAdmissionApply";
+import SuperAdminPanel from "./pages/admin/SuperAdminPanel";
 import { getRole, isLoggedIn, getUser } from "./api/auth";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Register from "./pages/Auth/Register";
@@ -125,6 +132,7 @@ export default function App() {
 
           {/* Public pages */}
           <Route path="/notices" element={<NoticeList />} />
+          <Route path="/admission/apply/:schoolId" element={<PublicAdmissionApply />} />
           <Route path="/notices/:id" element={<NoticeDetails />} />
           <Route path="/blog" element={<BlogList />} />
           <Route path="/blog/:id" element={<BlogDetails />} />
@@ -261,34 +269,50 @@ export default function App() {
               }
             />
             <Route
-              path="leaves"
+              path="library"
               element={
                 <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
-                  <AdminLeaves />
+                  <LibraryPage />
                 </RequireRole>
               }
             />
             <Route
-              path="fees-dues"
+              path="transport"
               element={
                 <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
-                  <AdminFeesDues />
+                  <TransportPage />
                 </RequireRole>
               }
             />
             <Route
-              path="leaves"
+              path="payroll"
               element={
                 <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
-                  <AdminLeaves />
+                  <PayrollPage />
                 </RequireRole>
               }
             />
             <Route
-              path="fees-dues"
+              path="admissions"
               element={
                 <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
-                  <AdminFeesDues />
+                  <AdmissionsPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="id-cards"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin", "staff"]}>
+                  <IdCardsPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="super-admin"
+              element={
+                <RequireRole allowedRoles={["superAdmin"]}>
+                  <SuperAdminPanel />
                 </RequireRole>
               }
             />
@@ -486,6 +510,48 @@ export default function App() {
               element={
                 <RequireRole allowedRoles={["teacher", "staff"]}>
                   <MyLeaves />
+                </RequireRole>
+              }
+            />
+
+            {/* New modules: Library, Transport, Payroll, Admissions, ID Cards */}
+            <Route
+              path="library"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin", "staff", "teacher"]}>
+                  <LibraryPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="transport"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <TransportPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="payroll"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <PayrollPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="admissions"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <AdmissionsPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="id-cards"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin", "staff"]}>
+                  <IdCardsPage />
                 </RequireRole>
               }
             />

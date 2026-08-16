@@ -8,7 +8,12 @@ const guardianSchema = new mongoose.Schema(
     password: { type: String, required: true },
     phone: { type: String, trim: true },
     children: [{ type: mongoose.Schema.Types.ObjectId, ref: "Student" }],
-    isSuspended: { type: Boolean, default: false }
+    schoolId: { type: mongoose.Schema.Types.ObjectId, ref: "School", default: null },
+    isSuspended: { type: Boolean, default: false },
+    emailVerified: { type: Boolean, default: true },
+    mustChangePassword: { type: Boolean, default: false },
+    resetPasswordToken: { type: String, select: false },
+    resetPasswordExpires: { type: Date, select: false },
   },
   { timestamps: true }
 );

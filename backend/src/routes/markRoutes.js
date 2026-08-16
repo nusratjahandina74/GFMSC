@@ -4,8 +4,8 @@ import { upsertMark, bulkUpsertMarks, getStudentReportCard } from "../controller
 
 const router = express.Router();
 
-router.post("/", authMiddleware(["teacher", "schoolAdmin"]), upsertMark);
-router.post("/bulk", authMiddleware(["teacher", "schoolAdmin"]), bulkUpsertMarks);
-router.get("/report-card", authMiddleware(["teacher", "schoolAdmin", "student"]), getStudentReportCard);
+router.post("/", authMiddleware(["teacher", "schoolAdmin", "superAdmin"]), upsertMark);
+router.post("/bulk", authMiddleware(["teacher", "schoolAdmin", "superAdmin"]), bulkUpsertMarks);
+router.get("/report-card", authMiddleware(["teacher", "schoolAdmin", "student", "guardian", "superAdmin"]), getStudentReportCard);
 
 export default router;

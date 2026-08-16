@@ -5,9 +5,13 @@ import ClassSubject from "../models/ClassSubject.js";
 
 export const createExam = async (req, res) => {
   try {
-    const { name, term, className, section, date } = req.body;
+    const { name, term, className, section, date, schoolId } = req.body;
+    const targetSchoolId = schoolId || req.user.schoolId;
     if (!name || !term || !className) {
       return res.status(400).json({ message: "name, term, className required" });
+    }
+    if (req.user.role !== "superAdmin" && !targetSchoolId) {
+      return res.status(400).json({ message: "School ID is required to create an exam." });
     }
 
     let examType = "Class Test";
@@ -44,8 +48,12 @@ export const createExam = async (req, res) => {
       return res.status(403).json({ message: "Access denied." });
     }
 
+    if (!targetSchoolId) {
+      return res.status(400).json({ message: "School ID is required to create an exam." });
+    }
+
     const exam = await Exam.create({
-      schoolId: req.user.schoolId,
+      schoolId: targetSchoolId,
       name,
       examType,
       term,
@@ -90,8 +98,19 @@ export const deleteExam = async (req, res) => {
 
 export const listExams = async (req, res) => {
   try {
-    const { className, section, term, page = 1, limit = 10 } = req.query;
-    const q = { schoolId: req.user.schoolId };
+    const { className, section, term, page = 1, limit = 10, schoolId } = req.query;
+    const targetSchoolId = schoolId || req.user.schoolId;
+
+    const q = {};
+    if (req.user.role === "superAdmin") {
+      if (schoolId) q.schoolId = schoolId;
+    } else {
+      if (!targetSchoolId) {
+        return res.status(400).json({ message: "Your account is not linked to a school. Please log in again or contact super admin support." });
+      }
+      q.schoolId = targetSchoolId;
+    }
+
     if (className) q.className = className;
     if (section) q.section = section;
     if (term) q.term = term;
@@ -100,12 +119,12 @@ export const listExams = async (req, res) => {
     // (class teacher OR teach a subject there) — same visibility rule as
     // attendance/marks.
     if (req.user.role === "teacher") {
-      const teacher = await Teacher.findOne({ userId: req.user.userId, schoolId: req.user.schoolId });
+      const teacher = await Teacher.findOne({ userId: req.user.userId, schoolId: targetSchoolId });
       if (!teacher) return res.json({ exams: [], total: 0, page: 1, totalPages: 1 });
 
-      const classTeacherOf = await ClassTeacher.find({ schoolId: req.user.schoolId, teacherId: teacher._id }).select("className section");
+      const classTeacherOf = await ClassTeacher.find({ schoolId: targetSchoolId, teacherId: teacher._id }).select("className section");
       const classSubjectsTeaching = teacher.subject
-        ? await ClassSubject.find({ schoolId: req.user.schoolId, "subjects.subjectName": teacher.subject }).select("className")
+        ? await ClassSubject.find({ schoolId: targetSchoolId, "subjects.subjectName": teacher.subject }).select("className")
         : [];
 
       const allowedClasses = new Set([

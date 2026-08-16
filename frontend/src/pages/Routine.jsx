@@ -195,7 +195,16 @@ export default function RoutinePage() {
     window.print();
   };
 
-  const teachersForShift = teachers.filter((t) => !formData.shift || t.shift === formData.shift);
+  // Show ALL active teachers, with shift-matched ones sorted first.
+  // Never filter out a teacher from the dropdown — admins must be able to assign any teacher to any period.
+  const teachersForShift = teachers
+    .slice()
+    .sort((a, b) => {
+      const aMatches = !formData.shift || a.shift === formData.shift ? 0 : 1;
+      const bMatches = !formData.shift || b.shift === formData.shift ? 0 : 1;
+      if (aMatches !== bMatches) return aMatches - bMatches;
+      return (a.name || "").localeCompare(b.name || "");
+    });
 
   const TABS = [
     { key: "list", label: "Weekly Routine" },
@@ -333,11 +342,27 @@ export default function RoutinePage() {
                     </SelectTrigger>
                     <SelectContent>
                       {teachersForShift.length === 0 && (
-                        <div className="px-3 py-2 text-xs text-muted-foreground">No teacher set to this shift yet — set a teacher's shift on the Teachers page.</div>
+                        <div className="px-3 py-2 text-xs text-muted-foreground">No teachers available — add teachers to the school first.</div>
                       )}
-                      {teachersForShift.map((t) => (
-                        <SelectItem key={t._id} value={t._id}>{t.name} - {t.subject}</SelectItem>
-                      ))}
+                      {teachersForShift.map((t) => {
+                        const mismatch = formData.shift && t.shift && t.shift !== formData.shift;
+                        return (
+                          <SelectItem key={t._id} value={t._id}>
+                            <div className="flex flex-col w-full">
+                              <span className="font-medium">
+                                {t.name} - {t.subject || "General Teacher"}
+                                {t.shift ? `  •  Shift: ${t.shift}` : "  •  Shift: Unassigned"}
+                                {mismatch && "  ⚠️"}
+                              </span>
+                              {mismatch && (
+                                <span className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5 leading-tight">
+                                  Currently assigned to Shift {t.shift} — being added to <span className="font-semibold">{formData.shift}</span>
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>

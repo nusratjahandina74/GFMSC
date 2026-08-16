@@ -4,9 +4,9 @@ import { setMonthlyFee, payFee, getStudentDue } from "../controllers/feesControl
 
 const router = express.Router();
 
-// SchoolAdmin only
-router.post("/set", authMiddleware(["schoolAdmin"]), setMonthlyFee);
-router.post("/pay", authMiddleware(["schoolAdmin"]), payFee);
-router.get("/due", authMiddleware(["schoolAdmin"]), getStudentDue);
+// SchoolAdmin + SuperAdmin
+router.post("/set", authMiddleware(["schoolAdmin", "superAdmin"]), setMonthlyFee);
+router.post("/pay", authMiddleware(["schoolAdmin", "superAdmin"]), payFee);
+router.get("/due", authMiddleware(["schoolAdmin", "superAdmin"]), getStudentDue);
 
 export default router;

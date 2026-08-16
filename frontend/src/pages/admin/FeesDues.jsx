@@ -13,7 +13,7 @@ export default function AdminFeesDues() {
   const [className, setClassName] = useState("Class 7");
   const [section, setSection] = useState("");
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
-  const [feeAmount, setFeeAmount] = useState(2500);
+  const [feeAmount, setFeeAmount] = useState("");
   const [feeTitle, setFeeTitle] = useState("Monthly Tuition Fee");
   
   const [students, setStudents] = useState([]);
@@ -48,13 +48,19 @@ export default function AdminFeesDues() {
     setLoading(true);
     setMsg("");
     try {
+      const amountNum = Number(feeAmount);
+      if (!Number.isFinite(amountNum) || amountNum < 0) {
+        setMsg("Please enter a valid, non-negative fee amount.");
+        setLoading(false);
+        return;
+      }
       await api.post("/fees/set", {
         className,
         month,
-        amount: Number(feeAmount),
+        amount: amountNum,
         title: feeTitle,
       });
-      setMsg(`✅ Monthly fee of ৳${feeAmount} set for ${className} (${month})!`);
+      setMsg(`✅ Monthly fee of ৳${amountNum.toLocaleString("en-BD")} set for ${className} (${month})!`);
     } catch (err) {
       setMsg(err?.response?.data?.message || "Failed to set fee");
     } finally {
@@ -152,7 +158,7 @@ export default function AdminFeesDues() {
                 </div>
                 <div className="space-y-2">
                   <Label>Amount (৳)</Label>
-                  <Input type="number" value={feeAmount} onChange={(e) => setFeeAmount(e.target.value)} required />
+                  <Input type="number" value={feeAmount} onChange={(e) => setFeeAmount(e.target.value)} required min="0" step="0.01" placeholder="e.g. 1500" />
                 </div>
               </div>
               <button

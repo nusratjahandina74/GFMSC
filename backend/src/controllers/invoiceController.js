@@ -88,7 +88,7 @@ export const bulkGenerateInvoices = async (req, res) => {
       className,
     }).session(session);
 
-    const amount = feeStructure?.amount || 2500;
+    const amount = feeStructure?.amount ?? 0;
 
     // Prepare invoices
     const invoices = students.map((student) => ({

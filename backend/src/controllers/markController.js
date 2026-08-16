@@ -1,9 +1,25 @@
 import Mark from "../models/Mark.js";
 import Exam from "../models/Exam.js";
+import Student from "../models/Student.js";
 import Teacher from "../models/Teacher.js";
 import ClassTeacher from "../models/ClassTeacher.js";
 import ClassSubject from "../models/ClassSubject.js";
 import { calculateGrade } from "../utils/grade.js";
+import { isValidId } from "../utils/validation.js";
+
+// Resolve a student id (either Mongo ObjectId or string studentId like "202607001")
+// into the real Student._id ObjectId. Returns null if no match found.
+const resolveStudentId = async (schoolId, identifier) => {
+  if (!identifier) return null;
+  // Case 1: it's already a valid ObjectId — verify the student belongs to the school
+  if (isValidId(identifier)) {
+    const match = await Student.findOne({ _id: identifier, schoolId }).select("_id");
+    if (match) return match._id;
+  }
+  // Case 2: it's the human-readable string studentId
+  const match = await Student.findOne({ studentId: identifier, schoolId }).select("_id");
+  return match ? match._id : null;
+};
 
 // Shared save-one-mark logic (with authorization) reused by both the
 // single upsertMark endpoint and the class-wise bulk endpoint below.
@@ -24,6 +40,12 @@ const saveOneMark = async (req, { examId, studentId, subject, written = 0, mcq =
   }
 
   const targetSchoolId = exam.schoolId || req.user.schoolId;
+
+  // Resolve the student identifier (accepts Mongo ObjectId AND string studentId)
+  const resolvedStudentId = await resolveStudentId(targetSchoolId, studentId);
+  if (!resolvedStudentId) {
+    return { error: "Student not found in this school — verify studentId (or Mongo _id)." };
+  }
 
   const classSubject = await ClassSubject.findOne({ schoolId: targetSchoolId, className: exam.className });
   if (classSubject && classSubject.subjects?.length > 0) {
@@ -55,8 +77,8 @@ const saveOneMark = async (req, { examId, studentId, subject, written = 0, mcq =
   const { grade, gpa } = calculateGrade(total);
 
   const mark = await Mark.findOneAndUpdate(
-    { schoolId: targetSchoolId, examId, studentId, subject },
-    { $set: { schoolId: targetSchoolId, examId, studentId, subject, written, mcq, practical, total, grade, gpa, enteredBy: req.user.userId } },
+    { schoolId: targetSchoolId, examId, studentId: resolvedStudentId, subject },
+    { $set: { schoolId: targetSchoolId, examId, studentId: resolvedStudentId, subject, written, mcq, practical, total, grade, gpa, enteredBy: req.user.userId } },
     { new: true, upsert: true }
   );
 
@@ -120,21 +142,30 @@ export const getStudentReportCard = async (req, res) => {
     const exam = await Exam.findOne(examFilter);
     if (!exam) return res.status(404).json({ message: "Exam not found" });
 
-    const markFilter = { examId };
-    if (req.user.role !== "superAdmin" && req.user.schoolId) {
-      markFilter.schoolId = req.user.schoolId;
+    const targetSchoolId = exam.schoolId || req.user.schoolId;
+    if (!targetSchoolId) {
+      return res.status(400).json({ message: "schoolId not found in exam or token. Pass examId with a school-scoped exam." });
     }
 
-    // studentId may be Mongo _id or numeric studentId string
-    const marks = await Mark.find({ ...markFilter, $or: [{ studentId }, { studentId: studentId }] }).sort({ subject: 1 });
+    const markFilter = { examId, schoolId: targetSchoolId };
+
+    // Resolve both forms of student id: Mongo _id OR string studentId
+    const resolvedStudentId = await resolveStudentId(targetSchoolId, studentId);
+    if (!resolvedStudentId) {
+      return res.status(404).json({ message: "Student not found in this school. Check studentId (numeric or Mongo _id)." });
+    }
+
+    const marks = await Mark.find({ ...markFilter, studentId: resolvedStudentId }).sort({ subject: 1 });
 
     const totalGpa = marks.reduce((sum, m) => sum + (m.gpa || 0), 0);
     const avgGpa = marks.length ? Number((totalGpa / marks.length).toFixed(2)) : 0;
 
+    const studentDoc = await Student.findById(resolvedStudentId).select("studentId studentName className section classRoll");
+
     res.json({
       message: "Report card fetched",
       exam,
-      studentId,
+      student: studentDoc || undefined,
       marks,
       avgGpa,
     });

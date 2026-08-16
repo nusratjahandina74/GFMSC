@@ -15,6 +15,8 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
+  BarChart,
+  Bar,
 } from "recharts";
 
 const PIE_COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#8b5cf6"];
@@ -77,6 +79,7 @@ export default function AdminDashboard() {
     { label: "Total Students", value: counts?.students ?? 0, icon: GraduationCap },
     { label: "Total Teachers", value: counts?.teachers ?? 0, icon: Users },
     { label: "Total Staff", value: counts?.staff ?? 0, icon: Briefcase },
+    { label: "Total Guardians", value: counts?.guardians ?? 0, icon: Users },
   ];
 
   return (
@@ -102,7 +105,7 @@ export default function AdminDashboard() {
           Loading stats...
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {stats.map((stat, i) => (
             <div
               key={i}
@@ -130,63 +133,89 @@ export default function AdminDashboard() {
           Loading analytics...
         </div>
       ) : analytics && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              People by Role
-            </h2>
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie
-                  data={[
-                    { name: "Students", value: analytics.roleCounts?.students || 0 },
-                    { name: "Teachers", value: analytics.roleCounts?.teachers || 0 },
-                    { name: "Staff", value: analytics.roleCounts?.staff || 0 },
-                    { name: "Guardians", value: analytics.roleCounts?.guardians || 0 },
-                  ]}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  outerRadius={90}
-                  label={(entry) => `${entry.name}: ${entry.value}`}
-                >
-                  {PIE_COLORS.map((color, i) => (
-                    <Cell key={i} fill={color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                People by Role
+              </h2>
+              <ResponsiveContainer width="100%" height={280}>
+                <PieChart>
+                  <Pie
+                    data={(analytics.roleDistribution || []).map((r) => ({
+                      name: r.role,
+                      value: r.value,
+                    }))}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={90}
+                    label={(entry) => `${entry.name}: ${entry.value}`}
+                  >
+                    {PIE_COLORS.map((color, i) => (
+                      <Cell key={i} fill={color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            <div className="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Attendance Trend (Last 14 Days)
+              </h2>
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={analytics.attendanceTrend || []}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="date"
+                    tickFormatter={(d) => (typeof d === "string" ? d.slice(5) : d ? String(d) : "")}
+                    fontSize={12}
+                  />
+                  <YAxis domain={[0, 100]} unit="%" fontSize={12} />
+                  <Tooltip
+                    formatter={(value) => [`${value}%`, "Present"]}
+                    labelFormatter={(d) => `Date: ${d}`}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="presentPct"
+                    stroke="#10b981"
+                    strokeWidth={2}
+                    dot={false}
+                    name="Present %"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           <div className="bg-white dark:bg-gray-900 p-6 rounded-xl border border-gray-200 dark:border-gray-800 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-              Attendance Trend (Last 14 Days)
+              Class-wise Student Performance (Average Marks)
             </h2>
-            <ResponsiveContainer width="100%" height={280}>
-              <LineChart data={analytics.attendanceTrend || []}>
+            <ResponsiveContainer width="100%" height={320}>
+              <BarChart data={analytics.performanceBars || []}>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={(d) => (typeof d === "string" ? d.slice(5) : d ? String(d) : "")}
-                  fontSize={12}
-                />
-                <YAxis domain={[0, 100]} unit="%" fontSize={12} />
+                <XAxis dataKey="className" fontSize={12} />
+                <YAxis allowDecimals={false} unit=" pts" fontSize={12} />
                 <Tooltip
-                  formatter={(value) => [`${value}%`, "Present"]}
-                  labelFormatter={(d) => `Date: ${d}`}
+                  formatter={(value, _name, props) => {
+                    const count = props?.payload?.count ?? 0;
+                    return [`${value} points across ${count} student${count === 1 ? "" : "s"}`, "Class Average"];
+                  }}
                 />
-                <Line
-                  type="monotone"
-                  dataKey="presentPct"
-                  stroke="#10b981"
-                  strokeWidth={2}
-                  dot={false}
-                  name="Present %"
+                <Legend />
+                <Bar
+                  dataKey="average"
+                  fill="#8b5cf6"
+                  name="Class Average"
+                  radius={[4, 4, 0, 0]}
                 />
-              </LineChart>
+              </BarChart>
             </ResponsiveContainer>
           </div>
         </div>

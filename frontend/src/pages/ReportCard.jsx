@@ -133,7 +133,7 @@ export default function ReportCard() {
                     </SelectTrigger>
                     <SelectContent>
                       {students.map((st) => (
-                        <SelectItem key={st._id} value={st.studentId}>
+                        <SelectItem key={st._id} value={st._id}>
                           {st.studentName} ({st.studentId}) - {st.className} ({st.section}) Roll: {st.classRoll}
                         </SelectItem>
                       ))}

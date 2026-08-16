@@ -8,12 +8,17 @@ const daysOfWeek = ["saturday", "sunday", "monday", "tuesday", "wednesday", "thu
 // Create routine
 export const createRoutine = async (req, res) => {
   try {
-    const { className, section, subject, teacherId, period, day, startTime, endTime, room, shift } = req.body;
+    const { className, section, subject, teacherId, period, day, startTime, endTime, room, shift, schoolId } = req.body;
+    const targetSchoolId = schoolId || req.user.schoolId;
+
+    if (!targetSchoolId) {
+      return res.status(400).json({ message: "School ID is required to create a routine entry." });
+    }
 
     if (!shift || !shift.trim()) {
       return res.status(400).json({ message: "Shift is required." });
     }
-    const shiftExists = await ShiftTemplate.findOne({ schoolId: req.user.schoolId, shift: shift.trim() });
+    const shiftExists = await ShiftTemplate.findOne({ schoolId: targetSchoolId, shift: shift.trim() });
     if (!shiftExists) {
       return res.status(400).json({ message: `Shift "${shift}" doesn't exist yet. Create it first on the Shift Time Slots tab.` });
     }
@@ -33,15 +38,15 @@ export const createRoutine = async (req, res) => {
       return res.status(400).json({ message: "Period must be a number between 1 and 10." });
     }
 
-    // Validate teacher exists
-    const teacher = await Teacher.findOne({ _id: teacherId, schoolId: req.user.schoolId });
+    // Validate teacher exists (use Teacher._id directly — it is already the correct reference, not userId)
+    const teacher = await Teacher.findOne({ _id: teacherId, schoolId: targetSchoolId });
     if (!teacher) {
-      return res.status(404).json({ message: "Teacher not found" });
+      return res.status(404).json({ message: "Teacher not found for this school. Verify the teacher exists and is assigned to the correct school." });
     }
 
     // Prevent double-booking the same class/section/day/period slot
     const clash = await Routine.findOne({
-      schoolId: req.user.schoolId,
+      schoolId: targetSchoolId,
       className,
       section: section || "",
       day,
@@ -52,7 +57,7 @@ export const createRoutine = async (req, res) => {
     }
 
     const routine = await Routine.create({
-      schoolId: req.user.schoolId,
+      schoolId: targetSchoolId,
       shift,
       className,
       section: section || "",
@@ -78,14 +83,18 @@ export const createRoutine = async (req, res) => {
 // Get class routine
 export const getClassRoutine = async (req, res) => {
   try {
-    const { className, section } = req.query;
+    const { className, section, schoolId } = req.query;
+    const targetSchoolId = schoolId || req.user.schoolId;
 
     if (!className) {
       return res.status(400).json({ message: "Missing required field: className is required" });
     }
+    if (!targetSchoolId) {
+      return res.status(400).json({ message: "School ID is required to load the class routine." });
+    }
 
     const routine = await Routine.find({
-      schoolId: req.user.schoolId,
+      schoolId: targetSchoolId,
       className,
       ...(section && { section }),
     })
@@ -103,13 +112,18 @@ export const getClassRoutine = async (req, res) => {
 export const getTeacherRoutine = async (req, res) => {
   try {
     const { teacherId } = req.params;
+    const { schoolId } = req.query;
+    const targetSchoolId = schoolId || req.user.schoolId;
 
     if (!teacherId) {
       return res.status(400).json({ message: "Missing required field: teacherId is required" });
     }
+    if (!targetSchoolId) {
+      return res.status(400).json({ message: "School ID is required to load the teacher routine." });
+    }
 
     const routine = await Routine.find({
-      schoolId: req.user.schoolId,
+      schoolId: targetSchoolId,
       teacherId,
     })
       .sort({ day: 1, startTime: 1 })
@@ -154,17 +168,19 @@ export const updateRoutine = async (req, res) => {
 //    entry that day/shift, cell = subject + teacher
 export const getRoutineMatrix = async (req, res) => {
   try {
-    const { shift, day } = req.query;
+    const { shift, day, schoolId } = req.query;
+    const targetSchoolId = schoolId || req.user.schoolId;
     if (!shift || !day) {
       return res.status(400).json({ message: "shift and day are required" });
     }
-
-    const schoolId = req.user.schoolId;
+    if (!targetSchoolId) {
+      return res.status(400).json({ message: "School ID is required to load the routine matrix." });
+    }
 
     const [template, teachers, entries] = await Promise.all([
-      ShiftTemplate.findOne({ schoolId, shift }),
-      Teacher.find({ schoolId, shift, isActive: true }).select("name email phone subject").sort({ name: 1 }),
-      Routine.find({ schoolId, shift, day }).populate("teacherId", "name email phone"),
+      ShiftTemplate.findOne({ schoolId: targetSchoolId, shift }),
+      Teacher.find({ schoolId: targetSchoolId, isActive: true }).select("name email phone subject shift").sort({ name: 1 }),
+      Routine.find({ schoolId: targetSchoolId, shift, day }).populate("teacherId", "name email phone"),
     ]);
 
     const periods = (template?.periods || []).slice().sort((a, b) => a.period - b.period);
@@ -210,7 +226,7 @@ export const getRoutineMatrix = async (req, res) => {
       return { period: p.period, startTime: p.startTime, endTime: p.endTime, cells };
     });
 
-    res.json({ periods, teacherGrid, classes, classGrid });
+    res.json({ periods, teacherGrid, classes, classGrid, teachers });
   } catch (err) {
     console.error("Get routine matrix error:", err);
     res.status(500).json({ message: err.message || "Failed to build routine matrix" });

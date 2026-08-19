@@ -7,7 +7,7 @@ const noticeSchema = new mongoose.Schema(
     tag: { type: String, default: "Notice" },
     targetAudience: {
       type: String,
-      enum: ["all", "teachers", "students"],
+      enum: ["all", "teachers", "students", "staff", "guardians"],
       default: "all",
       required: true,
     },

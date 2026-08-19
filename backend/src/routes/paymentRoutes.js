@@ -10,12 +10,18 @@ import { authMiddleware } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
 
-router.use(authMiddleware(["student", "schoolAdmin", "superAdmin"]));
+// Only the routes a logged-in user calls directly need auth. The
+// webhook/callback routes below are called server-to-server by the
+// payment gateway itself (SSLCommerz IPN, bKash webhook, and its browser
+// redirect after payment) — they carry no user JWT at all. Applying
+// authMiddleware to the whole router (as router.use(...) did before) meant
+// every one of those callbacks was rejected with 401 before it could ever
+// mark a payment as completed, so a customer could successfully pay and
+// the invoice would still show unpaid forever.
+router.post("/initiate", authMiddleware(["student", "schoolAdmin", "superAdmin"]), initiatePayment);
+router.get("/student/:studentId", authMiddleware(["student", "schoolAdmin", "superAdmin"]), getStudentPayments);
 
-router.post("/initiate", initiatePayment);
-router.get("/student/:studentId", getStudentPayments);
-
-// Webhook/Callback routes (no auth needed usually)
+// Webhook/Callback routes — intentionally NOT behind authMiddleware.
 router.post("/success", handlePaymentSuccess);
 router.post("/fail", handlePaymentFail);
 router.post("/cancel", handlePaymentCancel);

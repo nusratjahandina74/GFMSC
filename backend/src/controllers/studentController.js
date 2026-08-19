@@ -252,18 +252,24 @@ export const getStudentOptions = async (req, res) => {
           return res.status(200).json([]);
         }
 
-        const assignedClass = await ClassTeacher.findOne({
+        // Match getStudents/getStudentById: a teacher sees students for ALL
+        // class/sections they are assigned to as Class Teacher, regardless
+        // of the isFirstPeriodTeacher flag (previously this only matched
+        // isFirstPeriodTeacher:true, which left dropdowns empty for most
+        // class teachers).
+        const assignments = await ClassTeacher.find({
           teacherId: teacherProfile._id,
           schoolId: req.user.schoolId,
-          isFirstPeriodTeacher: true
-        });
+        }).select("className section");
 
-        if (!assignedClass) {
+        if (!assignments || assignments.length === 0) {
           return res.status(200).json([]);
         }
 
-        filter.className = assignedClass.className;
-        filter.section = assignedClass.section;
+        filter.$or = assignments.map((a) => ({
+          className: a.className,
+          section: a.section || "",
+        }));
       }
     }
 

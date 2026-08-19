@@ -65,7 +65,7 @@ export default function GuardianDashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                {child.name} - {child.className} {child.section}
+                {child.studentName} - {child.className} {child.section}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">

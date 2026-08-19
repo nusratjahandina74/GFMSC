@@ -115,6 +115,10 @@ export default function AdminNotices() {
         return "Teachers Only";
       case "students":
         return "Students Only";
+      case "staff":
+        return "Staff Only";
+      case "guardians":
+        return "Guardians Only";
       default:
         return "Everyone";
     }
@@ -175,6 +179,8 @@ export default function AdminNotices() {
                     <SelectItem value="all">Everyone</SelectItem>
                     <SelectItem value="teachers">Teachers Only</SelectItem>
                     <SelectItem value="students">Students Only</SelectItem>
+                    <SelectItem value="staff">Staff Only</SelectItem>
+                    <SelectItem value="guardians">Guardians Only</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

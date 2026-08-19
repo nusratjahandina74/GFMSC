@@ -159,6 +159,15 @@ export const getStudentInvoices = async (req, res) => {
   try {
     const { studentId } = req.params;
 
+    // SECURITY: a "student" role account must only ever be able to see
+    // their OWN invoices/dues. Previously this only scoped by schoolId,
+    // so any logged-in student could view another student's fee/payment
+    // history — private financial information — just by changing the
+    // studentId in the URL.
+    if (req.user.role === "student" && String(req.user.userId) !== String(studentId)) {
+      return res.status(403).json({ message: "Access denied. You can only view your own invoices." });
+    }
+
     const invoices = await Invoice.find({
       schoolId: req.user.schoolId,
       studentId,

@@ -17,10 +17,16 @@ export const createGuardian = async (req, res) => {
       });
     }
 
-    // Check if email already exists
-    const existing = await Guardian.findOne({ email, schoolId: targetSchoolId });
+    // NOTE: Guardian.email has a GLOBAL unique index in the schema (not
+    // scoped per-school), matching how login looks guardians up (by email
+    // alone, same pattern as User). The old check here only looked within
+    // the same school (`{ email, schoolId }`), so it would pass and then
+    // the actual insert would throw a raw Mongo E11000 duplicate-key error
+    // with a confusing message. Check globally so we can return a clean
+    // message before ever hitting the DB constraint.
+    const existing = await Guardian.findOne({ email });
     if (existing) {
-      return res.status(400).json({ message: "Email already in use for this school" });
+      return res.status(400).json({ message: "A guardian account with this email already exists." });
     }
 
     const guardian = new Guardian({
@@ -39,6 +45,9 @@ export const createGuardian = async (req, res) => {
       guardian,
     });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "A guardian account with this email already exists." });
+    }
     res.status(500).json({ message: error.message });
   }
 };
@@ -93,6 +102,15 @@ export const getGuardians = async (req, res) => {
 // Get Single Guardian
 export const getGuardianById = async (req, res) => {
   try {
+    // SECURITY: a "guardian" role account must only ever be able to view
+    // their OWN record. Previously this only scoped by schoolId, so any
+    // logged-in guardian could view another guardian's full profile
+    // (including their children's info) just by changing the :id in the
+    // URL to another guardian's id within the same school.
+    if (req.user.role === "guardian" && String(req.user.userId) !== String(req.params.id)) {
+      return res.status(403).json({ message: "Access denied. You can only view your own guardian profile." });
+    }
+
     const filter = { _id: req.params.id };
     if (req.user.role === "superAdmin") {
       const qSchoolId = req.query.schoolId;
@@ -124,6 +142,12 @@ export const getGuardianById = async (req, res) => {
 // Update Guardian
 export const updateGuardian = async (req, res) => {
   try {
+    // SECURITY: same IDOR fix as getGuardianById — a guardian may only
+    // ever update their own record.
+    if (req.user.role === "guardian" && String(req.user.userId) !== String(req.params.id)) {
+      return res.status(403).json({ message: "Access denied. You can only update your own guardian profile." });
+    }
+
     const filter = { _id: req.params.id };
     if (req.user.role === "superAdmin") {
       const qSchoolId = req.query.schoolId || req.body.schoolId;
@@ -143,7 +167,13 @@ export const updateGuardian = async (req, res) => {
       return res.status(404).json({ message: "Guardian not found" });
     }
 
-    const { password, ...updateData } = req.body;
+    const { password, schoolId, children, ...restUpdateData } = req.body;
+    // A guardian account editing their own profile may only change their
+    // own contact info (name/phone/password) — never their own schoolId
+    // or which children are linked to them (that's an admin-only action,
+    // done via the schoolAdmin/superAdmin path).
+    const updateData =
+      req.user.role === "guardian" ? restUpdateData : { ...restUpdateData, ...(children !== undefined ? { children } : {}) };
     if (password) {
       guardian.password = password;
     }
@@ -152,6 +182,9 @@ export const updateGuardian = async (req, res) => {
 
     res.status(200).json({ message: "Guardian updated successfully", guardian });
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: "A guardian account with this email already exists." });
+    }
     res.status(500).json({ message: error.message });
   }
 };

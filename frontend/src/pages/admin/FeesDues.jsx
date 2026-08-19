@@ -10,7 +10,7 @@ import { CLASS_LIST, SECTION_LIST } from "../../lib/constants";
 
 export default function AdminFeesDues() {
   const [activeTab, setActiveTab] = useState("dues");
-  const [className, setClassName] = useState("Class 7");
+  const [className, setClassName] = useState("");
   const [section, setSection] = useState("");
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
   const [feeAmount, setFeeAmount] = useState("");
@@ -26,6 +26,11 @@ export default function AdminFeesDues() {
     setMsg("");
     try {
       if (activeTab === "dues") {
+        if (!className) {
+          setStudents([]);
+          setLoading(false);
+          return;
+        }
         const res = await api.get("/students", { params: { className, section, limit: 300 } });
         setStudents(res.data?.students || []);
       } else if (activeTab === "invoices") {
@@ -48,6 +53,11 @@ export default function AdminFeesDues() {
     setLoading(true);
     setMsg("");
     try {
+      if (!className) {
+        setMsg("Please select a class first.");
+        setLoading(false);
+        return;
+      }
       const amountNum = Number(feeAmount);
       if (!Number.isFinite(amountNum) || amountNum < 0) {
         setMsg("Please enter a valid, non-negative fee amount.");
@@ -69,6 +79,10 @@ export default function AdminFeesDues() {
   };
 
   const handleBulkGenerateInvoices = async () => {
+    if (!className) {
+      setMsg("Please select a class first.");
+      return;
+    }
     setLoading(true);
     setMsg("");
     try {
@@ -221,7 +235,7 @@ export default function AdminFeesDues() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Students Roster - {className}</CardTitle>
+              <CardTitle>Students Roster{className ? ` - ${className}` : ""}</CardTitle>
               <CardDescription>Manage and view student fee statuses</CardDescription>
             </div>
             <div className="flex gap-2">
@@ -244,6 +258,10 @@ export default function AdminFeesDues() {
             {loading ? (
               <div className="p-8 text-center text-muted-foreground">
                 <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" /> Loading student roster...
+              </div>
+            ) : !className ? (
+              <div className="p-8 text-center text-muted-foreground border-t border-dashed">
+                Select a class above to view its student roster.
               </div>
             ) : (
               <Table>

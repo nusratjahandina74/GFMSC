@@ -23,7 +23,7 @@ router.post("/teachers", authMiddleware(["schoolAdmin"]), createTeacherUser);
 // Super Admin routes
 router.post("/school-admins", authMiddleware(["superAdmin"]), createSchoolAdmin);
 router.get("/users", authMiddleware(["superAdmin"]), getAllUsers);
-router.patch("/users/:userId/status", authMiddleware(), updateUserStatus);
+router.patch("/users/:userId/status", authMiddleware(["schoolAdmin", "superAdmin"]), updateUserStatus);
 router.patch("/school-admins/:userId", authMiddleware(["superAdmin"]), updateSchoolAdmin);
 router.delete("/users/:userId", authMiddleware(["superAdmin"]), deleteUser);
 

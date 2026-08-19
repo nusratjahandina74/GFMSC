@@ -20,6 +20,7 @@ import { Button } from "../components/ui/button";
 import ThemeToggle from "../components/ThemeToggle";
 import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../App";
+import { getClassTeachers } from "../api/classTeachers";
 
 function DashboardLayout() {
   const { user, setUser } = useContext(AuthContext);
@@ -27,6 +28,11 @@ function DashboardLayout() {
   const location = useLocation();
   const role = getRole();
   const [loading, setLoading] = useState(true);
+  // Only a teacher who is actually assigned as the Class Teacher of at
+  // least one class/section should see Attendance / Marks Entry / Report
+  // Card in their sidebar — a "subject teacher" with no class assignment
+  // has no student roster to take attendance for or enter marks against.
+  const [isClassTeacher, setIsClassTeacher] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -38,6 +44,26 @@ function DashboardLayout() {
     };
     init();
   }, [user, navigate]);
+
+  useEffect(() => {
+    if (role !== "teacher" || !user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const assignments = await getClassTeachers();
+        if (cancelled) return;
+        const assigned = (assignments || []).some(
+          (ct) => ct.teacherId?.userId === user.id || ct.teacherId?.userId?._id === user.id
+        );
+        setIsClassTeacher(assigned);
+      } catch (err) {
+        console.error("Failed to check class-teacher status:", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [role, user]);
 
   const handleLogout = () => {
     logout();
@@ -109,21 +135,29 @@ function DashboardLayout() {
           path: "/dashboard/routine",
           icon: Calendar,
         },
-        {
-          name: "Attendance",
-          path: "/dashboard/attendance",
-          icon: Users,
-        },
+        ...(isClassTeacher
+          ? [
+              {
+                name: "Attendance",
+                path: "/dashboard/attendance",
+                icon: Users,
+              },
+            ]
+          : []),
         {
           name: "Exams",
           path: "/dashboard/exams",
           icon: FileText,
         },
-        {
-          name: "Marks Entry",
-          path: "/dashboard/marks",
-          icon: BookOpen,
-        },
+        ...(isClassTeacher
+          ? [
+              {
+                name: "Marks Entry",
+                path: "/dashboard/marks",
+                icon: BookOpen,
+              },
+            ]
+          : []),
         {
           name: "Report Card",
           path: "/dashboard/report-card",

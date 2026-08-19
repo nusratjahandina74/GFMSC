@@ -95,7 +95,7 @@ export const changePassword = async (req, res) => {
 };
 export const register = async (req, res) => {
   try {
-    const { fullName, email, password, role, schoolName } = req.body;
+    const { fullName, email, password, schoolName } = req.body;
 
     if (!fullName || !email || !password) {
       return res.status(400).json({ message: "Full name, email and password are required." });
@@ -111,7 +111,14 @@ export const register = async (req, res) => {
     const rawToken = crypto.randomBytes(32).toString("hex");
     const verificationToken = hashToken(rawToken);
     const verificationTokenExpires = Date.now() + 24 * 60 * 60 * 1000; // 24h
-    const finalRole = role || "schoolAdmin";
+    // SECURITY: this is a PUBLIC, unauthenticated endpoint — it must NEVER
+    // trust a client-supplied role. It previously read `role` straight out
+    // of req.body (`role || "schoolAdmin"`), so anyone could POST
+    // { role: "superAdmin" } and instantly get full control of the whole
+    // platform. Self sign-up may only ever create a schoolAdmin (who gets
+    // their own new School below); every other role (teacher/staff/student/
+    // superAdmin) must be created top-down by an existing admin.
+    const finalRole = "schoolAdmin";
 
     // CRITICAL: every Teacher/Student/Staff/Routine/Attendance/Exam/Mark
     // record is created with schoolId: req.user.schoolId. A schoolAdmin with
@@ -431,6 +438,26 @@ export const mailConfigStatus = async (req, res) => {
 export const createSuperAdmin = async (req, res) => {
   try {
     const { name, email, password } = req.body;
+
+    // SECURITY: this route has NO auth middleware (it's how the very
+    // first superAdmin gets bootstrapped on a fresh deployment, before any
+    // account exists to log in with). That means it previously had ZERO
+    // protection — anyone, at any time, could call it and mint themselves
+    // a brand new superAdmin account with full control of every school on
+    // the platform. Locking it to a genuine one-time bootstrap: once a
+    // superAdmin account exists anywhere in the system, this endpoint is
+    // permanently disabled. Any superAdmin accounts needed after that must
+    // be created by an existing superAdmin through an authenticated route.
+    const existingSuperAdmin = await User.findOne({ role: "superAdmin" });
+    if (existingSuperAdmin) {
+      return res.status(403).json({
+        message: "Setup already completed. A Super Admin account already exists — this one-time setup endpoint is now disabled.",
+      });
+    }
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: "name, email and password are required." });
+    }
 
     let user = await User.findOne({ email });
     if (user)

@@ -14,15 +14,45 @@ const openPdfBlob = (blob, filename) => {
   setTimeout(() => window.URL.revokeObjectURL(url), 10000);
 };
 
+// When a blob-typed request fails, the server's JSON error body ({message})
+// arrives as a Blob too (axios doesn't know to parse it as JSON when
+// responseType is "blob"), so err.response.data.message is always
+// undefined and every failure showed the same generic fallback text no
+// matter what actually went wrong on the backend. This reads the blob's
+// text and parses it so the real error reaches the UI.
+const extractBlobErrorMessage = async (err, fallback) => {
+  const data = err?.response?.data;
+  if (data instanceof Blob) {
+    try {
+      const text = await data.text();
+      const parsed = JSON.parse(text);
+      return parsed?.message || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+  return err?.response?.data?.message || err?.message || fallback;
+};
+
 export const downloadStudentIdCard = async (studentId, studentLabel = "student") => {
-  const res = await apiClient.get(`/id-cards/student/${studentId}`, { responseType: "blob" });
-  openPdfBlob(res.data, `idcard-${studentLabel}.pdf`);
+  try {
+    const res = await apiClient.get(`/id-cards/student/${studentId}`, { responseType: "blob" });
+    openPdfBlob(res.data, `idcard-${studentLabel}.pdf`);
+  } catch (err) {
+    const message = await extractBlobErrorMessage(err, "Could not generate ID card");
+    throw new Error(message);
+  }
 };
 
 export const downloadClassIdCardSheet = async (className, section) => {
-  const res = await apiClient.get(`/id-cards/class-sheet`, {
-    params: { className, section },
-    responseType: "blob",
-  });
-  openPdfBlob(res.data, `idcards-${className}${section ? "-" + section : ""}.pdf`);
+  try {
+    const res = await apiClient.get(`/id-cards/class-sheet`, {
+      params: { className, section },
+      responseType: "blob",
+    });
+    openPdfBlob(res.data, `idcards-${className}${section ? "-" + section : ""}.pdf`);
+  } catch (err) {
+    const message = await extractBlobErrorMessage(err, "Could not generate ID card sheet");
+    throw new Error(message);
+  }
 };

@@ -4,7 +4,7 @@ import { Button } from "../../components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Badge } from "../../components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { UserPlus, Check, X, Link as LinkIcon } from "lucide-react";
+import { UserPlus, Check, X, Link as LinkIcon, Copy, ExternalLink } from "lucide-react";
 import { getAdmissions, approveAdmission, rejectAdmission } from "../../api/admissions";
 import { getUser } from "../../api/auth";
 
@@ -13,6 +13,7 @@ export default function AdmissionsPage() {
   const [status, setStatus] = useState("PENDING");
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
+  const [copied, setCopied] = useState(false);
   const user = getUser();
 
   const load = async () => {
@@ -75,12 +76,41 @@ export default function AdmissionsPage() {
       </div>
 
       {applyUrl && (
-        <div className="p-3 rounded-lg bg-gray-50 dark:bg-gray-800 text-sm flex items-center gap-2">
-          <LinkIcon className="h-4 w-4 shrink-0" />
-          Share this link with applicants:{" "}
-          <a href={applyUrl} target="_blank" rel="noreferrer" className="text-blue-600 dark:text-blue-400 underline break-all">
+        <div className="p-4 rounded-lg bg-gray-50 dark:bg-gray-800 space-y-3">
+          <div className="flex items-center gap-2 text-sm">
+            <LinkIcon className="h-4 w-4 shrink-0" />
+            <span className="font-medium">Your public admission application link:</span>
+          </div>
+          <div className="text-xs text-muted-foreground break-all font-mono bg-white dark:bg-gray-900 p-2 rounded border">
             {applyUrl}
-          </a>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              className="gap-2"
+              onClick={() => window.open(applyUrl, "_blank", "noreferrer")}
+            >
+              <ExternalLink className="h-4 w-4" /> Open Application Form
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-2"
+              onClick={async () => {
+                await navigator.clipboard.writeText(applyUrl);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+              }}
+            >
+              <Copy className="h-4 w-4" /> {copied ? "Copied!" : "Copy Link to Share"}
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Share this link with prospective students/guardians (WhatsApp, Facebook, your website) so they can apply online — submitted applications show up below for you to approve or reject.
+          </p>
         </div>
       )}
 

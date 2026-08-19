@@ -20,16 +20,11 @@ const router = express.Router();
 // SuperAdmin create (one-time)
 router.post("/superadmin", createSuperAdmin);
 
-// Register
-
-// SECURITY LOCKDOWN: public self-registration is disabled. Accounts are
-// now only created top-down: a superAdmin creates a School + its first
-// schoolAdmin via POST /api/schools, and that schoolAdmin then creates
-// Teacher/Staff/Student accounts from their own dashboard. The register()
-// controller function still exists in authController.js in case a
-// self-signup flow is ever needed again — it's just not routed here.
-// router.post("/register", register);
-
+// Register — public self-signup. Always creates a schoolAdmin account (the
+// controller hard-locks the role server-side and ignores any role sent by
+// the client) which gets its own new School. Every other role (teacher/
+// staff/student/superAdmin) must be created top-down by an existing admin
+// from their dashboard, never through this public endpoint.
 router.post("/register", register);
 // Login
 router.post("/login", login);

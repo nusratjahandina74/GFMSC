@@ -127,8 +127,7 @@ export default function AttendancePage() {
     return classTeachers.some(ct =>
       ct.className === className &&
       (section ? ct.section === section : true) &&
-      ct.isFirstPeriodTeacher &&
-      (ct.teacherId?._id === user?.id || ct.teacherId === user?.id)
+      (ct.teacherId?.userId === user?.id || ct.teacherId?.userId?._id === user?.id)
     );
   };
 

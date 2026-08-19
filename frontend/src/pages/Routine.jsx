@@ -44,8 +44,8 @@ export default function RoutinePage() {
   const isAdmin = role === "schoolAdmin" || role === "superAdmin";
   const [tab, setTab] = useState("list"); // list | shiftSetup | teacherGrid | classGrid
 
-  const [className, setClassName] = useState("Class 7");
-  const [section, setSection] = useState("A");
+  const [className, setClassName] = useState("");
+  const [section, setSection] = useState("");
   const [routine, setRoutine] = useState([]);
   const [teachers, setTeachers] = useState([]);
   const [classSubjects, setClassSubjects] = useState([]);
@@ -85,6 +85,13 @@ export default function RoutinePage() {
         res = await getTeacherRoutine(user.teacherId || user._id);
         setRoutine(res.data?.routine || []);
       } else {
+        if (!className) {
+          // Admin hasn't picked a class yet — don't show a stale/default
+          // class's routine, show nothing until they actually select one.
+          setRoutine([]);
+          setLoading(false);
+          return;
+        }
         res = await getClassRoutine({ className, section });
         setRoutine(res.data?.routine || []);
       }
@@ -505,6 +512,10 @@ export default function RoutinePage() {
             <div className="p-8 text-center text-muted-foreground">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
               Loading routine...
+            </div>
+          ) : isAdmin && !className ? (
+            <div className="p-8 text-center text-muted-foreground border rounded-lg border-dashed">
+              Select a class above to view its routine.
             </div>
           ) : (
             <div className="grid gap-4">

@@ -14,7 +14,7 @@ export const getClassTeachers = async (req, res) => {
     if (req.query.shift !== undefined) filter.shift = req.query.shift === "" ? "" : req.query.shift;
 
     const classTeachers = await ClassTeacher.find(filter)
-      .populate("teacherId", "name email shift");
+      .populate("teacherId", "name email shift userId");
     res.json({ classTeachers });
   } catch (error) {
     res.status(500).json({ message: error.message });

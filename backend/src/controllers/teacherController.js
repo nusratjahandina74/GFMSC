@@ -153,6 +153,17 @@ export const deleteTeacher = async (req, res) => {
     const teacher = await Teacher.findOne(filter);
     if (!teacher) return res.status(404).json({ message: "Teacher not found" });
 
+    // A Teacher profile is just half the account — the actual login lives
+    // on a separate User document (teacher.userId). Deleting only the
+    // Teacher profile left that User account behind forever: its email
+    // stayed permanently locked (so re-adding a teacher with the same
+    // email after "deleting" them always failed with "already exists"),
+    // and the orphaned account could still log in even though its Teacher
+    // profile — and therefore its whole dashboard — no longer existed.
+    if (teacher.userId) {
+      await User.findByIdAndDelete(teacher.userId);
+    }
+
     await teacher.deleteOne();
     res.status(200).json({ message: "Teacher deleted successfully" });
   } catch (error) {

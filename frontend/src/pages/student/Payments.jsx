@@ -28,6 +28,7 @@ import {
 import { Badge } from "../../components/ui/badge";
 import { CreditCard, CheckCircle, Clock, AlertCircle, Loader2 } from "lucide-react";
 import { getStudentInvoices } from "../../api/invoices";
+import api from "../../api/client";
 import { AuthContext } from "../../App";
 
 export default function Payments() {
@@ -65,19 +66,16 @@ export default function Payments() {
     if (!selectedInvoice) return;
     setPaying(true);
     try {
-      const { default: API } = await import("../../services/api");
-      const res = await API.post("/payments/initiate", {
+      const studentId = user?.id || user?.userId || user?.studentId;
+      const res = await api.post("/payments/initiate", {
+        studentId,
         invoiceId: selectedInvoice._id,
-        gateway: paymentMethod,
+        month: selectedInvoice.month,
+        method: paymentMethod,
         amount: selectedInvoice.amount,
       });
-      if (res.data?.checkoutUrl) {
-        window.location.href = res.data.checkoutUrl;
-      } else if (res.data?.demoMode || res.data?.mode === "SANDBOX-DEMO") {
-        setMsg("✅ Demo mode: " + (res.data?.message || res.data?.sandboxInstructions || "Payment simulated successfully"));
-        const refresh = await getStudentInvoices(user?.id || user?.userId || user?.studentId);
-        setInvoices(refresh?.invoices || refresh?.data?.invoices || []);
-        setSelectedInvoice(null);
+      if (res.data?.paymentUrl) {
+        window.location.href = res.data.paymentUrl;
       } else {
         setMsg(res.data?.message || "Payment initiated");
       }

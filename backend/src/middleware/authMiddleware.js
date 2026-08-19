@@ -71,3 +71,49 @@ export const authMiddleware = (roles = []) => {
     }
   };
 };
+
+// Populates req.user when a valid token is present, but NEVER blocks the
+// request when there's no token (or an invalid/expired one) — it just
+// proceeds with req.user left unset. For routes that must work for both
+// anonymous public visitors (e.g. the landing-page notice board) and
+// logged-in accounts that need role-based filtering applied.
+export const optionalAuthMiddleware = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return next();
+  }
+
+  const token = authHeader.split(" ")[1];
+  try {
+    const decoded = jwt.verify(token, JWT_MASTER_SECRET);
+    let account = null;
+    const role = decoded.role;
+
+    if (role === "student") {
+      account = await Student.findById(decoded.userId);
+    } else if (role === "guardian") {
+      account = await Guardian.findById(decoded.userId);
+    } else {
+      account = await User.findById(decoded.userId);
+    }
+
+    if (account && !account.isSuspended) {
+      req.user = {
+        userId: account._id,
+        role,
+        schoolId: account.schoolId,
+        name: role === "student" ? account.studentName : account.name,
+      };
+      if (role === "student") {
+        req.user.studentId = account.studentId;
+        req.user.className = account.className;
+        req.user.section = account.section;
+      }
+    }
+  } catch {
+    // Invalid/expired token on an optional-auth route — treat as anonymous
+    // rather than failing the request.
+  }
+
+  next();
+};

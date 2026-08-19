@@ -77,15 +77,16 @@ export const getSchoolAdminDashboard = async (req, res) => {
       });
     }
 
-    const [students, teachers, staff] = await Promise.all([
+    const [students, teachers, staff, guardians] = await Promise.all([
       Student.countDocuments({ schoolId }),
       Teacher.countDocuments({ schoolId }),
       Staff.countDocuments({ schoolId }),
+      Guardian.countDocuments({ schoolId }),
     ]);
 
     res.status(200).json({
       message: "Dashboard fetched",
-      counts: { students, teachers, staff },
+      counts: { students, teachers, staff, guardians },
     });
   } catch (err) {
     res.status(500).json({ message: err.message });

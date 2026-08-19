@@ -9,21 +9,7 @@ import { getClassTeachers as fetchClassTeachers } from "../../api/classTeachers"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Checkbox } from "../../components/ui/checkbox";
-
-const CLASSES = [
-  "Nursery",
-  "Class 1",
-  "Class 2",
-  "Class 3",
-  "Class 4",
-  "Class 5",
-  "Class 6",
-  "Class 7",
-  "Class 8",
-  "Class 9",
-  "Class 10"
-];
-const SECTIONS = ["A", "B", "C", "D"];
+import { CLASS_LIST, SECTION_LIST } from "../../lib/constants";
 
 export default function AdminClassTeachers() {
   const [classTeachers, setClassTeachers] = useState([]);
@@ -171,7 +157,7 @@ return (
                     <SelectValue placeholder="Select class" />
                   </SelectTrigger>
                   <SelectContent>
-                    {CLASSES.map((c) => (
+                    {CLASS_LIST.map((c) => (
                       <SelectItem key={c} value={c}>
                         {c}
                       </SelectItem>
@@ -190,7 +176,7 @@ return (
                     <SelectValue placeholder="Select section" />
                   </SelectTrigger>
                   <SelectContent>
-                    {SECTIONS.map((s) => (
+                    {SECTION_LIST.map((s) => (
                       <SelectItem key={s} value={s}>
                         {s}
                       </SelectItem>

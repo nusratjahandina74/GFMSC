@@ -38,7 +38,7 @@ export default function IdCardsPage() {
     try {
       await downloadStudentIdCard(student._id, student.studentId);
     } catch (err) {
-      setMsg(err?.response?.data?.message || "Could not generate ID card");
+      setMsg(err?.message || "Could not generate ID card");
     }
   };
 
@@ -47,7 +47,7 @@ export default function IdCardsPage() {
     try {
       await downloadClassIdCardSheet(className, section);
     } catch (err) {
-      setMsg(err?.response?.data?.message || "Could not generate ID card sheet");
+      setMsg(err?.message || "Could not generate ID card sheet");
     }
   };
 

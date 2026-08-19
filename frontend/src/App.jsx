@@ -9,6 +9,7 @@ import StudentDashboard from "./pages/StudentDashboard";
 import StaffDashboard from "./pages/StaffDashboard";
 import LandingPage from "./pages/LandingPage";
 import NoticeList from "./pages/NoticeList";
+import PaymentSandboxComplete from "./pages/PaymentSandboxComplete";
 import NoticeDetails from "./pages/NoticeDetails";
 import BlogList from "./pages/BlogList";
 import BlogDetails from "./pages/BlogDetails";
@@ -146,6 +147,7 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="/payments/sandbox-complete" element={<PaymentSandboxComplete />} />
 
           <Route
             path="/admin"

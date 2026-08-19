@@ -11,6 +11,8 @@ const studentSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: [
+        "Play",
+        "KG",
         "Nursery",
         "Class 1",
         "Class 2",

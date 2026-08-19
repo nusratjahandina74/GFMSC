@@ -62,10 +62,21 @@ export default function LandingPage() {
   ]), []);
 
   const features = useMemo(() => ([
-    { title: "Attendance & Result Automation", desc: "Digital attendance, marks entry, GPA and report card foundation." },
-    { title: "Fees Management", desc: "Due list, invoice, payment tracking and reminders." },
-    { title: "Notice & Communication", desc: "Publish notices fast for teachers/students/guardians." },
-    { title: "Role-based Dashboard", desc: "Separate dashboards for Admin, Teacher and Student." },
+    { title: "Student, Teacher, Staff & Guardian Management", desc: "Complete profiles with class/section assignment, all in one place." },
+    { title: "Attendance Tracking", desc: "Class teachers take daily attendance; admins can search by class, section, date and roll." },
+    { title: "Exams, Marks & Report Cards", desc: "Digital marks entry, automatic GPA/grade calculation, and printable report cards with Bangla font support." },
+    { title: "Fees & Online Payment", desc: "Invoice generation, dues tracking, and online payment via bKash/SSLCommerz." },
+    { title: "Routine & Class Scheduling", desc: "Class-wise weekly routines visible to teachers, students and guardians." },
+    { title: "Notice Board", desc: "Publish notices targeted to everyone or specific roles — teachers, students, staff or guardians." },
+    { title: "Guardian Portal", desc: "Guardians track their child's attendance, results and dues from their own dashboard." },
+    { title: "Online Admissions", desc: "A shareable public application form — submissions land directly in your admin panel for approval." },
+    { title: "Student ID Cards", desc: "Generate printable ID cards with a scannable QR code, individually or as a full-class sheet." },
+    { title: "Library Management", desc: "Track books, issue/return records, and due dates." },
+    { title: "Transport Management", desc: "Manage vehicles, routes, and student transport assignments with monthly billing." },
+    { title: "Staff Payroll", desc: "Generate and track monthly payroll for teachers and staff." },
+    { title: "Leave Management", desc: "Teachers, staff, students and guardians can request leave; admins approve or reject." },
+    { title: "Role-based Dashboards", desc: "Separate, focused dashboards for Super Admin, School Admin, Teacher, Student, Guardian and Staff." },
+    { title: "Data Export", desc: "Export student lists and attendance to Excel/CSV for record-keeping and reporting." },
   ]), []);
 
   const faqs = useMemo(() => ([
@@ -356,12 +367,7 @@ const onDemoSubmit = async (e) => {
           </div>
 
           <div style={{ marginTop: 12, display: "flex", gap: 10, flexWrap: "wrap" }}>
-            <button className="btn btnPrimary" onClick={() => alert("Prospectus download: add a PDF file later")}>
-              <a className="btn btnPrimary" href="/prospectus.pdf" download>
-                Download Prospectus
-              </a>
-            </button>
-            <button className="btn" onClick={() => scrollTo("contact")}>Contact for Admission</button>
+            <button className="btn btnPrimary" onClick={() => scrollTo("contact")}>Contact for Admission</button>
           </div>
         </div>
       </section>

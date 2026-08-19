@@ -2,6 +2,8 @@ import User from "../models/User.js";
 import School from "../models/School.js";
 import Student from "../models/Student.js";
 import Guardian from "../models/Guardian.js";
+import Teacher from "../models/Teacher.js";
+import Staff from "../models/Staff.js";
 
 // SchoolAdmin -> Create Teacher User
 export const createTeacherUser = async (req, res) => {
@@ -269,7 +271,14 @@ export const deleteUser = async (req, res) => {
       return res.status(403).json({ message: "Cannot delete Super Admin" });
     }
 
-    if (kind === "user") await User.findByIdAndDelete(userId);
+    if (kind === "user") {
+      // Clean up whichever profile document is linked to this login
+      // account (Teacher/Staff), not just the User row itself — leaving
+      // it behind orphans a profile with a dead userId reference forever.
+      await Teacher.findOneAndDelete({ userId });
+      await Staff.findOneAndDelete({ userId });
+      await User.findByIdAndDelete(userId);
+    }
     else if (kind === "student") await Student.findByIdAndDelete(userId);
     else if (kind === "guardian") await Guardian.findByIdAndDelete(userId);
 

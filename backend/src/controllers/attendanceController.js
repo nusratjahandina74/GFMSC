@@ -49,12 +49,16 @@ export const takeAttendance = async (req, res) => {
         return res.status(403).json({ message: "You are not authorized to take attendance. Teacher profile not found." });
       }
 
+      // Any class teacher assigned to this exact class/section may take
+      // attendance for it — the isFirstPeriodTeacher flag is unrelated to
+      // who's allowed to take attendance (that hardcoded restriction was
+      // removed everywhere else already; this was the one place it was
+      // still silently blocking legitimate class teachers).
       const isClassTeacher = await ClassTeacher.findOne({
         schoolId: req.user.schoolId,
         className,
         section: section || "",
         teacherId: teacher._id,
-        isFirstPeriodTeacher: true
       }).session(session);
 
     
@@ -62,7 +66,7 @@ export const takeAttendance = async (req, res) => {
         await session.abortTransaction();
         session.endSession();
         return res.status(403).json({ 
-          message: `Access denied. Only the assigned 1st period Class Teacher of ${className}${section ? "-" + section : ""} can take or edit attendance.` 
+          message: `Access denied. Only the assigned Class Teacher of ${className}${section ? "-" + section : ""} can take or edit attendance.` 
         });
       }
     }

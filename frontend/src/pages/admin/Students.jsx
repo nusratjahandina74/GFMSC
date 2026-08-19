@@ -4,27 +4,12 @@ import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
-import { Plus, Loader2, Edit, Trash2, Users, Search } from "lucide-react";
+import { Plus, Loader2, Edit, Trash2, Users, Search, Download } from "lucide-react";
 import { getStudents, createStudent, updateStudent, deleteStudent } from "../../api/students";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { CLASS_LIST, SECTION_LIST } from "../../lib/constants";
-
-const CLASSES = [
-  "Nursery",
-  "Class 1",
-  "Class 2",
-  "Class 3",
-  "Class 4",
-  "Class 5",
-  "Class 6",
-  "Class 7",
-  "Class 8",
-  "Class 9",
-  "Class 10"
-];
-
-const SECTIONS = ["A", "B", "C", "D"];
+import { exportStudentsCSV } from "../../api/exports";
 
 export default function AdminStudents() {
   const [students, setStudents] = useState([]);
@@ -50,17 +35,26 @@ export default function AdminStudents() {
   const [filterClass, setFilterClass] = useState("");
   const [filterSection, setFilterSection] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalStudents, setTotalStudents] = useState(0);
+  const PAGE_SIZE = 20;
 
-  const loadStudents = async () => {
+  const loadStudents = async (targetPage = page) => {
     setLoading(true);
     try {
       const res = await getStudents({
-        limit: 300, // avoid the default 20-per-page cap silently hiding students
+        page: targetPage,
+        limit: PAGE_SIZE,
         ...(filterClass ? { className: filterClass } : {}),
         ...(filterSection ? { section: filterSection } : {}),
         ...(searchTerm ? { search: searchTerm } : {}),
       });
       setStudents(res.students || []);
+      setTotalPages(res.totalPages || 1);
+      setTotalStudents(res.total ?? (res.students || []).length);
+      setPage(res.page || targetPage);
     } catch (err) {
       setMsg(err?.response?.data?.message || err.message);
     } finally {
@@ -69,7 +63,8 @@ export default function AdminStudents() {
   };
 
   useEffect(() => {
-    loadStudents();
+    setPage(1);
+    loadStudents(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filterClass, filterSection]);
 
@@ -146,6 +141,21 @@ export default function AdminStudents() {
     });
   };
 
+  const handleExport = async () => {
+    setExporting(true);
+    setMsg("");
+    try {
+      await exportStudentsCSV({
+        className: filterClass || undefined,
+        section: filterSection || undefined,
+      });
+    } catch (err) {
+      setMsg(err?.response?.data?.message || err.message || "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
       <div className="flex items-center justify-between">
@@ -153,6 +163,16 @@ export default function AdminStudents() {
           <h1 className="text-3xl font-bold tracking-tight">Students</h1>
           <p className="text-muted-foreground">Manage student records</p>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            title="Export the currently filtered student list to Excel/CSV"
+            className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-800 dark:text-gray-200 font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 transition-all disabled:opacity-60"
+          >
+            {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            {exporting ? "Exporting..." : "Export to Excel"}
+          </button>
         <Dialog open={open} onOpenChange={setOpen}>
           <DialogTrigger asChild>
             <button
@@ -200,7 +220,7 @@ export default function AdminStudents() {
                       <SelectValue placeholder="Select class" />
                     </SelectTrigger>
                     <SelectContent>
-                      {CLASSES.map((c) => (
+                      {CLASS_LIST.map((c) => (
                         <SelectItem key={c} value={c}>
                           {c}
                         </SelectItem>
@@ -219,7 +239,7 @@ export default function AdminStudents() {
                       <SelectValue placeholder="Select section" />
                     </SelectTrigger>
                     <SelectContent>
-                      {SECTIONS.map((s) => (
+                      {SECTION_LIST.map((s) => (
                         <SelectItem key={s} value={s}>
                           {s}
                         </SelectItem>
@@ -304,6 +324,7 @@ export default function AdminStudents() {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {msg && (
@@ -350,10 +371,21 @@ export default function AdminStudents() {
                 placeholder="Search by name or Student ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && loadStudents()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setPage(1);
+                    loadStudents(1);
+                  }
+                }}
                 className="flex-1"
               />
-              <Button variant="outline" onClick={loadStudents}>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setPage(1);
+                  loadStudents(1);
+                }}
+              >
                 <Search className="h-4 w-4" />
               </Button>
             </div>
@@ -412,6 +444,31 @@ export default function AdminStudents() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          {!loading && students.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-800">
+              <span className="text-sm text-muted-foreground">
+                Page {page} of {totalPages} · {totalStudents} student{totalStudents === 1 ? "" : "s"} total
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => loadStudents(page - 1)}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() => loadStudents(page + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -73,9 +73,6 @@ const SuperAdminPanel = () => {
   const [duesLoading, setDuesLoading] = useState(false);
   const [leavesData, setLeavesData] = useState([]);
   const [leavesLoading, setLeavesLoading] = useState(false);
-  const [noticeForm, setNoticeForm] = useState({ title: "", body: "", tag: "Notice", targetAudience: "all" });
-  const [noticeSubmitting, setNoticeSubmitting] = useState(false);
-  const [noticeMsg, setNoticeMsg] = useState("");
 
   const loadAnalytics = async () => {
     setAnalyticsLoading(true);
@@ -145,21 +142,6 @@ const SuperAdminPanel = () => {
       await loadSuperAdminLeaves();
     } catch (err) {
       alert(err?.response?.data?.message || "Failed to update leave status");
-    }
-  };
-
-  const handleCreateNotice = async (e) => {
-    e.preventDefault();
-    setNoticeSubmitting(true);
-    setNoticeMsg("");
-    try {
-      await api.post("/dashboard/super-admin/notices", noticeForm);
-      setNoticeMsg("✅ Notice/Meeting published successfully");
-      setNoticeForm({ title: "", body: "", tag: "Notice", targetAudience: "all" });
-    } catch (err) {
-      setNoticeMsg("❌ " + (err?.response?.data?.message || err.message));
-    } finally {
-      setNoticeSubmitting(false);
     }
   };
 
@@ -367,16 +349,6 @@ const SuperAdminPanel = () => {
           }`}
         >
           Leave Approvals
-        </button>
-        <button
-          onClick={() => setTab("notices")}
-          className={`px-3 py-2 font-semibold text-sm border-b-2 whitespace-nowrap transition-colors ${
-            tab === "notices"
-              ? "border-emerald-600 text-emerald-700 dark:text-emerald-400"
-              : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-          }`}
-        >
-          Notice & Meeting
         </button>
       </div>
 
@@ -918,80 +890,6 @@ const SuperAdminPanel = () => {
                 </TableBody>
               </Table>
             )}
-          </CardContent>
-        </Card>
-      )}
-
-      {tab === "notices" && (
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle>Publish Platform Notice or Meeting</CardTitle>
-            <CardDescription>Broadcast announcements, exam routines, or meeting links to all schools</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {noticeMsg && (
-              <div className="p-3 mb-4 rounded border text-sm bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200">
-                {noticeMsg}
-              </div>
-            )}
-            <form onSubmit={handleCreateNotice} className="space-y-4">
-              <div className="space-y-2">
-                <Label>Title / Subject *</Label>
-                <Input
-                  value={noticeForm.title}
-                  onChange={(e) => setNoticeForm({ ...noticeForm, title: e.target.value })}
-                  placeholder="e.g., General Emergency Staff Meeting / Exam Announcement"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Category Tag</Label>
-                <Select
-                  value={noticeForm.tag}
-                  onValueChange={(val) => setNoticeForm({ ...noticeForm, tag: val })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Tag" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Notice">Notice</SelectItem>
-                    <SelectItem value="Meeting">Meeting</SelectItem>
-                    <SelectItem value="Event">Event</SelectItem>
-                    <SelectItem value="Holiday">Holiday</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Target Audience</Label>
-                <Select
-                  value={noticeForm.targetAudience}
-                  onValueChange={(val) => setNoticeForm({ ...noticeForm, targetAudience: val })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Audience" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All (Teachers, Students, Staff, Admins)</SelectItem>
-                    <SelectItem value="teachers">Teachers Only</SelectItem>
-                    <SelectItem value="students">Students & Guardians Only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Details / Content / Meeting Link *</Label>
-                <textarea
-                  className="w-full min-h-[120px] p-3 rounded-md border border-input bg-transparent text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  value={noticeForm.body}
-                  onChange={(e) => setNoticeForm({ ...noticeForm, body: e.target.value })}
-                  placeholder="Enter notice description or Zoom/Google Meet link details..."
-                  required
-                />
-              </div>
-              <Button type="submit" disabled={noticeSubmitting} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
-                {noticeSubmitting && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                Publish Notice / Meeting
-              </Button>
-            </form>
           </CardContent>
         </Card>
       )}

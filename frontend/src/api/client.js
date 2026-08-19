@@ -24,9 +24,8 @@ api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`; // Secure direct header string injection fallback
+      config.headers.Authorization = `Bearer ${token}`;
     }
-    console.log(`[API Request] ${config.method?.toUpperCase()} ${config.url}`, config.data || "");
     return config;
   },
   (error) => Promise.reject(error)
@@ -41,12 +40,9 @@ const processQueue = (error, token = null) => {
 };
 
 api.interceptors.response.use(
-  (response) => {
-    console.log(`[API Response] ${response.config.method?.toUpperCase()} ${response.config.url}`, response.status, response.data);
-    return response;
-  },
+  (response) => response,
   async (error) => {
-    console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, error.response?.status, error.response?.data || error.message);
+    console.error(`[API Error] ${error.config?.method?.toUpperCase()} ${error.config?.url}`, error.response?.status);
 
     const originalRequest = error.config;
     const isAuthRoute = originalRequest?.url?.includes("/auth/login") || originalRequest?.url?.includes("/auth/refresh");

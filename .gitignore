@@ -5,9 +5,4 @@ frontend/dist/
 
 # Never commit real secrets. .env.example (no real values) is fine to
 # commit; .env, .env.local, .env.production.local etc are not.
-.env
-.env.local
-*.env.local
-backend/.env
-frontend/.env
-!frontend/.env.production
+

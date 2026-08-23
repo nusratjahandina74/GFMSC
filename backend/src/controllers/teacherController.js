@@ -1,48 +1,54 @@
 import Teacher from "../models/Teacher.js";
 import User from "../models/User.js";
+import mongoose from "mongoose";
 
-// Create Teacher (SchoolAdmin only)
 export const createTeacher = async (req, res) => {
-  try {
 
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
     const { name, email, phone, subject, shift, password, schoolId } = req.body;
 
     const targetSchoolId = schoolId || req.user.schoolId;
     if (!name || !email || !password) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ message: "Name, email, and password are required" });
     }
     if (!targetSchoolId) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ message: "School ID is required to create a teacher." });
     }
 
     // Check if User already exists
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email }).session(session);
     if (existingUser) {
+      await session.abortTransaction();
+      session.endSession();
       return res.status(400).json({ message: "User with this email already exists" });
     }
-
-    // Create User first
-    const user = await User.create({
+    const [user] = await User.create([{
       name,
       email,
       password,
       role: "teacher",
       schoolId: targetSchoolId,
       emailVerified: true,
-    });
+    }], { session });
 
-    // Create Teacher
-    const teacher = await Teacher.create({
+    const [teacher] = await Teacher.create([{
       name,
       email,
       phone,
       subject,
-
       shift: shift || undefined,
-
       schoolId: targetSchoolId,
       userId: user._id,
-    });
+    }], { session });
+    await session.commitTransaction();
+    session.endSession();
 
     res.status(201).json({
       message: "Teacher created successfully",
@@ -55,11 +61,11 @@ export const createTeacher = async (req, res) => {
       }
     });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     res.status(500).json({ message: error.message });
   }
 };
-
-// Get Teachers (own school only) with pagination and search
 export const getTeachers = async (req, res) => {
   try {
     const { page = 1, limit = 20, search } = req.query;
@@ -69,7 +75,6 @@ export const getTeachers = async (req, res) => {
 
     const filter = {};
     if (req.user.role === "superAdmin") {
-      // superAdmin can list all teachers; filter by schoolId if passed
       const qSchoolId = req.query.schoolId;
       if (qSchoolId) filter.schoolId = qSchoolId;
     } else {
@@ -108,7 +113,6 @@ export const getTeachers = async (req, res) => {
   }
 };
 
-// 🔍 Get single teacher by ID
 export const getTeacherById = async (req, res) => {
   try {
     const filter = { _id: req.params.id };
@@ -123,7 +127,6 @@ export const getTeacherById = async (req, res) => {
   }
 };
 
-// ✏️ Update Teacher (SchoolAdmin only)
 export const updateTeacher = async (req, res) => {
   try {
     const filter = { _id: req.params.id };
@@ -145,28 +148,34 @@ export const updateTeacher = async (req, res) => {
 
 // 🗑️ Delete Teacher (SchoolAdmin only)
 export const deleteTeacher = async (req, res) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
   try {
     const filter = { _id: req.params.id };
     if (req.user.role !== "superAdmin") {
       filter.schoolId = req.user.schoolId;
     }
-    const teacher = await Teacher.findOne(filter);
-    if (!teacher) return res.status(404).json({ message: "Teacher not found" });
-
-    // A Teacher profile is just half the account — the actual login lives
-    // on a separate User document (teacher.userId). Deleting only the
-    // Teacher profile left that User account behind forever: its email
-    // stayed permanently locked (so re-adding a teacher with the same
-    // email after "deleting" them always failed with "already exists"),
-    // and the orphaned account could still log in even though its Teacher
-    // profile — and therefore its whole dashboard — no longer existed.
-    if (teacher.userId) {
-      await User.findByIdAndDelete(teacher.userId);
+    const teacher = await Teacher.findOne(filter).session(session);
+    if (!teacher) {
+      await session.abortTransaction();
+      session.endSession();
+      return res.status(404).json({ message: "Teacher not found" });
     }
 
-    await teacher.deleteOne();
+    if (teacher.userId) {
+      await User.findByIdAndDelete(teacher.userId).session(session);
+    }
+
+    await teacher.deleteOne({ session });
+    
+    await session.commitTransaction();
+    session.endSession();
+
     res.status(200).json({ message: "Teacher deleted successfully" });
   } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
     res.status(500).json({ message: error.message });
   }
 };

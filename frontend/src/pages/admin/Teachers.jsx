@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 
 export default function AdminTeachers() {
   const [teachers, setTeachers] = useState([]);
-  const [shifts, setShifts] = useState([]); // live shift names from the school's Shift Time Slots setup
+  const [shifts, setShifts] = useState([]); 
   const [loading, setLoading] = useState(true);
   const [loadingForm, setLoadingForm] = useState(false);
   const [msg, setMsg] = useState("");
@@ -28,11 +28,21 @@ export default function AdminTeachers() {
     password: "",
   });
 
-  const loadTeachers = async () => {
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalTeachers, setTotalTeachers] = useState(0);
+
+ const loadTeachers = async (targetPage = page) => {
     setLoading(true);
     try {
-      const res = await getTeachers();
+      const res = await getTeachers({
+        page: targetPage,
+        limit: 20, // প্রতি পেজে ২০ জন করে দেখাবে
+      });
       setTeachers(res.teachers || []);
+      setTotalPages(res.totalPages || 1);
+      setTotalTeachers(res.total ?? (res.teachers || []).length);
+      setPage(res.page || targetPage);
     } catch (err) {
       setMsg(err?.response?.data?.message || err.message);
     } finally {
@@ -52,9 +62,10 @@ export default function AdminTeachers() {
   };
 
   useEffect(() => {
-    loadTeachers();
+    loadTeachers(page);
     loadShifts();
-  }, []);
+   
+  }, [page]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -71,14 +82,13 @@ export default function AdminTeachers() {
       }
       setOpen(false);
       resetForm();
-      await loadTeachers();
+      await loadTeachers(1); 
     } catch (err) {
       setMsg(err?.response?.data?.message || err.message);
     } finally {
       setLoadingForm(false);
     }
   };
-
   const handleEdit = (teacher) => {
     setEditingId(teacher._id);
     setFormData({
@@ -97,7 +107,7 @@ export default function AdminTeachers() {
     try {
       await deleteTeacher(id);
       setMsg("✅ Teacher deleted successfully");
-      await loadTeachers();
+      await loadTeachers(1); 
     } catch (err) {
       setMsg(err?.response?.data?.message || err.message);
     } finally {
@@ -254,19 +264,19 @@ export default function AdminTeachers() {
                     <TableCell className="font-medium">{teacher.name}</TableCell>
                     <TableCell>{teacher.subject}</TableCell>
                     <TableCell>{teacher.email}</TableCell>
-                    <TableCell>{teacher.phone || "-"}</TableCell>
-                    <TableCell className="text-sm">{teacher.shift || "-"}</TableCell>
+                    <TableCell>{teacher.phone || "N/A"}</TableCell>
+                    <TableCell>{teacher.shift || "N/A"}</TableCell>
                     <TableCell>
                       <div className="flex gap-2">
-                        <button 
+                        <button
                           onClick={() => handleEdit(teacher)}
-                          className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200 font-bold p-2 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all"
+                          className="text-indigo-600 hover:text-indigo-900 font-bold p-2"
                         >
                           <Edit className="h-4 w-4" />
                         </button>
-                        <button 
+                        <button
                           onClick={() => handleDelete(teacher._id)}
-                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 font-bold p-2 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-all"
+                          className="text-red-600 hover:text-red-900 font-bold p-2"
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -276,6 +286,33 @@ export default function AdminTeachers() {
                 ))}
               </TableBody>
             </Table>
+          )}
+
+          {/* 🔘 মেইন প্যাজিঙেশন বাটন প্যানেল */}
+          {!loading && teachers.length > 0 && (
+            <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-800">
+              <span className="text-sm text-muted-foreground">
+                Page {page} of {totalPages} · {totalTeachers} teacher{totalTeachers === 1 ? "" : "s"} total
+              </span>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => loadTeachers(page - 1)}
+                >
+                  Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() => loadTeachers(page + 1)}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>

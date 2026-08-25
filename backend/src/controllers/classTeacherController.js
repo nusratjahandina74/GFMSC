@@ -256,7 +256,7 @@ export const assignClassTeacher = async (req, res) => {
     _id: { $ne: existingClassTeacher._id },
     schoolId: targetSchoolId,
     teacherId,
-    shift: targetShift,
+    // shift: targetShift,
   });
 
   if (teacherAlreadyAssigned) {

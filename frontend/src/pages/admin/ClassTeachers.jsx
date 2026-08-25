@@ -143,10 +143,6 @@ export default function AdminClassTeachers() {
       return;
     }
 
-    if (!formData.shift) {
-      setMsg("Please enter/select a shift.");
-      return;
-    }
 
     setLoadingForm(true);
 

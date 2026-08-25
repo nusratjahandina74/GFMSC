@@ -42,12 +42,12 @@ export const getClassTeachers = async (req, res) => {
           : String(req.query.section).trim();
     }
 
-    if (req.query.shift !== undefined) {
-      filter.shift =
-        req.query.shift === ""
-          ? ""
-          : String(req.query.shift).trim();
-    }
+    // if (req.query.shift !== undefined) {
+    //   filter.shift =
+    //     req.query.shift === ""
+    //       ? ""
+    //       : String(req.query.shift).trim();
+    // }
 
     // --------------------------------------------------------
     // GET DATA
@@ -60,7 +60,6 @@ export const getClassTeachers = async (req, res) => {
       .sort({
         className: 1,
         section: 1,
-        shift: 1,
       });
 
     return res.status(200).json({
@@ -81,17 +80,17 @@ export const getClassTeachers = async (req, res) => {
 export const getClassTeacher = async (req, res) => {
   try {
     const { className, section } = req.params;
-    const { shift } = req.query;
+    // const { shift } = req.query;
 
     const targetSection =
       section === "undefined" || !section
         ? ""
         : String(section).trim();
 
-    const targetShift =
-      shift === "undefined" || !shift
-        ? ""
-        : String(shift).trim();
+    // const targetShift =
+    //   shift === "undefined" || !shift
+    //     ? ""
+    //     : String(shift).trim();
 
     // --------------------------------------------------------
     // SCHOOL SCOPE
@@ -115,7 +114,7 @@ export const getClassTeacher = async (req, res) => {
       schoolId: targetSchoolId,
       className,
       section: targetSection,
-      shift: targetShift,
+      // shift: targetShift,
     };
 
     const classTeacher = await ClassTeacher.findOne(filter)
@@ -297,7 +296,7 @@ export const updateClassTeacherById = async (
       className,
       section,
       isFirstPeriodTeacher,
-      shift,
+      // shift,
     } = req.body;
 
     const nextTeacherId =
@@ -311,10 +310,10 @@ export const updateClassTeacherById = async (
         ? String(section).trim()
         : classTeacher.section || "";
 
-    const nextShift =
-      shift !== undefined
-        ? String(shift).trim()
-        : classTeacher.shift || "";
+    // const nextShift =
+    //   shift !== undefined
+    //     ? String(shift).trim()
+    //     : classTeacher.shift || "";
 
     let nextIsFirstPeriodTeacher =
       classTeacher.isFirstPeriodTeacher;
@@ -373,7 +372,7 @@ export const updateClassTeacherById = async (
         _id: { $ne: classTeacher._id },
         schoolId: classTeacher.schoolId,
         teacherId: nextTeacherId,
-        shift: nextShift,
+        // shift: nextShift,
       });
 
     if (duplicateTeacher) {
@@ -394,7 +393,7 @@ export const updateClassTeacherById = async (
         schoolId: classTeacher.schoolId,
         className: nextClassName,
         section: nextSection,
-        shift: nextShift,
+        // shift: nextShift,
       });
 
     if (duplicateClass) {
@@ -416,8 +415,8 @@ export const updateClassTeacherById = async (
     classTeacher.section =
       nextSection;
 
-    classTeacher.shift =
-      nextShift;
+    // classTeacher.shift =
+    //   nextShift;
 
     classTeacher.isFirstPeriodTeacher =
       nextIsFirstPeriodTeacher;

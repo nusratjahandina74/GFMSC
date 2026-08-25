@@ -23,10 +23,10 @@ const classTeacherSchema = new mongoose.Schema({
     type: String,
     default: "" 
   },
-  shift: {
-    type: String,
-    default: "",
-  },
+  // shift: {
+  //   type: String,
+  //   default: "",
+  // },
   isFirstPeriodTeacher: { type: Boolean, default: false }
 }, { timestamps: true });
 

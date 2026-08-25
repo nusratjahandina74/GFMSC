@@ -68,7 +68,6 @@ export default function AdminClassTeachers() {
     teacherId: "",
     className: "",
     section: "",
-    shift: "",
     isFirstPeriodTeacher: false,
   });
 
@@ -206,7 +205,6 @@ export default function AdminClassTeachers() {
 
       // IMPORTANT:
       // Keep existing shift while editing
-      shift: ct.shift || "",
 
       isFirstPeriodTeacher:
         ct.isFirstPeriodTeacher === true,
@@ -261,7 +259,6 @@ export default function AdminClassTeachers() {
       teacherId: "",
       className: "",
       section: "",
-      shift: "",
       isFirstPeriodTeacher: false,
     });
   };
@@ -489,35 +486,7 @@ export default function AdminClassTeachers() {
 
               </div>
 
-              {/* =================================================
-                  SHIFT
-              ================================================== */}
-              <div className="space-y-2">
-
-                <Label>
-                  Shift *
-                </Label>
-
-                <input
-                  type="text"
-                  value={formData.shift}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      shift: e.target.value,
-                    }))
-                  }
-                  placeholder="Enter shift name"
-                  className="w-full border rounded-md px-3 py-2 bg-background"
-                  required
-                />
-
-                <p className="text-xs text-muted-foreground">
-                  Example: Morning Shift
-                </p>
-
-              </div>
-
+             
               {/* =================================================
                   FIRST PERIOD
               ================================================== */}

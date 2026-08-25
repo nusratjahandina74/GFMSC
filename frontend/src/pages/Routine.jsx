@@ -67,40 +67,100 @@ export default function RoutinePage() {
     room: "",
   });
 
-  const fetchShiftTemplates = async () => {
-    try {
-      const list = await getShiftTemplates();
-      setShiftTemplates(list);
-      setFormData((prev) => (prev.shift ? prev : { ...prev, shift: list[0]?.shift || "" }));
-    } catch (err) {
-      console.error("Fetch shift templates error:", err);
-    }
-  };
+const fetchShiftTemplates = async () => {
+  try {
+    const list = await getShiftTemplates();
 
-  const fetchRoutine = async () => {
-    setLoading(true);
-    try {
-      let res;
-      if (role === "teacher") {
-        res = await getTeacherRoutine(user.teacherId || user._id);
-        setRoutine(res.data?.routine || []);
-      } else {
-        if (!className) {
-          // Admin hasn't picked a class yet — don't show a stale/default
-          // class's routine, show nothing until they actually select one.
-          setRoutine([]);
-          setLoading(false);
-          return;
-        }
-        res = await getClassRoutine({ className, section });
-        setRoutine(res.data?.routine || []);
+    const safeList = Array.isArray(list) ? list : [];
+    setShiftTemplates(safeList);
+
+    setFormData((prev) => {
+      if (prev.shift) return prev;
+      return {
+        ...prev,
+        shift: safeList[0]?.shift || "",
+      };
+    });
+  } catch (err) {
+    console.error("Fetch shift templates error:", err);
+
+    setShiftTemplates([]);
+  }
+};
+
+const fetchRoutine = async () => {
+  setLoading(true);
+
+  try {
+    let res;
+
+    if (role === "teacher") {
+      const teacherId = user?.teacherId || user?._id;
+
+      if (!teacherId) {
+        setRoutine([]);
+        return;
       }
-    } catch (err) {
-      console.error("Fetch routine error:", err);
-    } finally {
-      setLoading(false);
+
+      res = await getTeacherRoutine(teacherId);
+      setRoutine(res.data?.routine || []);
+      return;
     }
-  };
+
+    if (!className) {
+      setRoutine([]);
+      return;
+    }
+
+    const params = {
+      className,
+    };
+    if (section) {
+      params.section = section;
+    }
+    res = await getClassRoutine(params);
+
+    const routineData = Array.isArray(res.data?.routine)
+      ? res.data.routine
+      : [];
+
+    setRoutine(routineData);
+
+    const existingShifts = [
+      ...new Set(
+        routineData
+          .map((item) => item?.shift)
+          .filter(Boolean)
+      ),
+    ];
+
+    if (existingShifts.length > 0) {
+      setShiftTemplates((prev) => {
+        const templateNames = prev.map((s) => s.shift);
+
+        const missing = existingShifts
+          .filter((name) => !templateNames.includes(name))
+          .map((name) => ({
+            _id: `legacy-${name}`,
+            shift: name,
+            periods: [],
+          }));
+
+        return [...prev, ...missing];
+      });
+    }
+  } catch (err) {
+    console.error("Fetch routine error:", err);
+
+    setRoutine([]);
+
+    if (err?.response?.data?.message) {
+      console.error(err.response.data.message);
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
 const fetchTeachers = async () => {
   try {
@@ -134,25 +194,58 @@ const fetchTeachers = async () => {
     fetchShiftTemplates();
   }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      if (editingId) {
-        await updateRoutine(editingId, formData);
-      } else {
-        await createRoutine(formData);
-      }
-      setOpenDialog(false);
-      resetForm();
-      fetchRoutine();
-    } catch (err) {
-      console.error("Submit routine error:", err);
-      alert(err?.response?.data?.message || "Failed to save routine entry");
-    } finally {
-      setLoading(false);
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+
+  if (!formData.shift) {
+    alert("Please select a shift first.");
+    return;
+  }
+
+  if (!formData.teacherId) {
+    alert("Please select a teacher.");
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const payload = {
+      ...formData,
+      period: Number(formData.period),
+      section: formData.section || "",
+      shift: formData.shift.trim(),
+    };
+
+    if (editingId) {
+      await updateRoutine(editingId, payload);
+    } else {
+      await createRoutine(payload);
     }
-  };
+
+    setOpenDialog(false);
+    resetForm();
+    await fetchRoutine();
+
+  } catch (err) {
+    console.error("Submit routine error:", err);
+
+    const status = err?.response?.status;
+    const message =
+      err?.response?.data?.message ||
+      "Failed to save routine entry";
+
+    if (status === 409) {
+      alert(
+        `This class/section/day/period- shift- routine already exists.\n\n${message}`
+      );
+    } else {
+      alert(message);
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleEdit = (item) => {
     setEditingId(item._id);
@@ -208,14 +301,21 @@ const fetchTeachers = async () => {
 
   // Show ALL active teachers, with shift-matched ones sorted first.
   // Never filter out a teacher from the dropdown — admins must be able to assign any teacher to any period.
-  const teachersForShift = teachers
-    .slice()
-    .sort((a, b) => {
-      const aMatches = !formData.shift || a.shift === formData.shift ? 0 : 1;
-      const bMatches = !formData.shift || b.shift === formData.shift ? 0 : 1;
-      if (aMatches !== bMatches) return aMatches - bMatches;
-      return (a.name || "").localeCompare(b.name || "");
-    });
+const teachersForShift = teachers
+  .slice()
+  .sort((a, b) => {
+    const aMatches =
+      !formData.shift || a.shift === formData.shift ? 0 : 1;
+
+    const bMatches =
+      !formData.shift || b.shift === formData.shift ? 0 : 1;
+
+    if (aMatches !== bMatches) {
+      return aMatches - bMatches;
+    }
+
+    return (a.name || "").localeCompare(b.name || "");
+  });
 
   const TABS = [
     { key: "list", label: "Weekly Routine" },

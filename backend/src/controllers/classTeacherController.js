@@ -1,154 +1,603 @@
 import ClassTeacher from "../models/ClassTeacher.js";
-import User from "../models/User.js";
-import Routine from "../models/Routine.js";
 import Teacher from "../models/Teacher.js";
 
-
+// ============================================================
+// GET ALL CLASS TEACHERS
+// ============================================================
 export const getClassTeachers = async (req, res) => {
   try {
     const filter = {};
-    const targetSchoolId = req.query.schoolId || req.user.schoolId;
-    if (targetSchoolId) filter.schoolId = targetSchoolId;
-    if (req.query.className) filter.className = req.query.className;
-    if (req.query.section !== undefined) filter.section = req.query.section === "" ? "" : req.query.section;
-    if (req.query.shift !== undefined) filter.shift = req.query.shift === "" ? "" : req.query.shift;
 
+    // --------------------------------------------------------
+    // SCHOOL SCOPE
+    // --------------------------------------------------------
+    let targetSchoolId;
+
+    if (req.user.role === "superAdmin") {
+      targetSchoolId = req.query.schoolId || req.user.schoolId;
+    } else {
+      targetSchoolId = req.user.schoolId;
+    }
+
+    if (!targetSchoolId) {
+      return res.status(400).json({
+        message:
+          "Your account is not linked to a school. Please log in again or contact super admin support.",
+      });
+    }
+
+    filter.schoolId = targetSchoolId;
+
+    // --------------------------------------------------------
+    // OPTIONAL FILTERS
+    // --------------------------------------------------------
+    if (req.query.className) {
+      filter.className = req.query.className;
+    }
+
+    if (req.query.section !== undefined) {
+      filter.section =
+        req.query.section === ""
+          ? ""
+          : String(req.query.section).trim();
+    }
+
+    if (req.query.shift !== undefined) {
+      filter.shift =
+        req.query.shift === ""
+          ? ""
+          : String(req.query.shift).trim();
+    }
+
+    // --------------------------------------------------------
+    // GET DATA
+    // --------------------------------------------------------
     const classTeachers = await ClassTeacher.find(filter)
-      .populate("teacherId", "name email shift userId");
-    res.json({ classTeachers });
+      .populate(
+        "teacherId",
+        "name email phone subject shift userId isActive"
+      )
+      .sort({
+        className: 1,
+        section: 1,
+        shift: 1,
+      });
+
+    return res.status(200).json({
+      classTeachers,
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error("getClassTeachers error:", error);
+
+    return res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
+// ============================================================
+// GET SINGLE CLASS TEACHER
+// ============================================================
 export const getClassTeacher = async (req, res) => {
   try {
     const { className, section } = req.params;
     const { shift } = req.query;
-    const targetSection = section === "undefined" || !section ? "" : section;
-    const targetShift = shift === "undefined" || !shift ? "" : shift;
-    
-    const filter = { className, section: targetSection, shift: targetShift };
-    const targetSchoolId = req.query.schoolId || req.user.schoolId;
-    if (targetSchoolId) filter.schoolId = targetSchoolId;
 
-    const classTeacher = await ClassTeacher.findOne(filter)
-      .populate("teacherId", "name email");
-    res.json({ classTeacher });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
+    const targetSection =
+      section === "undefined" || !section
+        ? ""
+        : String(section).trim();
 
-export const assignClassTeacher = async (req, res) => {
-  try {
-    const { teacherId, className, section, schoolId, isFirstPeriodTeacher, shift } = req.body;
-    const targetSchoolId = schoolId || req.user.schoolId;
-    const targetSection = section || "";
-    const targetShift = shift || "";
+    const targetShift =
+      shift === "undefined" || !shift
+        ? ""
+        : String(shift).trim();
 
-    if (!teacherId || !className) {
-      return res.status(400).json({ message: "teacherId and className are required" });
+    // --------------------------------------------------------
+    // SCHOOL SCOPE
+    // --------------------------------------------------------
+    let targetSchoolId;
+
+    if (req.user.role === "superAdmin") {
+      targetSchoolId = req.query.schoolId || req.user.schoolId;
+    } else {
+      targetSchoolId = req.user.schoolId;
     }
+
     if (!targetSchoolId) {
-      return res.status(400).json({ message: "School ID is required to assign a class teacher" });
+      return res.status(400).json({
+        message:
+          "Your account is not linked to a school.",
+      });
     }
 
-    const checkFirstPeriod = isFirstPeriodTeacher === "true" || isFirstPeriodTeacher === true;
-
-    if (checkFirstPeriod) {
-      const teacherProfile = await Teacher.findById(teacherId);
-      if (!teacherProfile || !teacherProfile.userId) {
-        return res.status(400).json({ message: "Linked user login account not found for this teacher." });
-      }
-      // NOTE: The 1st-period routine validation check has been intentionally REMOVED
-      // per user request. Previously this blocked class-teacher assignment with:
-      //   "This teacher doesn't have a 1st-period class..."
-      // Admins can now mark any teacher as "Is First Period Teacher" directly,
-      // even before their routine entry exists. The teacher visibility rule in
-      // studentController still restricts them to this assigned class/section.
-    }
-
-    // Upsert by schoolId + className + section + shift — different shifts on the same class get their own class teacher.
-    let classTeacher = await ClassTeacher.findOne({
+    const filter = {
       schoolId: targetSchoolId,
       className,
       section: targetSection,
       shift: targetShift,
+    };
+
+    const classTeacher = await ClassTeacher.findOne(filter)
+      .populate(
+        "teacherId",
+        "name email phone subject shift userId isActive"
+      );
+
+    return res.status(200).json({
+      classTeacher,
     });
-    if (classTeacher) {
-      classTeacher.teacherId = teacherId;
-      classTeacher.isFirstPeriodTeacher = checkFirstPeriod;
-      classTeacher.shift = targetShift;
-      await classTeacher.save();
+  } catch (error) {
+    console.error("getClassTeacher error:", error);
+
+    return res.status(500).json({
+      message: error.message,
+    });
+  }
+};
+
+// ============================================================
+// ASSIGN / CREATE CLASS TEACHER
+// ============================================================
+export const assignClassTeacher = async (req, res) => {
+  try {
+    const {
+      teacherId,
+      className,
+      section,
+      schoolId,
+      isFirstPeriodTeacher,
+      shift,
+    } = req.body;
+
+    // --------------------------------------------------------
+    // SCHOOL SCOPE
+    // --------------------------------------------------------
+    let targetSchoolId;
+
+    if (req.user.role === "superAdmin") {
+      targetSchoolId =
+        schoolId || req.user.schoolId;
     } else {
-      classTeacher = await ClassTeacher.create({
+      targetSchoolId = req.user.schoolId;
+    }
+
+    if (!targetSchoolId) {
+      return res.status(400).json({
+        message:
+          "School ID is required to assign a class teacher.",
+      });
+    }
+
+    // --------------------------------------------------------
+    // NORMALIZE VALUES
+    // --------------------------------------------------------
+    const targetSection =
+      section !== undefined &&
+      section !== null
+        ? String(section).trim()
+        : "";
+
+    const targetShift =
+      shift !== undefined &&
+      shift !== null
+        ? String(shift).trim()
+        : "";
+
+    // --------------------------------------------------------
+    // REQUIRED FIELDS
+    // --------------------------------------------------------
+    if (!teacherId || !className) {
+      return res.status(400).json({
+        message:
+          "teacherId and className are required",
+      });
+    }
+
+    // --------------------------------------------------------
+    // VERIFY TEACHER
+    // --------------------------------------------------------
+    const teacherProfile = await Teacher.findOne({
+      _id: teacherId,
+      schoolId: targetSchoolId,
+    });
+
+    if (!teacherProfile) {
+      return res.status(404).json({
+        message:
+          "Teacher not found in this school.",
+      });
+    }
+
+    if (teacherProfile.isActive === false) {
+      return res.status(400).json({
+        message:
+          "This teacher is inactive and cannot be assigned as a class teacher.",
+      });
+    }
+
+    // --------------------------------------------------------
+    // FIRST PERIOD FLAG
+    // --------------------------------------------------------
+    const checkFirstPeriod =
+      isFirstPeriodTeacher === true ||
+      isFirstPeriodTeacher === "true";
+
+    // --------------------------------------------------------
+    // LINKED USER REQUIRED FOR CLASS TEACHER LOGIN
+    // --------------------------------------------------------
+    if (checkFirstPeriod && !teacherProfile.userId) {
+      return res.status(400).json({
+        message:
+          "Linked user login account not found for this teacher.",
+      });
+    }
+
+    // ========================================================
+    // IMPORTANT RULE #1
+    // SAME CLASS + SECTION + SHIFT
+    // CAN HAVE ONLY ONE CLASS TEACHER
+    // ========================================================
+    const existingClassTeacher =
+      await ClassTeacher.findOne({
+        schoolId: targetSchoolId,
+        className,
+        section: targetSection,
+        shift: targetShift,
+      });
+
+    // --------------------------------------------------------
+    // If assignment already exists, update it
+    // --------------------------------------------------------
+  if (existingClassTeacher) {
+  // Same teacher cannot be assigned to another class
+  // in the same shift.
+  const teacherAlreadyAssigned = await ClassTeacher.findOne({
+    _id: { $ne: existingClassTeacher._id },
+    schoolId: targetSchoolId,
+    teacherId,
+    shift: targetShift,
+  });
+
+  if (teacherAlreadyAssigned) {
+    return res.status(409).json({
+      message:
+        `This teacher is already assigned as class teacher of ` +
+        `${teacherAlreadyAssigned.className}` +
+        `${teacherAlreadyAssigned.section ? `-${teacherAlreadyAssigned.section}` : ""}` +
+        ` in ${targetShift || "this"} shift.`,
+    });
+  }
+
+  existingClassTeacher.teacherId = teacherId;
+  existingClassTeacher.isFirstPeriodTeacher =
+    checkFirstPeriod;
+  existingClassTeacher.shift = targetShift;
+
+  await existingClassTeacher.save();
+
+  await existingClassTeacher.populate(
+    "teacherId",
+    "name email phone subject shift userId isActive"
+  );
+
+  return res.status(200).json({
+    message: "Class teacher assigned successfully",
+    classTeacher: existingClassTeacher,
+  });
+}
+
+    // ========================================================
+    // IMPORTANT RULE #2
+    // SAME TEACHER CANNOT BE CLASS TEACHER OF
+    // TWO DIFFERENT CLASSES IN THE SAME SHIFT
+    // ========================================================
+    const teacherAlreadyAssigned =
+      await ClassTeacher.findOne({
+        schoolId: targetSchoolId,
+        teacherId,
+        shift: targetShift,
+      }).populate(
+        "teacherId",
+        "name email phone subject shift userId isActive"
+      );
+
+    if (teacherAlreadyAssigned) {
+      return res.status(409).json({
+        message:
+          `This teacher is already assigned as class teacher of ${teacherAlreadyAssigned.className}${teacherAlreadyAssigned.section ? `-${teacherAlreadyAssigned.section}` : ""} in ${targetShift || "this"} shift.`,
+      });
+    }
+
+    // ========================================================
+    // CREATE NEW ASSIGNMENT
+    // ========================================================
+    const classTeacher =
+      await ClassTeacher.create({
         schoolId: targetSchoolId,
         teacherId,
         className,
         section: targetSection,
         shift: targetShift,
-        isFirstPeriodTeacher: checkFirstPeriod,
+        isFirstPeriodTeacher:
+          checkFirstPeriod,
+      });
+
+    await classTeacher.populate(
+      "teacherId",
+      "name email phone subject shift userId isActive"
+    );
+
+    return res.status(201).json({
+      message:
+        "Class teacher assigned successfully",
+      classTeacher,
+    });
+  } catch (error) {
+    console.error(
+      "assignClassTeacher error:",
+      error
+    );
+
+    // MongoDB unique index error
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message:
+          "A class teacher for this class/section/shift combination already exists.",
       });
     }
 
-    res.json({ message: "Class teacher assigned successfully", classTeacher });
-  } catch (error) {
-    if (error.code === 11000) {
-      res.status(409).json({ message: "A class teacher for this class/section/shift combination already exists." });
-    } else {
-      res.status(500).json({ message: error.message });
-    }
+    return res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-
-export const updateClassTeacherById = async (req, res) => {
+// ============================================================
+// UPDATE CLASS TEACHER
+// ============================================================
+export const updateClassTeacherById = async (
+  req,
+  res
+) => {
   try {
-    const filter = { _id: req.params.id };
-    if (req.user.role !== "superAdmin") filter.schoolId = req.user.schoolId;
+    const filter = {
+      _id: req.params.id,
+    };
 
-    const classTeacher = await ClassTeacher.findOne(filter);
-    if (!classTeacher) return res.status(404).json({ message: "Class teacher assignment not found" });
-
-    const { teacherId, className, section, isFirstPeriodTeacher, shift } = req.body;
-    const nextTeacherId = teacherId ?? classTeacher.teacherId;
-    const nextClassName = className ?? classTeacher.className;
-    const nextSection = section !== undefined ? String(section).trim() : classTeacher.section;
-    const nextShift = shift !== undefined ? String(shift).trim() : (classTeacher.shift || "");
-    
-    let nextIsFirstPeriodTeacher = classTeacher.isFirstPeriodTeacher;
-    if (isFirstPeriodTeacher !== undefined) {
-      nextIsFirstPeriodTeacher = isFirstPeriodTeacher === "true" || isFirstPeriodTeacher === true;
-    }
-
-    if (nextIsFirstPeriodTeacher) {
-      const teacherProfile = await Teacher.findById(nextTeacherId);
-      if (!teacherProfile || !teacherProfile.userId) {
-        return res.status(400).json({ message: "Linked user login account not found for this teacher." });
+    // --------------------------------------------------------
+    // SCHOOL ADMIN MUST ONLY UPDATE OWN SCHOOL
+    // --------------------------------------------------------
+    if (req.user.role !== "superAdmin") {
+      if (!req.user.schoolId) {
+        return res.status(400).json({
+          message:
+            "Your account is not linked to a school.",
+        });
       }
-      // NOTE: 1st-period routine validation REMOVED (see assignClassTeacher above).
+
+      filter.schoolId = req.user.schoolId;
     }
 
-    classTeacher.teacherId = nextTeacherId;
-    classTeacher.className = nextClassName;
-    classTeacher.section = nextSection;
-    classTeacher.shift = nextShift;
-    classTeacher.isFirstPeriodTeacher = nextIsFirstPeriodTeacher;
+    const classTeacher =
+      await ClassTeacher.findOne(filter);
+
+    if (!classTeacher) {
+      return res.status(404).json({
+        message:
+          "Class teacher assignment not found",
+      });
+    }
+
+    const {
+      teacherId,
+      className,
+      section,
+      isFirstPeriodTeacher,
+      shift,
+    } = req.body;
+
+    const nextTeacherId =
+      teacherId || classTeacher.teacherId;
+
+    const nextClassName =
+      className || classTeacher.className;
+
+    const nextSection =
+      section !== undefined
+        ? String(section).trim()
+        : classTeacher.section || "";
+
+    const nextShift =
+      shift !== undefined
+        ? String(shift).trim()
+        : classTeacher.shift || "";
+
+    let nextIsFirstPeriodTeacher =
+      classTeacher.isFirstPeriodTeacher;
+
+    if (isFirstPeriodTeacher !== undefined) {
+      nextIsFirstPeriodTeacher =
+        isFirstPeriodTeacher === true ||
+        isFirstPeriodTeacher === "true";
+    }
+
+    // --------------------------------------------------------
+    // VERIFY TEACHER BELONGS TO SAME SCHOOL
+    // --------------------------------------------------------
+    const teacherProfile =
+      await Teacher.findOne({
+        _id: nextTeacherId,
+        schoolId: classTeacher.schoolId,
+      });
+
+    if (!teacherProfile) {
+      return res.status(404).json({
+        message:
+          "Teacher not found in this school.",
+      });
+    }
+
+    if (teacherProfile.isActive === false) {
+      return res.status(400).json({
+        message:
+          "This teacher is inactive and cannot be assigned as a class teacher.",
+      });
+    }
+
+    // --------------------------------------------------------
+    // FIRST PERIOD / LOGIN RULE
+    // --------------------------------------------------------
+    if (
+      nextIsFirstPeriodTeacher &&
+      !teacherProfile.userId
+    ) {
+      return res.status(400).json({
+        message:
+          "Linked user login account not found for this teacher.",
+      });
+    }
+
+    // ========================================================
+    // IMPORTANT:
+    // SAME TEACHER CANNOT BE ASSIGNED TO ANOTHER CLASS
+    // IN THE SAME SHIFT
+    //
+    // But exclude the current assignment itself.
+    // ========================================================
+    const duplicateTeacher =
+      await ClassTeacher.findOne({
+        _id: { $ne: classTeacher._id },
+        schoolId: classTeacher.schoolId,
+        teacherId: nextTeacherId,
+        shift: nextShift,
+      });
+
+    if (duplicateTeacher) {
+      return res.status(409).json({
+        message:
+          `This teacher is already assigned as class teacher of ${duplicateTeacher.className}${duplicateTeacher.section ? `-${duplicateTeacher.section}` : ""} in ${nextShift || "this"} shift.`,
+      });
+    }
+
+    // ========================================================
+    // IMPORTANT:
+    // SAME CLASS + SECTION + SHIFT
+    // CANNOT HAVE ANOTHER ASSIGNMENT
+    // ========================================================
+    const duplicateClass =
+      await ClassTeacher.findOne({
+        _id: { $ne: classTeacher._id },
+        schoolId: classTeacher.schoolId,
+        className: nextClassName,
+        section: nextSection,
+        shift: nextShift,
+      });
+
+    if (duplicateClass) {
+      return res.status(409).json({
+        message:
+          "Another class teacher already exists for this class/section/shift combination.",
+      });
+    }
+
+    // --------------------------------------------------------
+    // UPDATE
+    // --------------------------------------------------------
+    classTeacher.teacherId =
+      nextTeacherId;
+
+    classTeacher.className =
+      nextClassName;
+
+    classTeacher.section =
+      nextSection;
+
+    classTeacher.shift =
+      nextShift;
+
+    classTeacher.isFirstPeriodTeacher =
+      nextIsFirstPeriodTeacher;
+
     await classTeacher.save();
 
-    res.json({ message: "Class teacher updated successfully", classTeacher });
+    await classTeacher.populate(
+      "teacherId",
+      "name email phone subject shift userId isActive"
+    );
+
+    return res.status(200).json({
+      message:
+        "Class teacher updated successfully",
+      classTeacher,
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error(
+      "updateClassTeacherById error:",
+      error
+    );
+
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message:
+          "Another class teacher already exists for this class/section/shift combination.",
+      });
+    }
+
+    return res.status(500).json({
+      message: error.message,
+    });
   }
 };
 
-export const deleteClassTeacher = async (req, res) => {
+// ============================================================
+// DELETE CLASS TEACHER
+// ============================================================
+export const deleteClassTeacher = async (
+  req,
+  res
+) => {
   try {
-    const { id } = req.params;
-    await ClassTeacher.findByIdAndDelete(id);
-    res.json({ message: "Class teacher assignment deleted successfully" });
+    const filter = {
+      _id: req.params.id,
+    };
+
+    // School admin can delete only own school's assignment
+    if (req.user.role !== "superAdmin") {
+      if (!req.user.schoolId) {
+        return res.status(400).json({
+          message:
+            "Your account is not linked to a school.",
+        });
+      }
+
+      filter.schoolId = req.user.schoolId;
+    }
+
+    const classTeacher =
+      await ClassTeacher.findOne(filter);
+
+    if (!classTeacher) {
+      return res.status(404).json({
+        message:
+          "Class teacher assignment not found",
+      });
+    }
+
+    await classTeacher.deleteOne();
+
+    return res.status(200).json({
+      message:
+        "Class teacher assignment deleted successfully",
+    });
   } catch (error) {
-    res.status(500).json({ message: error.message });
+    console.error(
+      "deleteClassTeacher error:",
+      error
+    );
+
+    return res.status(500).json({
+      message: error.message,
+    });
   }
 };

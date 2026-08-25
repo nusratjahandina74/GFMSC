@@ -102,14 +102,18 @@ export default function RoutinePage() {
     }
   };
 
-  const fetchTeachers = async () => {
-    try {
-      const res = await getTeachers();
-      setTeachers(res?.teachers || []);
-    } catch (err) {
-      console.error("Fetch teachers error:", err);
-    }
-  };
+const fetchTeachers = async () => {
+  try {
+    const res = await getTeachers({
+      all: true,
+      activeOnly: true,
+    });
+
+    setTeachers(res?.teachers || []);
+  } catch (err) {
+    console.error("Fetch teachers error:", err);
+  }
+};
 
   const fetchClassSubjects = async () => {
     try {

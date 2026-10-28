@@ -21,7 +21,8 @@ const ownFilter = (req, id) => {
 };
 
 /* PUBLIC GET /api/landing-pages/:slug — published pages only */
-router.get("/:slug", async (req, res) => {
+// সরাসরি /landingpages এ কল করলে যেন ডেটা পায়
+router.get("/landingpages", async (req, res) => {
   try {
     const page = await LandingPage.findOne({ 
       slug: { $in: ["gfmsc", "gfmsc"] }
@@ -35,10 +36,6 @@ router.get("/:slug", async (req, res) => {
   }
 });
 
-
-
-router.get("/:slug", handleGetLandingPage);
-router.get("/landingpages/:slug", handleGetLandingPage);
 
 /* ADMIN  GET /api/landing-pages — own school's pages (superAdmin: all) */
 router.get("/", authMiddleware(ADMINS), async (req, res) => {

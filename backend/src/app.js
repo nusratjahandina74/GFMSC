@@ -208,7 +208,7 @@ app.use("/api/exam-duties", examDutyRoutes);
 app.use("/api/library", libraryRoutes);
 app.use("/api/admissions", admissionRoutes);
 app.use("/api/id-cards", idCardRoutes);
-app.use("/api/landingpages", landingPageRoutes);
+app.use("/api", landingPageRoutes);
 
 app.get("/", (req, res) => {
   res.status(200).json({ success: true, message: "GFMSC API is running." });

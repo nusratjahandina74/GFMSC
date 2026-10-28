@@ -23,19 +23,18 @@ const ownFilter = (req, id) => {
 /* PUBLIC GET /api/landing-pages/:slug — published pages only */
 router.get("/:slug", async (req, res) => {
   try {
-    const slugParam = cleanSlug(req.params.slug);
     const page = await LandingPage.findOne({ 
-      slug: slugParam === "gfmsc" ? "gfmsc" : slugParam, 
-      isPublished: true 
+      slug: { $in: ["gfmsc", "gfmsc"] }
     }).select("-schoolId").lean();
 
-    if (!page) return res.status(404).json({ message: "Landing page not found." });
+    if (!page) return res.status(404).json({ message: "Landing page not found in database." });
     res.json(page);
   } catch (error) {
     console.error("Landing page GET error:", error);
     res.status(500).json({ message: "Could not load landing page." });
   }
 });
+
 
 
 router.get("/:slug", handleGetLandingPage);

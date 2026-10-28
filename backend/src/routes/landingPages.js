@@ -20,21 +20,26 @@ const ownFilter = (req, id) => {
   return f;
 };
 
-/* PUBLIC GET /api/landing-pages/:slug — published pages only */
-// সরাসরি /landingpages এ কল করলে যেন ডেটা পায়
-router.get("/landingpages", async (req, res) => {
+// ফ্রন্টএন্ড ঠিক যেভাবে রিকোয়েস্ট পাঠাচ্ছে (landingpages/gfmsc), এটি সেভাবে ডেটা রিটার্ন করবে
+router.get("/landingpages/:slug", async (req, res) => {
   try {
+    const { slug } = req.params; // ফ্রন্টএন্ড থেকে পাঠানো 'gfmsc' স্ল্যাগটি ধরবে
+    
     const page = await LandingPage.findOne({ 
-      slug: { $in: ["gfmsc", "gfmsc"] }
+      slug: slug // ডাটাবেজে gfmsc নামের স্ল্যাগটি খুঁজবে
     }).select("-schoolId").lean();
 
-    if (!page) return res.status(404).json({ message: "Landing page not found in database." });
+    if (!page) {
+      return res.status(404).json({ message: "Landing page not found in database." });
+    }
+    
     res.json(page);
   } catch (error) {
     console.error("Landing page GET error:", error);
     res.status(500).json({ message: "Could not load landing page." });
   }
 });
+
 
 
 /* ADMIN  GET /api/landing-pages — own school's pages (superAdmin: all) */

@@ -1,0 +1,22 @@
+### Manual API smoke tests (VS Code "REST Client"). Put real values in your own copy — never commit credentials.
+
+### Health (public, reveals nothing)
+GET http://localhost:5000/api/health/ready
+
+### Create the FIRST superAdmin — preferred: `npm run create-superadmin` (no HTTP endpoint needed).
+### This endpoint 404s unless BOOTSTRAP_SECRET is set on the server and works only while no superAdmin exists.
+POST http://localhost:5000/api/auth/superadmin
+Content-Type: application/json
+X-Bootstrap-Secret: <BOOTSTRAP_SECRET from backend/.env>
+
+{
+  "name": "Your Name",
+  "email": "you@example.com",
+  "password": "<choose-a-strong-password>"
+}
+
+### Login
+POST http://localhost:5000/api/auth/login
+Content-Type: application/json
+
+{ "email": "you@example.com", "password": "<your-password>" }

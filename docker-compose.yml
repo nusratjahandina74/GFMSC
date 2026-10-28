@@ -1,0 +1,34 @@
+# Local full stack WITH a single-node MongoDB replica set (needed for multi-document transactions —
+# the payment/attendance/library code paths rely on them; a plain standalone mongod silently skips atomicity).
+#   cp backend/.env.example backend/.env  (set JWT_SECRET / JWT_REFRESH_SECRET)  &&  docker compose up --build
+services:
+  mongo:
+    image: mongo:7
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports: ["27017:27017"]
+    volumes: ["mongo-data:/data/db"]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "try { rs.status().ok } catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}).ok }"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+  backend:
+    build: ./backend
+    env_file: ./backend/.env
+    environment:
+      NODE_ENV: production
+      MONGO_URI: mongodb://mongo:27017/GFMSC?replicaSet=rs0
+      REQUIRE_TRANSACTIONS: "true"
+      BACKEND_URL: http://localhost:5000
+      BASE_RETURN_URL: http://localhost:8080
+    depends_on:
+      mongo: { condition: service_healthy }
+    ports: ["5000:5000"]
+  frontend:
+    build:
+      context: ./frontend
+      args: { VITE_API_BASE_URL: http://localhost:5000/api }
+    depends_on: [backend]
+    ports: ["8080:80"]
+volumes:
+  mongo-data:

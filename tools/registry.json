@@ -1,0 +1,1508 @@
+{
+ "bugs": [
+  {
+   "id": "C01",
+   "sev": "Critical",
+   "mod": "Auth",
+   "file": "controllers/authController.js",
+   "desc": "Public POST /api/auth/superadmin allows first-comer SuperAdmin takeover",
+   "root": "",
+   "fix": "Endpoint 404s unless BOOTSTRAP_SECRET set; needs X-Bootstrap-Secret (timing-safe), only while no superAdmin exists, strong password",
+   "test": "tests/auth.test.js::C01",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "C02",
+   "sev": "Critical",
+   "mod": "Payment",
+   "file": "controllers/paymentController.js",
+   "desc": "Payment success webhook is forgeable: only transactionId is checked, gateway never verified server-to-server",
+   "root": "",
+   "fix": "Public /success,/fail,/cancel,/bkash/webhook removed. SSLCommerz success/IPN re-verified via Order Validation API (status, tran_id, amount, BDT); bKash callback executes+verifies server-side; demo gateway only when PAYMENTS_DEMO_MODE=true & non-prod",
+   "test": "tests/payment.test.js::C02 (forged/invalid/amount-mismatch)",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "C03",
+   "sev": "Critical",
+   "mod": "Payment",
+   "file": "controllers/paymentController.js",
+   "desc": "initiatePayment trusts client-supplied amount instead of Invoice due",
+   "root": "",
+   "fix": "Amount always copied from Invoice; client amount ignored; unguessable TXN ids",
+   "test": "tests/payment.test.js::C03",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "C04",
+   "sev": "Critical",
+   "mod": "Payment/Tenant",
+   "file": "controllers/paymentController.js",
+   "desc": "invoiceId from transaction metadata updates Invoice without schoolId filter (cross-school BOLA)",
+   "root": "",
+   "fix": "finalizeSuccess filters Invoice by tx.schoolId+studentId explicitly (callbacks run without tenant context)",
+   "test": "tests/payment.test.js (cross-school)",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "C05",
+   "sev": "Critical",
+   "mod": "Payment/Tenant",
+   "file": "controllers/paymentController.js",
+   "desc": "GET /payments/student/:studentId has no school/ownership check (BOLA)",
+   "root": "",
+   "fix": "getStudentPayments: student own-only, staff must own the student (404 otherwise), ObjectId validated",
+   "test": "tests/payment.test.js::C05",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "C06",
+   "sev": "Critical",
+   "mod": "Invoice/Tenant",
+   "file": "controllers/invoiceController.js",
+   "desc": "PATCH /invoices/:id/status uses findByIdAndUpdate with no schoolId scope",
+   "root": "",
+   "fix": "updateInvoiceStatus scoped by schoolId, validates ids, foreign paymentId rejected, Payment-backed paid invoice cannot be re-opened",
+   "test": "tests/finance.test.js::C06",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "C07",
+   "sev": "Critical",
+   "mod": "Student/Tenant",
+   "file": "controllers/studentController.js",
+   "desc": "req.body.schoolId overrides tenant on student create",
+   "root": "",
+   "fix": "Tenant plugin + request sanitisation: body.schoolId ignored for non-superAdmin",
+   "test": "tests/tenant.test.js::C07",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "C08",
+   "sev": "Critical",
+   "mod": "Exam/Tenant",
+   "file": "controllers/examController.js, resultController.js",
+   "desc": "client schoolId trusted on exam create",
+   "root": "",
+   "fix": "Tenant guard + tenantIdFor; exam create forged-schoolId verified",
+   "test": "tests/academic.test.js::T03.5",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "C09",
+   "sev": "Critical",
+   "mod": "Marks/Tenant",
+   "file": "controllers/resultController.js, markController.js",
+   "desc": "client schoolId trusted on mark upsert/bulk",
+   "root": "",
+   "fix": "Marks written through markService under exam's own school; forged schoolId ignored",
+   "test": "tests/academic.test.js::C09",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "C10",
+   "sev": "Critical",
+   "mod": "Attendance",
+   "file": "controllers/attendanceController.js",
+   "desc": "records[].studentId not validated to same school/class/section",
+   "root": "",
+   "fix": "takeAttendance validates every studentId belongs to school+class+section, rejects duplicates, whitelists fields",
+   "test": "tests/student-guardian.test.js::C10",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H01",
+   "sev": "High",
+   "mod": "Auth",
+   "file": "middleware/authMiddleware.js",
+   "desc": "Hardcoded JWT secret fallback",
+   "root": "dotenv/imports order + fallback constants",
+   "fix": "All hardcoded JWT fallbacks removed; config/env.js fails startup if secrets missing/short/known-leaked/equal",
+   "test": "tests/auth.test.js (+startup check)",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H02",
+   "sev": "High",
+   "mod": "Auth",
+   "file": "middleware/authMiddleware.js, authController.js",
+   "desc": "JWT role trusted over DB role (stale privileges); refresh re-signs old role",
+   "root": "",
+   "fix": "authMiddleware takes role from DB and rejects tokens whose role/session differ (ROLE_CHANGED)",
+   "test": "tests/auth.test.js::H02",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H03",
+   "sev": "High",
+   "mod": "Auth",
+   "file": "controllers/authController.js",
+   "desc": "Refresh token not revocable (no server session store / rotation / reuse detection)",
+   "root": "",
+   "fix": "AuthSession store: refresh rotation (atomic CAS), reuse detection revokes session, server-side logout, password change/reset revoke sessions",
+   "test": "tests/auth.test.js (rotation/reuse/logout)",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H04",
+   "sev": "High",
+   "mod": "Fees/Tenant",
+   "file": "controllers/feesController.js",
+   "desc": "setMonthlyFee trusts client schoolId",
+   "root": "",
+   "fix": "tenantIdFor + tenant plugin; forged schoolId verified for fees/notices/class-subjects/shift-templates",
+   "test": "tests/academic.test.js::T03.5",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H05",
+   "sev": "High",
+   "mod": "Fees",
+   "file": "controllers/feesController.js",
+   "desc": "payFee creates Payment but never syncs Invoice (two truths)",
+   "root": "",
+   "fix": "payFee syncs Invoice atomically (paidAmount, partial payments, overpayment rejected)",
+   "test": "tests/finance.test.js::H05",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H06",
+   "sev": "High",
+   "mod": "Notice/Tenant",
+   "file": "controllers/noticeController.js",
+   "desc": "Notice create trusts client schoolId",
+   "root": "",
+   "fix": "tenantIdFor + tenant plugin; forged schoolId verified for fees/notices/class-subjects/shift-templates",
+   "test": "tests/academic.test.js::T03.5",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H07",
+   "sev": "High",
+   "mod": "ClassSubject/Tenant",
+   "file": "controllers/classSubjectController.js",
+   "desc": "client schoolId trusted",
+   "root": "",
+   "fix": "tenantIdFor + tenant plugin; forged schoolId verified for fees/notices/class-subjects/shift-templates",
+   "test": "tests/academic.test.js::T03.5",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H08",
+   "sev": "High",
+   "mod": "Shift/Tenant",
+   "file": "controllers/shiftTemplateController.js",
+   "desc": "client schoolId trusted",
+   "root": "",
+   "fix": "tenantIdFor + tenant plugin; forged schoolId verified for fees/notices/class-subjects/shift-templates",
+   "test": "tests/academic.test.js::T03.5",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H09",
+   "sev": "High",
+   "mod": "Library",
+   "file": "controllers/libraryController.js",
+   "desc": "Borrower not validated to school; issue+decrement not atomic (race)",
+   "root": "",
+   "fix": "Borrower must belong to school; atomic copy decrement ({availableCopies:{$gte:1}} + $inc) inside withTxn; atomic ISSUED->RETURNED claim on return (copy given back once); scoped updates; over-issue safety net; ids/dates validated; e.message leaks removed",
+   "test": "tests/library.test.js (3 pass; parallel-last-copy test SKIPPED on FerretDB, must run on real MongoDB)",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H10",
+   "sev": "High",
+   "mod": "Export",
+   "file": "controllers/exportController.js",
+   "desc": "Attendance CSV export assumes top-level studentId/status but model nests records[]",
+   "root": "",
+   "fix": "exportMonthlyAttendanceCSV flattens records[]; month validated (no regex from input, M06 for this endpoint); CSV formula-injection guard; BOM for Excel",
+   "test": "tests/misc-fixes.test.js::H10",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H11",
+   "sev": "High",
+   "mod": "Admission",
+   "file": "controllers/admissionController.js",
+   "desc": "approveAdmission roll=last+1 race; no unique (class,section,roll)",
+   "root": "",
+   "fix": "Admission approve: atomic PENDING->APPROVED claim, roll retry on collision, unique index (school,class,section,session,roll); public apply validated + duplicate guard. Script findDuplicateRolls.js to run BEFORE deploying the index to existing data",
+   "test": "tests/admission.test.js (6 concurrent approvals -> 6 distinct rolls)",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H12",
+   "sev": "High",
+   "mod": "School",
+   "file": "controllers/schoolController.js",
+   "desc": "School delete leaves orphan data across all collections",
+   "root": "",
+   "fix": "deleteSchoolBySuperAdmin cascades over EVERY model with a schoolId path (auto-discovered) inside withTxn, revokes all that school's sessions, logs removed counts",
+   "test": "tests/school.test.js::H12",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H13",
+   "sev": "High",
+   "mod": "School",
+   "file": "controllers/schoolController.js",
+   "desc": "School registration (school+admin+owner link) not atomic",
+   "root": "",
+   "fix": "createSchool creates School+admin in one transaction (compensating delete when no txn support); password policy; clean 409/400 errors",
+   "test": "tests/school.test.js::H13",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H14",
+   "sev": "High",
+   "mod": "Invoice",
+   "file": "models/Invoice.js",
+   "desc": "No unique (schoolId,studentId,month,type) -> duplicate invoices",
+   "root": "",
+   "fix": "Fixed with dedupeKey unique+sparse (tuition only); verified enforced",
+   "test": "tests/finance.test.js::H14",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H15",
+   "sev": "High",
+   "mod": "Payment",
+   "file": "controllers/paymentController.js + frontend",
+   "desc": "SSLCommerz callbacks (success/fail/cancel, tran_id/val_id) not parsed/validated; frontend routes missing",
+   "root": "",
+   "fix": "SSLCommerz success/fail/cancel/IPN verified server-side then 303 to frontend /payment/result (page now exists). Only remaining gap: not exercised against live SSLCommerz sandbox (needs store credentials)",
+   "test": "",
+   "status": "Partial",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H16",
+   "sev": "High",
+   "mod": "Payment",
+   "file": "controllers/paymentController.js + frontend",
+   "desc": "bKash callback/execute flow incomplete",
+   "root": "",
+   "fix": "bKash: callback endpoint executes+verifies payment; written against v1.0.0-beta API, NOT tested with real bKash sandbox credentials",
+   "test": "",
+   "status": "Partial",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H17",
+   "sev": "High",
+   "mod": "Landing",
+   "file": "routes/landingPages.js",
+   "desc": "Uses role 'admin' which does not exist in User enum",
+   "root": "",
+   "fix": "Landing admin routes use schoolAdmin/superAdmin (role 'admin' never existed)",
+   "test": "tests/misc-fixes.test.js::H17",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H18",
+   "sev": "High",
+   "mod": "Landing/Tenant",
+   "file": "models/LandingPage.js",
+   "desc": "LandingPage has no schoolId; slug globally unique",
+   "root": "",
+   "fix": "LandingPage.schoolId added; admin CRUD tenant-scoped; public GET by slug unchanged & hides schoolId (slug remains globally unique by design)",
+   "test": "tests/misc-fixes.test.js",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H19",
+   "sev": "High",
+   "mod": "ClassTeacher",
+   "file": "controllers/classTeacherController.js",
+   "desc": "nextShift referenced but commented out -> ReferenceError",
+   "root": "",
+   "fix": "Removed reference to commented-out nextShift in duplicate class-teacher message",
+   "test": "static; code path simple",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H20",
+   "sev": "High",
+   "mod": "Dashboard/Frontend",
+   "file": "frontend api vs backend routes",
+   "desc": "School-admin analytics endpoint path mismatch (404)",
+   "root": "",
+   "fix": "Not reproducible in this codebase: frontend calls /dashboard/school-admin/analytics and backend route exists",
+   "test": "",
+   "status": "WontFix",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H21",
+   "sev": "High",
+   "mod": "Frontend",
+   "file": "frontend App.jsx / sidebar",
+   "desc": "My Leaves link shown to student/guardian but route allows teacher/staff only",
+   "root": "",
+   "fix": "Removed 'My Leaves' sidebar entry for student and guardian (route allows teacher/staff only)",
+   "test": "manual/static",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H22",
+   "sev": "High",
+   "mod": "Auth",
+   "file": "controllers/studentController.js, guardianController.js",
+   "desc": "Default password 123456 for student/guardian",
+   "root": "",
+   "fix": "No default 123456: admin password validated or random temporary password returned once (mustChangePassword)",
+   "test": "tests/student-guardian.test.js::H22",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H23",
+   "sev": "High",
+   "mod": "Student",
+   "file": "models/Student.js",
+   "desc": "studentId globally unique instead of (schoolId,studentId)",
+   "root": "",
+   "fix": "School.schoolNo (atomic counter) prefixes generated studentId so IDs are unique across schools; found by test (global unique collision)",
+   "test": "tests/student-guardian.test.js",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H24",
+   "sev": "High",
+   "mod": "LandingPage",
+   "file": "controllers (landing)",
+   "desc": "Raw ...req.body spread on create/update (mass assignment)",
+   "root": "",
+   "fix": "Landing: field whitelist, slug regex, no raw req.body spread; student: whitelist",
+   "test": "tests/misc-fixes.test.js",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H25",
+   "sev": "High",
+   "mod": "Ops",
+   "file": "app.js",
+   "desc": "Public /api/health/status leaks node/platform/memory/queue/payment/font info",
+   "root": "",
+   "fix": "/api/health, /live, /ready public & minimal; /status and /payment-config superAdmin-only",
+   "test": "tests/auth.test.js::H25/H26",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H26",
+   "sev": "High",
+   "mod": "Ops",
+   "file": "app.js",
+   "desc": "Health returns 200 when degraded; no liveness/readiness split",
+   "root": "",
+   "fix": "/ready returns 503 when DB not connected",
+   "test": "tests/auth.test.js::H25/H26",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H27",
+   "sev": "High",
+   "mod": "Ops",
+   "file": "app.js",
+   "desc": "Error handler returns err.message to client",
+   "root": "",
+   "fix": "Central error handler + codemod: 122 raw err.message 500-responses replaced by generic message across 30 files; 86 catch blocks now log server-side; 0 leaks remain (typed AuthError/PaymentError messages are intentional)",
+   "test": "tests/auth.test.js::H27 + grep scan = 0",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H28",
+   "sev": "High",
+   "mod": "Auth/Frontend",
+   "file": "frontend/src/api/client.js",
+   "desc": "Access token stored in localStorage (XSS-stealable)",
+   "root": "",
+   "fix": "Access token only in memory (api/tokenStore.js). Reload: first API call silently gets a new token from the httpOnly refresh cookie via a SINGLE-FLIGHT refresh shared by the eager and 401-retry paths (server rotates refresh tokens; parallel refresh would end the session). logout() now revokes the server session. Legacy localStorage 'token' key purged. 'user'/'role' remain as non-secret UI hints. Residual risk: XSS can still call the API while the page is open (but cannot steal a reusable credential)",
+   "test": "frontend unit tests (5) + real-client-vs-real-backend e2e: 9/9 (login, reload, 10 parallel calls, logout kills token)",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H29",
+   "sev": "High",
+   "mod": "Reports",
+   "file": "workers/index.js",
+   "desc": "Report worker is a stub",
+   "root": "",
+   "fix": "Stub reports worker + enqueueReport removed (it generated nothing and nothing used it); reports remain synchronous PDF/CSV endpoints",
+   "test": "static",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "H30",
+   "sev": "High",
+   "mod": "Notifications",
+   "file": "utils/smsSender.js",
+   "desc": "SMS/email sent directly and via queue (two models, no retry/DLQ/delivery status)",
+   "root": "",
+   "fix": "One delivery model for SMS: everything goes through the outbox (sendSMS/sendBulkSMS keep their signatures; SMS worker delegates). Email still sends directly via mailer + worker (NOT yet in the outbox)",
+   "test": "tests/notifications.test.js",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "M01",
+   "sev": "Medium",
+   "mod": "Security",
+   "file": "app.js",
+   "desc": "helmet CSP disabled",
+   "root": "",
+   "fix": "helmet CSP enabled (default-src none, frame-ancestors none)",
+   "test": "manual",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "M02",
+   "sev": "Medium",
+   "mod": "Observability",
+   "file": "app.js",
+   "desc": "No request-id / structured logging",
+   "root": "",
+   "fix": "X-Request-Id + structured JSON access log (userId/schoolId/status/ms). traceId/metrics pending",
+   "test": "manual",
+   "status": "Partial",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "M03",
+   "sev": "Medium",
+   "mod": "Audit",
+   "file": "(missing)",
+   "desc": "No immutable audit trail",
+   "root": "",
+   "fix": "Append-only AuditLog (all update/delete ops + re-save throw); utils/audit.js scrubs secrets, never breaks the business op; hooks: auth.login/login_failed/password_changed/password_reset, payment.gateway_success/reconciliation_needed/cash_recorded, invoice.status_changed(before/after), marks.saved, student.deleted, school.created/deleted (trail survives school delete), user.status_changed; GET /api/audit-logs (audit:read, tenant-scoped, paginated)",
+   "test": "tests/audit.test.js (5) + payment audit assertions",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "M04",
+   "sev": "Medium",
+   "mod": "Validation",
+   "file": "controllers/*",
+   "desc": "Inconsistent hand-written validation; need central schema validation",
+   "root": "",
+   "fix": "middleware/validate.js (type coercion, bounds, enum, pattern, objectId, date, array; unknown fields dropped) wired into POST /notices and POST /library/books. Most other create/update endpoints still use hand-written checks -> migrate gradually (students/teachers/exams/fees/routines next)",
+   "test": "tests/validation.test.js::M04",
+   "status": "Partial",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "M05",
+   "sev": "Medium",
+   "mod": "Validation",
+   "file": "controllers/*",
+   "desc": "Inconsistent ObjectId validation (CastError -> 500)",
+   "root": "",
+   "fix": "router.param(objectIdParam) on every route file for id/userId/studentId/routineId/teacherId/schoolId/leaveId/invoiceId/examId -> malformed ids are a clean 400 before any controller (non-ObjectId params like transactionId/slug are excluded)",
+   "test": "tests/validation.test.js::M05 (9 routes)",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "M06",
+   "sev": "Medium",
+   "mod": "Search",
+   "file": "controllers/*",
+   "desc": "Unescaped user input in $regex",
+   "root": "",
+   "fix": "utils/safeRegex.js (type-check, trim, length cap, escape) used in every $regex search (students, guardians, teachers, staff, library, results, pdf); attendance month sanitised",
+   "test": "tests/misc-fixes.test.js::M06 (metachars literal, ReDoS input fast, ?search[$ne]= ignored)",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "M07",
+   "sev": "Medium",
+   "mod": "Jobs",
+   "file": "jobs/monthlyFeeCron.js",
+   "desc": "Cron depends on server timezone",
+   "root": "",
+   "fix": "Cron month key + schedule use Asia/Dhaka (APP_TIMEZONE); due date built for THAT month; insertMany duplicate race handled",
+   "test": "tests/cron.test.js",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "M08",
+   "sev": "Medium",
+   "mod": "Payment",
+   "file": "controllers/paymentController.js",
+   "desc": "No idempotency key on payment initiation",
+   "root": "",
+   "fix": "Idempotency-Key header + double-click reuse of pending transaction",
+   "test": "tests/payment.test.js::M08",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "E01",
+   "sev": "Critical",
+   "mod": "Backend",
+   "file": "controllers/teacherController.js",
+   "desc": "Duplicate const destructure -> SyntaxError, whole API down",
+   "root": "",
+   "fix": "Removed duplicate line",
+   "test": "manual/static",
+   "status": "Fixed",
+   "src": "Earlier sessions"
+  },
+  {
+   "id": "E02",
+   "sev": "Critical",
+   "mod": "Backend",
+   "file": "controllers/classTeacherController.js",
+   "desc": "Duplicate destructure + double ClassTeacher.create",
+   "root": "",
+   "fix": "Removed duplicates",
+   "test": "manual/static",
+   "status": "Fixed",
+   "src": "Earlier sessions"
+  },
+  {
+   "id": "E03",
+   "sev": "High",
+   "mod": "Backend",
+   "file": "app.js",
+   "desc": "CORS methods missing PATCH (7 routes blocked in browser)",
+   "root": "",
+   "fix": "Added PATCH",
+   "test": "manual/static",
+   "status": "Fixed",
+   "src": "Earlier sessions"
+  },
+  {
+   "id": "E04",
+   "sev": "Critical",
+   "mod": "Student/Guardian",
+   "file": "models/Student.js, Guardian.js",
+   "desc": "async pre('save', function(next)) -> 'next is not a function' on every create",
+   "root": "",
+   "fix": "Dropped next param (kareem passes none to async hooks)",
+   "test": "manual/static",
+   "status": "Fixed",
+   "src": "Earlier sessions"
+  },
+  {
+   "id": "E05",
+   "sev": "High",
+   "mod": "Guardian",
+   "file": "models/Guardian.js",
+   "desc": "schoolId field missing from schema (silently dropped)",
+   "root": "",
+   "fix": "Field added",
+   "test": "manual/static",
+   "status": "Fixed",
+   "src": "Earlier sessions"
+  },
+  {
+   "id": "E06",
+   "sev": "High",
+   "mod": "Frontend",
+   "file": "pages/**",
+   "desc": "<SelectItem value=\"\"> crashes Radix Select (8+ pages)",
+   "root": "",
+   "fix": "All 9 <SelectItem value=\"\"> replaced with '__all__' sentinel mapped back to '' (IdCards, ExamDuties, Routine x2, MarksEntry, ExamsPage x3, teacher/Attendance)",
+   "test": "static scan: 0 remaining; esbuild parse 96 files OK",
+   "status": "Fixed",
+   "src": "Earlier sessions"
+  },
+  {
+   "id": "E07",
+   "sev": "Medium",
+   "mod": "Frontend",
+   "file": "pages/admin/SuperAdminPanel.jsx",
+   "desc": "Button used but not imported",
+   "root": "",
+   "fix": "Import added",
+   "test": "manual/static",
+   "status": "Fixed",
+   "src": "Earlier sessions"
+  },
+  {
+   "id": "E08",
+   "sev": "High",
+   "mod": "Frontend",
+   "file": "pages/Routine.jsx, Teachers.jsx",
+   "desc": "SHIFTS undefined / hardcoded shift lists",
+   "root": "",
+   "fix": "Dynamic shift templates",
+   "test": "manual/static",
+   "status": "Fixed",
+   "src": "Earlier sessions"
+  },
+  {
+   "id": "N01",
+   "sev": "Critical",
+   "mod": "Secrets",
+   "file": "backend/.env.example (tracked in git)",
+   "desc": "REAL MongoDB Atlas credentials + Resend API key committed in .env.example (public repo history) — must be rotated by owner",
+   "root": "",
+   "fix": "Code side: backend/.env.example sanitised (placeholders only), startup now rejects the leaked JWT values. STILL REQUIRED (owner): rotate Atlas DB password + Resend key; they remain in git history — consider history rewrite",
+   "test": "",
+   "status": "Partial",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "N02",
+   "sev": "High",
+   "mod": "Auth/Config",
+   "file": "server.js",
+   "desc": "dotenv.config() runs AFTER imports (ESM hoisting) so controller top-level process.env.JWT_SECRET always used the hardcoded fallback in local dev",
+   "root": "",
+   "fix": "server.js imports config/env.js first (dotenv loads before any module reads env)",
+   "test": "manual boot",
+   "status": "Fixed",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "N03",
+   "sev": "Medium",
+   "mod": "Auth",
+   "file": "backend/.env (JWT_SECRET value equals the public .env.example value)",
+   "desc": "JWT_SECRET value is public in git history -> treat as compromised; rotate",
+   "root": "",
+   "fix": "",
+   "test": "",
+   "status": "Open",
+   "src": "SMS.pdf audit"
+  },
+  {
+   "id": "N04",
+   "sev": "High",
+   "mod": "Marks/Authz",
+   "file": "controllers/resultController.js (/api/results/marks*)",
+   "desc": "Teacher authorisation was missing on the routes the FRONTEND uses: any teacher could edit any class/subject marks (only the unused /api/marks checked)",
+   "root": "",
+   "fix": "Single services/markService.js used by both route sets: exam scoped, teacher must be class teacher or subject teacher",
+   "test": "tests/academic.test.js (teacher cases on both paths)",
+   "status": "Fixed",
+   "src": "Found in session (T08)"
+  },
+  {
+   "id": "N05",
+   "sev": "High",
+   "mod": "Marks/Validation",
+   "file": "controllers/markController.js + resultController.js",
+   "desc": "Marks accepted negative, NaN/text, >100 per part and total (grade A+ for 9999), student of another class, undefined subject; bulk 'checked' subject was a no-op",
+   "root": "",
+   "fix": "Validation in markService: finite, 0..100, total<=100, student must be in exam class/section, subject must be in ClassSubject list; per-row errors; valid rows saved in one withTxn",
+   "test": "tests/academic.test.js",
+   "status": "Fixed",
+   "src": "Found in session (T08)"
+  },
+  {
+   "id": "N06",
+   "sev": "Medium",
+   "mod": "Auth/Ops",
+   "file": "routes/authRoutes.js",
+   "desc": "GET /api/auth/mail-config-status was public and leaked mail/env configuration",
+   "root": "",
+   "fix": "superAdmin only",
+   "test": "tests/route-audit.test.js::N06",
+   "status": "Fixed",
+   "src": "Found in session (T05)"
+  },
+  {
+   "id": "N07",
+   "sev": "High",
+   "mod": "Exams/Authz",
+   "file": "routes/resultRoutes.js, controllers/resultController.js",
+   "desc": "PUT /api/results/exams/:id let ANY teacher rewrite any exam; DELETE /api/results/marks/:id let any teacher delete any mark; two divergent exam implementations",
+   "root": "",
+   "fix": "Single examController (teacher class-test rules, whitelist, class lock once marks exist, atomic audited cascade delete); resultController re-exports it; update route admin-only; deleteMark uses the mark authorizer",
+   "test": "tests/academic.test.js (T08 completion)",
+   "status": "Fixed",
+   "src": "Found in session (T08)"
+  },
+  {
+   "id": "N08",
+   "sev": "High",
+   "mod": "Notifications",
+   "file": "utils/smsSender.js",
+   "desc": "SMS was NEVER sent: sendSingleSMS only console.log()ed 'SMS sent' (real API call commented out) — absence/payment SMS silently did nothing, with an in-memory queue lost on restart",
+   "root": "",
+   "fix": "Durable Notification outbox + notificationService (BD phone normalisation, GreenWeb HTTP provider, retry with exponential backoff, dead-letter 'failed' with reason, stuck-row recovery, atomic claim, poller). Production without SMS_API_KEY fails honestly (dev uses a log provider)",
+   "test": "tests/notifications.test.js (8)",
+   "status": "Fixed",
+   "src": "Found in session (T25)"
+  }
+ ],
+ "tasks": [
+  {
+   "id": "T01",
+   "phase": "Setup",
+   "title": "Repository audit (no code change)",
+   "mark": "x",
+   "note": "Audit done; 56 registered issues",
+   "subs": [
+    {
+     "id": "T01.1",
+     "title": "Backend architecture",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T01.2",
+     "title": "Frontend architecture",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T01.3",
+     "title": "Models/routes/controllers",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T01.4",
+     "title": "Auth + tenant + payment flows",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T01.5",
+     "title": "Known bugs register",
+     "mark": "x",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "T02",
+   "phase": "Setup",
+   "title": "Safe development setup (git, .gitignore, secrets, build, tests)",
+   "mark": "x",
+   "note": "Git, .gitignore, tests (62), frontend build verified. Docker/CI is T24",
+   "subs": [
+    {
+     "id": "T02.1",
+     "title": "Git baseline commit",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T02.2",
+     "title": "Verify .gitignore & untracked .env",
+     "mark": "x",
+     "note": "real .env.example secrets found -> N01"
+    },
+    {
+     "id": "T02.3",
+     "title": "Backend startup",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T02.4",
+     "title": "Frontend build",
+     "mark": "x",
+     "note": "vite build passes after fresh npm install (10s)"
+    },
+    {
+     "id": "T02.5",
+     "title": "Test runner + integration DB",
+     "mark": "x",
+     "note": "node --test + supertest + FerretDB"
+    }
+   ]
+  },
+  {
+   "id": "T03",
+   "phase": "Phase 0 Security",
+   "title": "Multi-tenant isolation (central tenant context)",
+   "mark": "x",
+   "note": "Central tenant guard (plugin+context), input sanitising, tenantIdFor in 13 controllers, cross-school tests for student/exam/mark/notice/shift/subject/fees/invoice/payment/library/landing/export",
+   "subs": [
+    {
+     "id": "T03.1",
+     "title": "Central tenant helper + middleware",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T03.2",
+     "title": "Strip body/query/params schoolId for non-superAdmin",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T03.3",
+     "title": "Fix every client-schoolId controller (C07-C09,H04-H08)",
+     "mark": "x",
+     "note": "codemod -> tenantIdFor in 13 controllers"
+    },
+    {
+     "id": "T03.4",
+     "title": "Scope all by-id queries (find/update/delete)",
+     "mark": "x",
+     "note": "enforced by plugin for every schoolId-bearing model"
+    },
+    {
+     "id": "T03.5",
+     "title": "Cross-school regression tests",
+     "mark": "x",
+     "note": "tests/tenant + academic + others cross-school"
+    }
+   ]
+  },
+  {
+   "id": "T04",
+   "phase": "Phase 0 Security",
+   "title": "Authentication hardening",
+   "mark": "x",
+   "note": "Backend complete + H28 done. Remaining nit: admin-created teacher/staff passwords use their own validation paths (policy not re-audited)",
+   "subs": [
+    {
+     "id": "T04.1",
+     "title": "Remove JWT fallback secrets; fail startup",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T04.2",
+     "title": "DB role authoritative (no stale role)",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T04.3",
+     "title": "Session store + refresh rotation + reuse detection + logout",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T04.4",
+     "title": "Close public SuperAdmin endpoint (C01)",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T04.5",
+     "title": "Password policy + remove default 123456",
+     "mark": "~",
+     "note": "policy enforced in register/change/reset/bootstrap; admin-created accounts pending"
+    },
+    {
+     "id": "T04.6",
+     "title": "Login brute-force protection",
+     "mark": "x",
+     "note": "8 failures/15min lock per identifier + express-rate-limit per IP"
+    },
+    {
+     "id": "T04.7",
+     "title": "Tokens: move off localStorage (H28)",
+     "mark": " ",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "T05",
+   "phase": "Phase 0 Security",
+   "title": "RBAC + permission system",
+   "mark": "x",
+   "note": "config/permissions.js (catalogue + can + requirePermission, typo = startup error), utils/ownership.js, applied to fees+invoice routes; route-audit tests: (1) every route protected or on reviewed allow-list, (2) ~150 protected routes 401 without/garbage token, (3) role names valid, (4) role matrix: unlisted role gets 403 on every restricted route",
+   "subs": [
+    {
+     "id": "T05.1",
+     "title": "Permission catalog + role map",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T05.2",
+     "title": "requirePermission middleware",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T05.3",
+     "title": "Ownership checks",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T05.4",
+     "title": "Tests",
+     "mark": "x",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "T06",
+   "phase": "Phase 0 Security",
+   "title": "Payment security (C02-C05,H15,H16,M08)",
+   "mark": "x",
+   "note": "Backend + frontend done; 14 payment tests. NOT verified against live bKash/SSLCommerz sandbox (needs credentials)",
+   "subs": [
+    {
+     "id": "T06.1",
+     "title": "Server-authoritative amount from Invoice",
+     "mark": "x",
+     "note": "amount taken from Invoice in paymentService.initiate"
+    },
+    {
+     "id": "T06.2",
+     "title": "Gateway server-to-server verification (SSLCommerz validate, bKash execute)",
+     "mark": "x",
+     "note": "gateway adapter written; controller wiring + tests pending"
+    },
+    {
+     "id": "T06.3",
+     "title": "Idempotent success handling",
+     "mark": "x",
+     "note": "atomic claim pending->success + unique Payment.transactionRef"
+    },
+    {
+     "id": "T06.4",
+     "title": "Tenant scoping of invoice/payment reads",
+     "mark": "x",
+     "note": "Payment/Invoice/Transaction all scoped"
+    },
+    {
+     "id": "T06.5",
+     "title": "Disable demo gateway in production",
+     "mark": "x",
+     "note": "demo gateway only when PAYMENTS_DEMO_MODE=true and NODE_ENV!=production"
+    },
+    {
+     "id": "T06.6",
+     "title": "Idempotency-Key on initiate",
+     "mark": "x",
+     "note": "Idempotency-Key supported in service; controller header wiring pending"
+    },
+    {
+     "id": "T06.7",
+     "title": "Frontend callback routes",
+     "mark": "x",
+     "note": "PaymentResult page, sandbox page -> /payments/demo/complete, no client amount, Idempotency-Key"
+    }
+   ]
+  },
+  {
+   "id": "T07",
+   "phase": "Phase 1 Integrity",
+   "title": "Finance integrity (H05,H14,C06)",
+   "mark": "~",
+   "note": "H05,H14,C06 done; school/library/admission now use withTxn. Remaining: ledger groundwork, refunds",
+   "subs": [
+    {
+     "id": "T07.1",
+     "title": "Invoice unique index",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T07.2",
+     "title": "payFee <-> Invoice sync",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T07.3",
+     "title": "Transactions everywhere (withTransaction helper)",
+     "mark": "~",
+     "note": "withTxn helper created, used in attendance/payments/fees/invoice"
+    },
+    {
+     "id": "T07.4",
+     "title": "Ledger groundwork",
+     "mark": " ",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "id": "T08",
+   "phase": "Phase 1 Integrity",
+   "title": "Academic data integrity (canonical Exam->Mark->Result)",
+   "mark": "~",
+   "note": "Marks+exams canonical & locked: markService (authz+validation), examController single implementation, publish/lock, deleteMark authz, class lock. 16 academic tests. Remaining: GPA rules (fail-subject/4th subject), ranking/merit position, report-card consistency across /marks vs /results, result-sheet export",
+   "subs": []
+  },
+  {
+   "id": "T09",
+   "phase": "Phase 1 Integrity",
+   "title": "Attendance integrity (C10,H10)",
+   "mark": "x",
+   "note": "C10 + H10 done and tested",
+   "subs": [
+    {
+     "id": "T09.1",
+     "title": "Validate student belongs to school/class/section",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T09.2",
+     "title": "Fix CSV export for nested records",
+     "mark": "x",
+     "note": "exportMonthlyAttendanceCSV rewritten + tested"
+    }
+   ]
+  },
+  {
+   "id": "T10",
+   "phase": "Phase 1 Integrity",
+   "title": "Admission (H11) race-safe roll + unique index + full workflow",
+   "mark": "x",
+   "note": "H11 + admission hardening done (4 tests). Full workflow extras (fees at admission, documents, waitlist) NOT built",
+   "subs": []
+  },
+  {
+   "id": "T11",
+   "phase": "Phase 2 Bugs",
+   "title": "Landing page (H17,H18,H24) tenant + role + whitelist",
+   "mark": "~",
+   "note": "Backend part done (H17/H18/H24). Remaining: frontend admin UI may need schoolId-less flows verified",
+   "subs": []
+  },
+  {
+   "id": "T12",
+   "phase": "Phase 1 Integrity",
+   "title": "Library (H09) atomic issue + borrower validation + extended features",
+   "mark": "~",
+   "note": "H09 done. Extended library features (reservations, fines->invoice, barcode, reports) NOT built",
+   "subs": []
+  },
+  {
+   "id": "T13",
+   "phase": "Phase 4 ERP",
+   "title": "HR + Payroll",
+   "mark": " ",
+   "note": "",
+   "subs": []
+  },
+  {
+   "id": "T14",
+   "phase": "Phase 4 ERP",
+   "title": "Transport + Hostel",
+   "mark": " ",
+   "note": "",
+   "subs": []
+  },
+  {
+   "id": "T15",
+   "phase": "Phase 4 ERP",
+   "title": "Online exams + Assignments",
+   "mark": " ",
+   "note": "",
+   "subs": []
+  },
+  {
+   "id": "T16",
+   "phase": "Phase 4 ERP",
+   "title": "Communication / messaging",
+   "mark": " ",
+   "note": "",
+   "subs": []
+  },
+  {
+   "id": "T17",
+   "phase": "Phase 4 ERP",
+   "title": "Inventory + Procurement",
+   "mark": " ",
+   "note": "",
+   "subs": []
+  },
+  {
+   "id": "T18",
+   "phase": "Phase 4 ERP",
+   "title": "SaaS subscription / billing",
+   "mark": " ",
+   "note": "",
+   "subs": []
+  },
+  {
+   "id": "T19",
+   "phase": "Phase 3 Arch",
+   "title": "Audit logging (M03)",
+   "mark": "x",
+   "note": "Done: see M03. NOT audited yet: teacher/staff/guardian create+delete, exam/notice/routine edits, library issues, attendance edits, admission approve (add as modules are touched)",
+   "subs": []
+  },
+  {
+   "id": "T20",
+   "phase": "Phase 3 Arch",
+   "title": "API hardening: validation (M04,M05), /api/v1, pagination, error shape (H27), regex (M06)",
+   "mark": "~",
+   "note": "M05 done everywhere; M04 mechanism + 2 endpoints; M06,H27 done. Remaining: apply validate() to remaining write endpoints, /api/v1 versioning, uniform pagination on list endpoints (parsePage helper exists), API docs (OpenAPI)",
+   "subs": []
+  },
+  {
+   "id": "T21",
+   "phase": "Phase 0 Security",
+   "title": "Security hardening: helmet/CSP (M01), health (H25,H26), request-id (M02)",
+   "mark": "~",
+   "note": "M01,M02(partial),H25,H26 done. Remaining: CORS review, final security scan, security headers test",
+   "subs": []
+  },
+  {
+   "id": "T22",
+   "phase": "Phase 2 Bugs",
+   "title": "Frontend production hardening (Select value, My Leaves H21, analytics H20, error handling)",
+   "mark": "~",
+   "note": "E06, H21, H28 done. Remaining: global error boundary/toasts review, a11y, lint cleanup",
+   "subs": [
+    {
+     "id": "T22.1",
+     "title": "Radix SelectItem value=\"\" crash (E06)",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T22.2",
+     "title": "H21 My Leaves route",
+     "mark": "x",
+     "note": ""
+    },
+    {
+     "id": "T22.3",
+     "title": "H20 analytics path",
+     "mark": "x",
+     "note": "not reproducible"
+    }
+   ]
+  },
+  {
+   "id": "T23",
+   "phase": "Testing",
+   "title": "Automated testing (unit/integration/security/E2E)",
+   "mark": " ",
+   "note": "",
+   "subs": []
+  },
+  {
+   "id": "T24",
+   "phase": "Phase 5 DevOps",
+   "title": "Docker, CI/CD, env separation",
+   "mark": "~",
+   "note": "WRITTEN but NOT EXECUTED in this sandbox (no Docker, no real mongod): backend+frontend Dockerfiles (non-root, healthcheck), docker-compose with Mongo replica set, GitHub Actions CI (real replica set, tests, vite build, npm audit, secrets scan), RUNBOOK.md. YAML validated only. First CI run may expose issues in real-transaction code paths (never run against a real replica set yet). Staging/prod env separation + deploy pipeline NOT done",
+   "subs": []
+  },
+  {
+   "id": "T25",
+   "phase": "Phase 5 DevOps",
+   "title": "Redis + queues (H29,H30)",
+   "mark": "~",
+   "note": "SMS outbox done (N08/H30), H29 resolved. Remaining: email through the outbox, Redis/BullMQ path untested, delivery-status/dead-letter admin UI+API (GET /notifications, requeue), idempotent fee-invoice worker review",
+   "subs": []
+  },
+  {
+   "id": "T26",
+   "phase": "Phase 5 DevOps",
+   "title": "Database optimization / indexes / M07 timezone",
+   "mark": "~",
+   "note": "M07 done. Remaining: index audit/explain on hot queries, pagination",
+   "subs": []
+  },
+  {
+   "id": "T27",
+   "phase": "Final",
+   "title": "Final production audit (Definition of Done, 25 gates)",
+   "mark": " ",
+   "note": "",
+   "subs": []
+  }
+ ],
+ "decisions": [
+  {
+   "date": "2026-10-12",
+   "title": "Tenant isolation strategy",
+   "text": "Shared DB + schoolId. Enforced centrally: authMiddleware derives tenant from the DB account, sanitises schoolId from body/query/params for non-superAdmin and runs the request inside an AsyncLocalStorage context; a global Mongoose plugin forces schoolId on every query/aggregate/create for schoolId-bearing models and blocks re-assigning schoolId in updates. SuperAdmin, public routes, cron and workers run without context (must scope explicitly). Queries must be awaited INSIDE the request handler (Mongoose queries are lazy)."
+  },
+  {
+   "date": "2026-10-12",
+   "title": "Authentication strategy",
+   "text": "Short-lived access JWT (15m, HS256, iss/aud, typ=access, sid) + 30d httpOnly refresh cookie. Server-side AuthSession per login; refresh rotates jti with atomic compare-and-swap; replay of an old jti revokes the session. Role/school are always read from the DB account, never from the token. Secrets are mandatory env vars (startup fails otherwise). Login brute-force lock per identifier."
+  },
+  {
+   "date": "2026-10-13",
+   "title": "Transactions",
+   "text": "utils/txn.js withTxn(): real transaction on replica set/mongos (detected once via hello), otherwise runs fn(null) once with a warning; REQUIRE_TRANSACTIONS=true makes unsupported deployments fail. Never 'run then retry without txn' (could double-write). Idempotency does not rely on transactions: atomic status claim + unique sparse indexes (Payment.transactionRef, Invoice.dedupeKey)."
+  },
+  {
+   "date": "2026-10-13",
+   "title": "Payment trust model",
+   "text": "Browser/IPN payloads are never trusted. Success is recorded ONLY by paymentService.finalizeSuccess after gateway server-to-server verification (SSLCommerz validation API / bKash execute), amount+currency+tran_id compared to the server-side Transaction (copied from Invoice). Late fail/cancel can only change PENDING transactions. Money taken for an already-paid invoice is flagged 'invoice_already_paid' for manual reconciliation instead of double-crediting."
+  },
+  {
+   "date": "2026-10-14",
+   "title": "School deletion semantics",
+   "text": "Hard cascade delete (as the existing UI implies) incl. financial records, auto-discovering schoolId models; no undo. Recommendation for production: add an 'archive' step / export before delete (NOT built)."
+  },
+  {
+   "date": "2026-10-15",
+   "title": "RBAC model",
+   "text": "authMiddleware(roles) stays as the coarse gate; config/permissions.js is the single policy catalogue and requirePermission(...) is the preferred way for NEW/changed routes (already used by fees+invoices). Ownership (own student / own class) via utils/ownership.js. tests/route-audit.test.js is the safety net: any new route without auth or off the allow-list fails CI; any role not listed gets 403 on every restricted route."
+  }
+ ],
+ "changelog": [
+  {
+   "date": "2026-10-12",
+   "text": "Added config/env.js (fail-fast secrets), tenant guard (context+plugin), AuthSession/LoginThrottle, hardened authMiddleware & authController, health split, CSP, request-id, central error handler"
+  },
+  {
+   "date": "2026-10-13",
+   "text": "Payment pipeline groundwork: gateway adapter, Transaction/Payment/Invoice model changes, paymentService; attendance C10; H22/H23; mass-assignment whitelist; toJSON strips password hashes"
+  },
+  {
+   "date": "2026-10-13",
+   "text": "T06 payments secured (verified callbacks, idempotent finalize, demo gating); C06/H05/H14 finance integrity; withTxn rewritten (up-front detection)"
+  },
+  {
+   "date": "2026-10-13",
+   "text": "H10 export, landing pages hardened, H19, E06/H21 frontend, .env.example sanitised, create-superadmin CLI"
+  },
+  {
+   "date": "2026-10-14",
+   "text": "H11 admission race-safety + unique roll index; approve now returns temporaryPassword"
+  },
+  {
+   "date": "2026-10-14",
+   "text": "H09 library atomic issue/return + tests; engine-aware atomicity test helper"
+  },
+  {
+   "date": "2026-10-14",
+   "text": "H12 cascade school delete, H13 atomic school creation"
+  },
+  {
+   "date": "2026-10-14",
+   "text": "H27 completed across all controllers (122 leaks removed, 86 logs added)"
+  },
+  {
+   "date": "2026-10-14",
+   "text": "M06 regex-injection/ReDoS protection across all search endpoints"
+  },
+  {
+   "date": "2026-10-14",
+   "text": "M07 cron timezone; npm audit fix (non-breaking): axios/compression/proxy-addr(critical)/qs/ip-address/nodemailer patched; frontend vite build verified OK"
+  },
+  {
+   "date": "2026-10-15",
+   "text": "T08: markService (authz+validation, N04/N05), T03 complete with cross-school tests"
+  },
+  {
+   "date": "2026-10-15",
+   "text": "T05 RBAC: permission catalogue, requirePermission, ownership helpers, route-audit + role-matrix tests; N06 mail-config-status locked"
+  },
+  {
+   "date": "2026-10-18",
+   "text": "T19 audit log + hooks + read API + 5 tests"
+  },
+  {
+   "date": "2026-10-18",
+   "text": "T24: Dockerfiles, compose (replica set), CI workflow, RUNBOOK.md, robust test DB URI"
+  },
+  {
+   "date": "2026-10-18",
+   "text": "T08: exam CRUD de-duplicated (N07), publish/lock, deleteMark authorisation"
+  },
+  {
+   "date": "2026-10-18",
+   "text": "T20: validate middleware, ObjectId param validation on all routes, validated notices+library books"
+  },
+  {
+   "date": "2026-10-18",
+   "text": "T25: durable notification outbox with retry/dead-letter (N08/H30), stub report worker removed (H29)"
+  },
+  {
+   "date": "2026-10-18",
+   "text": "Removed hardcoded password from backend/test.http (secret-scan finding)"
+  },
+  {
+   "date": "2026-10-26",
+   "text": "H28: in-memory access token + single-flight refresh + server logout; verified end-to-end with the real client against the real backend"
+  }
+ ],
+ "tests": {
+  "suites": [
+   {
+    "suite": "backend/tests/tenant.test.js",
+    "total": 6,
+    "passed": 6,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "backend/tests/auth.test.js",
+    "total": 14,
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "backend/tests/payment.test.js",
+    "total": 14,
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "backend/tests/finance.test.js",
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "backend/tests/student-guardian.test.js",
+    "total": 7,
+    "passed": 7,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "backend/tests/admission.test.js",
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "backend/tests/library.test.js",
+    "total": 4,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 1
+   },
+   {
+    "suite": "backend/tests/school.test.js",
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "backend/tests/misc-fixes.test.js",
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "backend/tests/cron.test.js",
+    "total": 2,
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "backend/tests/route-audit.test.js",
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "backend/tests/permissions.test.js",
+    "total": 3,
+    "passed": 3,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "backend/tests/audit.test.js",
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "backend/tests/academic.test.js",
+    "total": 16,
+    "passed": 16,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "backend/tests/validation.test.js",
+    "total": 4,
+    "passed": 4,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "backend/tests/notifications.test.js",
+    "total": 8,
+    "passed": 8,
+    "failed": 0,
+    "skipped": 0
+   },
+   {
+    "suite": "frontend/src/api/tokenStore.test.js",
+    "total": 5,
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0
+   }
+  ],
+  "total": 108,
+  "passed": 107,
+  "failed": 0,
+  "skipped": 1,
+  "known": [
+   "REAL-TRANSACTION PATHS UNVERIFIED: every withTxn() call ran WITHOUT a transaction here (FerretDB). The first run on a real replica set (CI/Atlas) must be treated as the real test of attendance/payment/library/school/fees code.",
+   "library.test.js 'LAST copy parallel' is SKIPPED on FerretDB (its findOneAndUpdate is not atomic: 18/20 rounds allowed >1 winner in a raw-driver probe). Must pass on real MongoDB/Atlas before go-live.",
+   "Atomic-claim/transaction behaviour (payments, attendance, library) is only fully verifiable on a replica set — FerretDB has no transactions.",
+   "No frontend automated tests exist yet (T23); frontend verified only via esbuild parse of all files (no vite build possible offline here: missing native rollup binary).",
+   "No live SSLCommerz/bKash sandbox test (needs merchant credentials)."
+  ]
+ },
+ "status": {
+  "blocker-secrets": "OWNER ACTION: rotate MongoDB Atlas user password and Resend API key (they were committed in backend/.env.example); also set new JWT_SECRET/JWT_REFRESH_SECRET",
+  "test-infra": "Integration tests need a MongoDB: set TEST_MONGO_URI (sandbox used FerretDB 1.24/SQLite, which has NO multi-doc transactions — transaction paths must be tested on real mongod/Atlas replica set)",
+  "next-step": "ERP modules T13-T18 need PRODUCT DECISIONS from the owner (payroll rules, transport routes/fees, hostel, inventory, SaaS plans/pricing) -> ask before building. Engineering work still open: email outbox, admin notification view, validate() on remaining endpoints, T23 frontend/E2E CI, T27 final audit, owner actions (rotate secrets, real-gateway sandbox tests, real replica-set CI run)",
+  "test-caveat": "FerretDB (sandbox engine) findAndModify is not atomic under concurrency and has no transactions; atomic-claim/transaction behaviour must be re-run on real MongoDB (Atlas replica set) before go-live",
+  "how-to-resume": "1) read PROJECT_STATUS.md 2) cd backend && npm install && npm test (needs MongoDB: TEST_MONGO_URI) 3) next tasks in order: T05 RBAC permissions, T08 academic integrity (Exam->Mark->Result), T10 admission race, T12 library atomic issue, T07 ledger, T19 audit log, T20 validation, then ERP modules T13-T18, T23-T27",
+  "last-session-summary": "DONE: T01,T02,T06,T09,T10 + big parts of T03,T04,T07,T11,T12,T20,T21,T22,T26. 62 backend tests (61 pass,1 engine-skip). Fixed 47/59 bugs. NOT DONE: T05,T08,T13-T19,T23-T25,T27, H28,H29,H30,N01(owner)",
+  "deploy-warning": "Before deploying to the existing Atlas DB run: node src/scripts/findDuplicateRolls.js (unique roll index) and check duplicate tuition invoices (dedupeKey index); legacy Guardians without schoolId need backfill",
+  "dependencies": "3 npm-audit findings remain: node-cron+uuid (needs node-cron 4 major upgrade — API change, test first) and a nodemailer advisory (check `npm audit`). Frontend: vite build passes (fresh npm install).",
+  "gateway-unverified": "GreenWeb success/error response format ('Ok:'/'Error:') is ASSUMED from its public docs, not tested with a live key. Verify with a real SMS before go-live.",
+  "e2e-harness": "Frontend client e2e (not committed as a test yet): bundle frontend/src/api/client.js with esbuild (define import.meta.env.VITE_API_BASE_URL), run against a live backend with a seeded schoolAdmin. Worth turning into a CI job (T23).",
+  "tech-debt": "Mongoose 9 warns that findOneAndUpdate `{ new: true }` is deprecated (use returnDocument:'after') — ~40 call sites; harmless today, mechanical codemod later. 3 npm-audit findings remain (node-cron/uuid needs node-cron 4 major; nodemailer advisory)."
+ }
+}

@@ -112,7 +112,7 @@ export default function LandingPage() {
       setPageError("");
 
       try {
-        const url = `${API_BASE}/landing-pages/${encodeURIComponent(
+        const url = `${API_BASE}/landingpages/${encodeURIComponent(
           SLUG
         )}`;
 

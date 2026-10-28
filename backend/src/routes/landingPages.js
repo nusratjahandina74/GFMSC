@@ -20,17 +20,23 @@ const ownFilter = (req, id) => {
   return f;
 };
 
-/* PUBLIC GET /api/landing-pages/:slug and /api/landingpages/:slug — published pages only */
-const handleGetLandingPage = async (req, res) => {
+/* PUBLIC GET /api/landing-pages/:slug — published pages only */
+router.get("/:slug", async (req, res) => {
   try {
-    const page = await LandingPage.findOne({ slug: cleanSlug(req.params.slug), isPublished: true }).select("-schoolId").lean();
+    const slugParam = cleanSlug(req.params.slug);
+    const page = await LandingPage.findOne({ 
+      slug: slugParam === "gfmsc" ? "gfmsc" : slugParam, 
+      isPublished: true 
+    }).select("-schoolId").lean();
+
     if (!page) return res.status(404).json({ message: "Landing page not found." });
     res.json(page);
   } catch (error) {
     console.error("Landing page GET error:", error);
     res.status(500).json({ message: "Could not load landing page." });
   }
-};
+});
+
 
 router.get("/:slug", handleGetLandingPage);
 router.get("/landingpages/:slug", handleGetLandingPage);

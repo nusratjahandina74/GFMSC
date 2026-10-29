@@ -17,7 +17,7 @@ import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "../components/ui/dialog";
 import { Clock, MapPin, Plus, Edit, Trash2, Loader2, Printer, Check, X, Save, Table2 } from "lucide-react";
-import { getClassRoutine, getTeacherRoutine, createRoutine, updateRoutine, deleteRoutine } from "../api/routines";
+import { getClassRoutine, getTeacherRoutine, createRoutine, updateRoutine, deleteRoutine,getAllSchools } from "../api/routines";
 import { getRoutineMatrix } from "../api/routineMatrix";
 import { getShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate } from "../api/shiftTemplates";
 import { getTeachers } from "../api/teachers";
@@ -67,113 +67,100 @@ export default function RoutinePage() {
     room: "",
   });
 
-const fetchShiftTemplates = async () => {
-  try {
-    const list = await getShiftTemplates();
+  const [schools, setSchools] = useState([]);
+  const [selectedSchoolId, setSelectedSchoolId] = useState("");
+  const fetchShiftTemplates = async () => {
+    try {
+      const list = await getShiftTemplates();
 
-    const safeList = Array.isArray(list) ? list : [];
-    setShiftTemplates(safeList);
+      const safeList = Array.isArray(list) ? list : [];
+      setShiftTemplates(safeList);
 
-    setFormData((prev) => {
-      if (prev.shift) return prev;
-      return {
-        ...prev,
-        shift: safeList[0]?.shift || "",
-      };
-    });
-  } catch (err) {
-    console.error("Fetch shift templates error:", err);
+      setFormData((prev) => {
+        if (prev.shift) return prev;
+        return {
+          ...prev,
+          shift: safeList[0]?.shift || "",
+        };
+      });
+    } catch (err) {
+      console.error("Fetch shift templates error:", err);
 
-    setShiftTemplates([]);
-  }
-};
+      setShiftTemplates([]);
+    }
+  };
 
-const fetchRoutine = async () => {
-  setLoading(true);
+  const fetchRoutine = async () => {
+    setLoading(true);
+    try {
+      let res;
+      if (role === "teacher") {
+        const teacherId = user?.teacherId || user?._id;
+        if (!teacherId) {
+          setRoutine([]);
+          return;
+        }
+        res = await getTeacherRoutine(teacherId);
+        setRoutine(res.data?.routine || []);
+        return;
+      }
 
-  try {
-    let res;
-
-    if (role === "teacher") {
-      const teacherId = user?.teacherId || user?._id;
-
-      if (!teacherId) {
+      if (!className) {
         setRoutine([]);
         return;
       }
 
-      res = await getTeacherRoutine(teacherId);
-      setRoutine(res.data?.routine || []);
-      return;
-    }
+const currentSchoolId = user?.schoolId || selectedSchoolId || "6ae0289e2ce6ddb4bf328daa";
 
-    if (!className) {
+const params = {
+  className,
+  schoolId: currentSchoolId
+};
+
+      if (section) {
+        params.section = section;
+      }
+
+      res = await getClassRoutine(params);
+      const routineData = Array.isArray(res.data?.routine) ? res.data.routine : [];
+      setRoutine(routineData);
+
+      const existingShifts = [
+        ...new Set(routineData.map((item) => item?.shift).filter(Boolean)),
+      ];
+      if (existingShifts.length > 0) {
+        setShiftTemplates((prev) => {
+          const templateNames = prev.map((s) => s.shift);
+          const missing = existingShifts
+            .filter((name) => !templateNames.includes(name))
+            .map((name) => ({
+              _id: `legacy-${name}`,
+              shift: name,
+              periods: [],
+            }));
+          return [...prev, ...missing];
+        });
+      }
+    } catch (err) {
+      console.error("Fetch routine error:", err);
       setRoutine([]);
-      return;
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const params = {
-      className,
-    };
-    if (section) {
-      params.section = section;
-    }
-    res = await getClassRoutine(params);
-
-    const routineData = Array.isArray(res.data?.routine)
-      ? res.data.routine
-      : [];
-
-    setRoutine(routineData);
-
-    const existingShifts = [
-      ...new Set(
-        routineData
-          .map((item) => item?.shift)
-          .filter(Boolean)
-      ),
-    ];
-
-    if (existingShifts.length > 0) {
-      setShiftTemplates((prev) => {
-        const templateNames = prev.map((s) => s.shift);
-
-        const missing = existingShifts
-          .filter((name) => !templateNames.includes(name))
-          .map((name) => ({
-            _id: `legacy-${name}`,
-            shift: name,
-            periods: [],
-          }));
-
-        return [...prev, ...missing];
+  const fetchTeachers = async () => {
+    try {
+      const res = await getTeachers({
+        all: true,
+        activeOnly: true,
       });
+
+      setTeachers(res?.teachers || []);
+    } catch (err) {
+      console.error("Fetch teachers error:", err);
     }
-  } catch (err) {
-    console.error("Fetch routine error:", err);
-
-    setRoutine([]);
-
-    if (err?.response?.data?.message) {
-      console.error(err.response.data.message);
-    }
-  } finally {
-    setLoading(false);
-  }
-};
-
-const fetchTeachers = async () => {
-  try {
-    const res = await getTeachers({
-      all: true,
-      activeOnly: true,
-    });
-
-    setTeachers(res?.teachers || []);
-  } catch (err) {
-    console.error("Fetch teachers error:", err);
-  }
-};
+  };
 
   const fetchClassSubjects = async () => {
     try {
@@ -184,9 +171,44 @@ const fetchTeachers = async () => {
     }
   };
 
+  // useEffect(() => {
+  //   const fetchSchools = async () => {
+  //     if (role === "superAdmin") {
+  //       try {
+  //         const res = await getAllSchools();
+  //         const schoolList = Array.isArray(res.data) ? res.data : res.data?.schools || [];
+  //         setSchools(schoolList);
+  //         if (schoolList.length > 0) {
+  //           setSelectedSchoolId(schoolList[0]._id);
+  //         }
+  //       } catch (err) {
+  //         console.error("Schools load error:", err);
+  //       }
+  //     }
+  //   };
+  //   fetchSchools();
+  // }, [role]);
+useEffect(() => {
+  const fetchSchools = async () => {
+    if (role === "superAdmin") {
+      try {
+        const res = await getAllSchools();
+        const schoolList = Array.isArray(res.data) 
+          ? res.data 
+          : res.data?.schools || res.data?.data || [];
+          
+        setSchools(schoolList);
+      } catch (err) {
+        console.error("Schools load error:", err);
+      }
+    }
+  };
+  fetchSchools();
+}, [role]);
+
   useEffect(() => {
     if (tab === "list") fetchRoutine();
-  }, [className, section, role, tab]);
+  }, [className, section, role, tab, selectedSchoolId]);
 
   useEffect(() => {
     fetchTeachers();
@@ -194,58 +216,58 @@ const fetchTeachers = async () => {
     fetchShiftTemplates();
   }, []);
 
- const handleSubmit = async (e) => {
-  e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  if (!formData.shift) {
-    alert("Please select a shift first.");
-    return;
-  }
-
-  if (!formData.teacherId) {
-    alert("Please select a teacher.");
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    const payload = {
-      ...formData,
-      period: Number(formData.period),
-      section: formData.section || "",
-      shift: formData.shift.trim(),
-    };
-
-    if (editingId) {
-      await updateRoutine(editingId, payload);
-    } else {
-      await createRoutine(payload);
+    if (!formData.shift) {
+      alert("Please select a shift first.");
+      return;
     }
 
-    setOpenDialog(false);
-    resetForm();
-    await fetchRoutine();
-
-  } catch (err) {
-    console.error("Submit routine error:", err);
-
-    const status = err?.response?.status;
-    const message =
-      err?.response?.data?.message ||
-      "Failed to save routine entry";
-
-    if (status === 409) {
-      alert(
-        `This class/section/day/period- shift- routine already exists.\n\n${message}`
-      );
-    } else {
-      alert(message);
+    if (!formData.teacherId) {
+      alert("Please select a teacher.");
+      return;
     }
-  } finally {
-    setLoading(false);
-  }
-};
+
+    setLoading(true);
+
+    try {
+      const payload = {
+        ...formData,
+        period: Number(formData.period),
+        section: formData.section || "",
+        shift: formData.shift.trim(),
+      };
+
+      if (editingId) {
+        await updateRoutine(editingId, payload);
+      } else {
+        await createRoutine(payload);
+      }
+
+      setOpenDialog(false);
+      resetForm();
+      await fetchRoutine();
+
+    } catch (err) {
+      console.error("Submit routine error:", err);
+
+      const status = err?.response?.status;
+      const message =
+        err?.response?.data?.message ||
+        "Failed to save routine entry";
+
+      if (status === 409) {
+        alert(
+          `This class/section/day/period- shift- routine already exists.\n\n${message}`
+        );
+      } else {
+        alert(message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleEdit = (item) => {
     setEditingId(item._id);
@@ -301,30 +323,30 @@ const fetchTeachers = async () => {
 
   // Show ALL active teachers, with shift-matched ones sorted first.
   // Never filter out a teacher from the dropdown — admins must be able to assign any teacher to any period.
-const teachersForShift = teachers
-  .slice()
-  .sort((a, b) => {
-    const aMatches =
-      !formData.shift || a.shift === formData.shift ? 0 : 1;
+  const teachersForShift = teachers
+    .slice()
+    .sort((a, b) => {
+      const aMatches =
+        !formData.shift || a.shift === formData.shift ? 0 : 1;
 
-    const bMatches =
-      !formData.shift || b.shift === formData.shift ? 0 : 1;
+      const bMatches =
+        !formData.shift || b.shift === formData.shift ? 0 : 1;
 
-    if (aMatches !== bMatches) {
-      return aMatches - bMatches;
-    }
+      if (aMatches !== bMatches) {
+        return aMatches - bMatches;
+      }
 
-    return (a.name || "").localeCompare(b.name || "");
-  });
+      return (a.name || "").localeCompare(b.name || "");
+    });
 
   const TABS = [
     { key: "list", label: "Weekly Routine" },
     ...(isAdmin
       ? [
-          { key: "shiftSetup", label: "Shift Time Slots" },
-          { key: "teacherGrid", label: "Teacher Availability Grid" },
-          { key: "classGrid", label: "Class-Period Subjects" },
-        ]
+        { key: "shiftSetup", label: "Shift Time Slots" },
+        { key: "teacherGrid", label: "Teacher Availability Grid" },
+        { key: "classGrid", label: "Class-Period Subjects" },
+      ]
       : []),
   ];
 
@@ -348,208 +370,208 @@ const teachersForShift = teachers
             </button>
           )}
           {isAdmin && tab === "list" && (
-          <Dialog open={openDialog} onOpenChange={setOpenDialog}>
-            <DialogTrigger asChild>
-              <button 
-                onClick={resetForm}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 visible opacity-100 z-50 transition-all"
-              >
-                <Plus className="h-4 w-4" />
-                Add Routine
-              </button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingId ? "Edit Routine Entry" : "Add New Routine Entry"}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Shift *</Label>
-                  <Select
-                    value={formData.shift}
-                    onValueChange={(val) => setFormData({ ...formData, shift: val, teacherId: "" })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select shift" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {shiftNames.length === 0 && (
-                        <div className="px-3 py-2 text-xs text-muted-foreground">No shifts yet — create one on the "Shift Time Slots" tab first.</div>
-                      )}
-                      {shiftNames.map((s) => (
-                        <SelectItem key={s} value={s}>{s}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Class</Label>
-                    <Select
-                      value={formData.className}
-                      onValueChange={(val) => setFormData({ ...formData, className: val })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select class" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CLASS_LIST.map((cls) => (
-                          <SelectItem key={cls} value={cls}>{cls}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Section</Label>
-                    <Select
-                      value={formData.section || "__all__"}
-                      onValueChange={(val) => setFormData({ ...formData, section: val === "__all__" ? "" : val })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select section" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__all__">All</SelectItem>
-                        {SECTION_LIST.map((sec) => (
-                          <SelectItem key={sec} value={sec}>{sec}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Subject</Label>
-                  <Select
-                    value={formData.subject}
-                    onValueChange={(val) => setFormData({ ...formData, subject: val })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select subject" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(() => {
-                        const cs = classSubjects.find(cs => cs.className === formData.className);
-                        const customSubjects = (cs?.subjects || []).map(sub => typeof sub === "string" ? sub : sub.subjectName || sub.name);
-                        const defaultSubjects = ["Bangla", "English", "Mathematics", "Science", "Social Science", "Religion", "ICT", "General Knowledge", "Physics", "Chemistry", "Biology", "Accounting"];
-                        const combined = Array.from(new Set([...customSubjects, ...defaultSubjects]));
-                        return combined.map((s) => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ));
-                      })()}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Teacher</Label>
-                  <Select
-                    value={formData.teacherId}
-                    onValueChange={(val) => setFormData({ ...formData, teacherId: val })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select teacher" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {teachersForShift.length === 0 && (
-                        <div className="px-3 py-2 text-xs text-muted-foreground">No teachers available — add teachers to the school first.</div>
-                      )}
-                      {teachersForShift.map((t) => {
-                        const mismatch = formData.shift && t.shift && t.shift !== formData.shift;
-                        return (
-                          <SelectItem key={t._id} value={t._id}>
-                            <div className="flex flex-col w-full">
-                              <span className="font-medium">
-                                {t.name} - {t.subject || "General Teacher"}
-                                {t.shift ? `  •  Shift: ${t.shift}` : "  •  Shift: Unassigned"}
-                                {mismatch && "  ⚠️"}
-                              </span>
-                              {mismatch && (
-                                <span className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5 leading-tight">
-                                  Currently assigned to Shift {t.shift} — being added to <span className="font-semibold">{formData.shift}</span>
-                                </span>
-                              )}
-                            </div>
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Day</Label>
-                  <Select
-                    value={formData.day}
-                    onValueChange={(val) => setFormData({ ...formData, day: val })}
-                    required
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select day" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {daysOfWeek.map((d) => (
-                        <SelectItem key={d} value={d}>{dayNames[d]}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Period</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={formData.period}
-                      onChange={(e) => setFormData({ ...formData, period: Number(e.target.value) })}
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Period 1 = first class of the day. A teacher must hold period 1 for a
-                      class/section before they can be made its Class Teacher.
-                    </p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Start Time</Label>
-                    <Input
-                      type="time"
-                      value={formData.startTime}
-                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                      required
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>End Time</Label>
-                    <Input
-                      type="time"
-                      value={formData.endTime}
-                      onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                      required
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Room</Label>
-                  <Input
-                    value={formData.room}
-                    onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-                  />
-                </div>
-                <div className="flex justify-end gap-2">
-                <DialogClose asChild>
-                  <button type="button" className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-bold px-5 py-2.5 rounded-lg shadow-md transition-all">Cancel</button>
-                </DialogClose>
-                <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 visible opacity-100 z-50 transition-all duration-200">
-                  {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {editingId ? "Update" : "Create"}
+            <Dialog open={openDialog} onOpenChange={setOpenDialog}>
+              <DialogTrigger asChild>
+                <button
+                  onClick={resetForm}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 visible opacity-100 z-50 transition-all"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Routine
                 </button>
-              </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>{editingId ? "Edit Routine Entry" : "Add New Routine Entry"}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Shift *</Label>
+                    <Select
+                      value={formData.shift}
+                      onValueChange={(val) => setFormData({ ...formData, shift: val, teacherId: "" })}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select shift" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {shiftNames.length === 0 && (
+                          <div className="px-3 py-2 text-xs text-muted-foreground">No shifts yet — create one on the "Shift Time Slots" tab first.</div>
+                        )}
+                        {shiftNames.map((s) => (
+                          <SelectItem key={s} value={s}>{s}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Class</Label>
+                      <Select
+                        value={formData.className}
+                        onValueChange={(val) => setFormData({ ...formData, className: val })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select class" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CLASS_LIST.map((cls) => (
+                            <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Section</Label>
+                      <Select
+                        value={formData.section || "__all__"}
+                        onValueChange={(val) => setFormData({ ...formData, section: val === "__all__" ? "" : val })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select section" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__all__">All</SelectItem>
+                          {SECTION_LIST.map((sec) => (
+                            <SelectItem key={sec} value={sec}>{sec}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Subject</Label>
+                    <Select
+                      value={formData.subject}
+                      onValueChange={(val) => setFormData({ ...formData, subject: val })}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select subject" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(() => {
+                          const cs = classSubjects.find(cs => cs.className === formData.className);
+                          const customSubjects = (cs?.subjects || []).map(sub => typeof sub === "string" ? sub : sub.subjectName || sub.name);
+                          const defaultSubjects = ["Bangla", "English", "Mathematics", "Science", "Social Science", "Religion", "ICT", "General Knowledge", "Physics", "Chemistry", "Biology", "Accounting"];
+                          const combined = Array.from(new Set([...customSubjects, ...defaultSubjects]));
+                          return combined.map((s) => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ));
+                        })()}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Teacher</Label>
+                    <Select
+                      value={formData.teacherId}
+                      onValueChange={(val) => setFormData({ ...formData, teacherId: val })}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select teacher" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {teachersForShift.length === 0 && (
+                          <div className="px-3 py-2 text-xs text-muted-foreground">No teachers available — add teachers to the school first.</div>
+                        )}
+                        {teachersForShift.map((t) => {
+                          const mismatch = formData.shift && t.shift && t.shift !== formData.shift;
+                          return (
+                            <SelectItem key={t._id} value={t._id}>
+                              <div className="flex flex-col w-full">
+                                <span className="font-medium">
+                                  {t.name} - {t.subject || "General Teacher"}
+                                  {t.shift ? `  •  Shift: ${t.shift}` : "  •  Shift: Unassigned"}
+                                  {mismatch && "  ⚠️"}
+                                </span>
+                                {mismatch && (
+                                  <span className="text-[11px] text-amber-600 dark:text-amber-400 mt-0.5 leading-tight">
+                                    Currently assigned to Shift {t.shift} — being added to <span className="font-semibold">{formData.shift}</span>
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Day</Label>
+                    <Select
+                      value={formData.day}
+                      onValueChange={(val) => setFormData({ ...formData, day: val })}
+                      required
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select day" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {daysOfWeek.map((d) => (
+                          <SelectItem key={d} value={d}>{dayNames[d]}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Period</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="10"
+                        value={formData.period}
+                        onChange={(e) => setFormData({ ...formData, period: Number(e.target.value) })}
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Period 1 = first class of the day. A teacher must hold period 1 for a
+                        class/section before they can be made its Class Teacher.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Start Time</Label>
+                      <Input
+                        type="time"
+                        value={formData.startTime}
+                        onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>End Time</Label>
+                      <Input
+                        type="time"
+                        value={formData.endTime}
+                        onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Room</Label>
+                    <Input
+                      value={formData.room}
+                      onChange={(e) => setFormData({ ...formData, room: e.target.value })}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <DialogClose asChild>
+                      <button type="button" className="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 font-bold px-5 py-2.5 rounded-lg shadow-md transition-all">Cancel</button>
+                    </DialogClose>
+                    <button type="submit" className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 visible opacity-100 z-50 transition-all duration-200">
+                      {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                      {editingId ? "Update" : "Create"}
+                    </button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           )}
         </div>
       </div>
@@ -560,11 +582,10 @@ const teachersForShift = teachers
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
-                tab === t.key
+              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${tab === t.key
                   ? "bg-emerald-600 text-white"
                   : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
-              }`}
+                }`}
             >
               {t.label}
             </button>
@@ -581,6 +602,28 @@ const teachersForShift = teachers
                 <CardDescription>Choose class and section to view routine</CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+{role === "superAdmin" && (
+  <div className="space-y-2 md:col-span-2">
+    <Label htmlFor="schoolId">Select School</Label>
+    <select
+      id="schoolId"
+      value={selectedSchoolId}
+      onChange={(e) => setSelectedSchoolId(e.target.value)}
+      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background text-black dark:text-white"
+    >
+      <option value="">Select a School</option>
+
+      {schools.map((school) => (
+        <option key={school._id} value={school._id}>
+          {school.name}
+        </option>
+      ))}
+    </select>
+  </div>
+)}
+
+
+
                 <div className="space-y-2">
                   <Label htmlFor="className">Class</Label>
                   <Select value={className} onValueChange={setClassName}>
@@ -643,13 +686,13 @@ const teachersForShift = teachers
                                   </div>
                                   {isAdmin && (
                                     <div className="flex gap-1">
-                                      <button 
+                                      <button
                                         onClick={() => handleEdit(item)}
                                         className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200 font-bold p-1 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all"
                                       >
                                         <Edit className="h-4 w-4" />
                                       </button>
-                                      <button 
+                                      <button
                                         onClick={() => handleDelete(item._id)}
                                         className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 font-bold p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-all"
                                       >

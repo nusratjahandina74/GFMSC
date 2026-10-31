@@ -17,7 +17,7 @@ import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "../components/ui/dialog";
 import { Clock, MapPin, Plus, Edit, Trash2, Loader2, Printer, Check, X, Save, Table2 } from "lucide-react";
-import { getClassRoutine, getTeacherRoutine, createRoutine, updateRoutine, deleteRoutine,getAllSchools } from "../api/routines";
+import { getClassRoutine, getTeacherRoutine, createRoutine, updateRoutine, deleteRoutine, getAllSchools } from "../api/routines";
 import { getRoutineMatrix } from "../api/routineMatrix";
 import { getShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate } from "../api/shiftTemplates";
 import { getTeachers } from "../api/teachers";
@@ -69,6 +69,7 @@ export default function RoutinePage() {
 
   const [schools, setSchools] = useState([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState("");
+  const [activeDay, setActiveDay] = useState("saturday");
   const fetchShiftTemplates = async () => {
     try {
       const list = await getShiftTemplates();
@@ -110,12 +111,12 @@ export default function RoutinePage() {
         return;
       }
 
-const currentSchoolId = user?.schoolId || selectedSchoolId || "6ae0289e2ce6ddb4bf328daa";
+      const currentSchoolId = user?.schoolId || selectedSchoolId || "6ae0289e2ce6ddb4bf328daa";
 
-const params = {
-  className,
-  schoolId: currentSchoolId
-};
+      const params = {
+        className,
+        schoolId: currentSchoolId
+      };
 
       if (section) {
         params.section = section;
@@ -188,23 +189,23 @@ const params = {
   //   };
   //   fetchSchools();
   // }, [role]);
-useEffect(() => {
-  const fetchSchools = async () => {
-    if (role === "superAdmin") {
-      try {
-        const res = await getAllSchools();
-        const schoolList = Array.isArray(res.data) 
-          ? res.data 
-          : res.data?.schools || res.data?.data || [];
-          
-        setSchools(schoolList);
-      } catch (err) {
-        console.error("Schools load error:", err);
+  useEffect(() => {
+    const fetchSchools = async () => {
+      if (role === "superAdmin") {
+        try {
+          const res = await getAllSchools();
+          const schoolList = Array.isArray(res.data)
+            ? res.data
+            : res.data?.schools || res.data?.data || [];
+
+          setSchools(schoolList);
+        } catch (err) {
+          console.error("Schools load error:", err);
+        }
       }
-    }
-  };
-  fetchSchools();
-}, [role]);
+    };
+    fetchSchools();
+  }, [role]);
 
   useEffect(() => {
     if (tab === "list") fetchRoutine();
@@ -583,8 +584,8 @@ useEffect(() => {
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${tab === t.key
-                  ? "bg-emerald-600 text-white"
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
+                ? "bg-emerald-600 text-white"
+                : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
                 }`}
             >
               {t.label}
@@ -594,35 +595,170 @@ useEffect(() => {
       )}
 
       {tab === "list" && (
+        //         <>
+        //           {(role === "schoolAdmin" || role === "superAdmin" || role === "student") && (
+        //             <Card>
+        //               <CardHeader>
+        //                 <CardTitle>Select Class</CardTitle>
+        //                 <CardDescription>Choose class and section to view routine</CardDescription>
+        //               </CardHeader>
+        //               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        // {role === "superAdmin" && (
+        //   <div className="space-y-2 md:col-span-2">
+        //     <Label htmlFor="schoolId">Select School</Label>
+        //     <select
+        //       id="schoolId"
+        //       value={selectedSchoolId}
+        //       onChange={(e) => setSelectedSchoolId(e.target.value)}
+        //       className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background text-black dark:text-white"
+        //     >
+        //       <option value="">Select a School</option>
+
+        //       {schools.map((school) => (
+        //         <option key={school._id} value={school._id}>
+        //           {school.name}
+        //         </option>
+        //       ))}
+        //     </select>
+        //   </div>
+        // )}
+
+
+
+        //                 <div className="space-y-2">
+        //                   <Label htmlFor="className">Class</Label>
+        //                   <Select value={className} onValueChange={setClassName}>
+        //                     <SelectTrigger id="className">
+        //                       <SelectValue placeholder="Select class" />
+        //                     </SelectTrigger>
+        //                     <SelectContent>
+        //                       {CLASS_LIST.map((cls) => (
+        //                         <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+        //                       ))}
+        //                     </SelectContent>
+        //                   </Select>
+        //                 </div>
+        //                 <div className="space-y-2">
+        //                   <Label htmlFor="section">Section</Label>
+        //                   <Select value={section || "__all__"} onValueChange={(v) => setSection(v === "__all__" ? "" : v)}>
+        //                     <SelectTrigger id="section">
+        //                       <SelectValue placeholder="Select section" />
+        //                     </SelectTrigger>
+        //                     <SelectContent>
+        //                       <SelectItem value="__all__">All</SelectItem>
+        //                       {SECTION_LIST.map((sec) => (
+        //                         <SelectItem key={sec} value={sec}>{sec}</SelectItem>
+        //                       ))}
+        //                     </SelectContent>
+        //                   </Select>
+        //                 </div>
+        //               </CardContent>
+        //             </Card>
+        //           )}
+
+        //           {loading ? (
+        //             <div className="p-8 text-center text-muted-foreground">
+        //               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+        //               Loading routine...
+        //             </div>
+        //           ) : isAdmin && !className ? (
+        //             <div className="p-8 text-center text-muted-foreground border rounded-lg border-dashed">
+        //               Select a class above to view its routine.
+        //             </div>
+        //           ) : (
+        //             <div className="grid gap-4">
+        //               {daysOfWeek.map((day) => {
+        //                 const dayRoutine = getRoutineByDay(day).slice().sort((a, b) => (a.period || 0) - (b.period || 0));
+        //                 return (
+        //                   <Card key={day}>
+        //                     <CardHeader>
+        //                       <CardTitle>{dayNames[day]}</CardTitle>
+        //                     </CardHeader>
+        //                     <CardContent>
+        //                       {dayRoutine.length > 0 ? (
+        //                         <div className="grid gap-3 md:grid-cols-3">
+        //                           {dayRoutine.map((item) => (
+        //                             <Card key={item?._id || Math.random()}>
+        //                               <CardContent className="p-4">
+        //                                 <div className="flex justify-between items-start">
+        //                                   <div>
+        //                                     <div className="font-semibold text-lg">{item?.subject || "Unknown Subject"}</div>
+        //                                     <div className="text-xs text-muted-foreground">Period {item?.period ?? "-"} &middot; {item?.shift || "-"}</div>
+        //                                   </div>
+        //                                   {isAdmin && (
+        //                                     <div className="flex gap-1">
+        //                                       <button
+        //                                         onClick={() => handleEdit(item)}
+        //                                         className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200 font-bold p-1 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all"
+        //                                       >
+        //                                         <Edit className="h-4 w-4" />
+        //                                       </button>
+        //                                       <button
+        //                                         onClick={() => handleDelete(item._id)}
+        //                                         className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 font-bold p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-all"
+        //                                       >
+        //                                         <Trash2 className="h-4 w-4" />
+        //                                       </button>
+        //                                     </div>
+        //                                   )}
+        //                                 </div>
+        //                                 <div className="text-muted-foreground text-sm mb-2">
+        //                                   {item?.teacherId?.name || "Unknown Teacher"}
+        //                                 </div>
+        //                                 <div className="flex flex-wrap items-center gap-4 text-sm">
+        //                                   <div className="flex items-center gap-1">
+        //                                     <Clock className="h-4 w-4" />
+        //                                     {item?.startTime || "-"} - {item?.endTime || "-"}
+        //                                   </div>
+        //                                   {item?.room && (
+        //                                     <div className="flex items-center gap-1">
+        //                                       <MapPin className="h-4 w-4" />
+        //                                       Room {item.room}
+        //                                     </div>
+        //                                   )}
+        //                                 </div>
+        //                               </CardContent>
+        //                             </Card>
+        //                           ))}
+        //                         </div>
+        //                       ) : (
+        //                         <div className="text-center text-muted-foreground py-6">
+        //                           No classes on {dayNames[day]}
+        //                         </div>
+        //                       )}
+        //                     </CardContent>
+        //                   </Card>
+        //                 );
+        //               })}
+        //             </div>
+        //           )}
+        //         </>
         <>
           {(role === "schoolAdmin" || role === "superAdmin" || role === "student") && (
-            <Card>
+            <Card className="print:hidden">
               <CardHeader>
                 <CardTitle>Select Class</CardTitle>
                 <CardDescription>Choose class and section to view routine</CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-{role === "superAdmin" && (
-  <div className="space-y-2 md:col-span-2">
-    <Label htmlFor="schoolId">Select School</Label>
-    <select
-      id="schoolId"
-      value={selectedSchoolId}
-      onChange={(e) => setSelectedSchoolId(e.target.value)}
-      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background text-black dark:text-white"
-    >
-      <option value="">Select a School</option>
-
-      {schools.map((school) => (
-        <option key={school._id} value={school._id}>
-          {school.name}
-        </option>
-      ))}
-    </select>
-  </div>
-)}
-
-
+                {role === "superAdmin" && (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="schoolId">Select School</Label>
+                    <select
+                      id="schoolId"
+                      value={selectedSchoolId}
+                      onChange={(e) => setSelectedSchoolId(e.target.value)}
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background text-black dark:text-white"
+                    >
+                      <option value="">Select a School</option>
+                      {schools.map((school) => (
+                        <option key={school._id} value={school._id}>
+                          {school.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="className">Class</Label>
@@ -655,6 +791,25 @@ useEffect(() => {
             </Card>
           )}
 
+          {/* 🌟 ডে-ওয়াইজ পেজিনেশন বাটন গ্রুপ (যা প্রিন্টে দেখাবে না) */}
+          {(!isAdmin || className) && (
+            <div className="flex flex-wrap gap-2 my-4 no-print bg-white dark:bg-gray-950 p-3 rounded-lg border shadow-sm">
+              {daysOfWeek.map((day) => (
+                <button
+                  key={day}
+                  type="button"
+                  onClick={() => setActiveDay(day)}
+                  className={`px-4 py-2 rounded-md font-semibold text-sm transition-all ${activeDay === day
+                      ? "bg-emerald-600 text-white shadow-md"
+                      : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
+                    }`}
+                >
+                  {dayNames[day]}
+                </button>
+              ))}
+            </div>
+          )}
+
           {loading ? (
             <div className="p-8 text-center text-muted-foreground">
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
@@ -666,75 +821,112 @@ useEffect(() => {
             </div>
           ) : (
             <div className="grid gap-4">
-              {daysOfWeek.map((day) => {
-                const dayRoutine = getRoutineByDay(day).slice().sort((a, b) => (a.period || 0) - (b.period || 0));
-                return (
-                  <Card key={day}>
-                    <CardHeader>
-                      <CardTitle>{dayNames[day]}</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {dayRoutine.length > 0 ? (
-                        <div className="grid gap-3 md:grid-cols-3">
-                          {dayRoutine.map((item) => (
-                            <Card key={item?._id || Math.random()}>
-                              <CardContent className="p-4">
-                                <div className="flex justify-between items-start">
-                                  <div>
-                                    <div className="font-semibold text-lg">{item?.subject || "Unknown Subject"}</div>
-                                    <div className="text-xs text-muted-foreground">Period {item?.period ?? "-"} &middot; {item?.shift || "-"}</div>
+              {/* 🖥️ ১. শুধুমাত্র স্ক্রিন ভিউ (বর্তমানে সিলেক্ট করা দিনটি দেখাবে) */}
+              <Card className="print:hidden">
+                <CardHeader>
+                  <CardTitle>{dayNames[activeDay]}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const dayRoutine = getRoutineByDay(activeDay).slice().sort((a, b) => (a.period || 0) - (b.period || 0));
+                    return dayRoutine.length > 0 ? (
+                      <div className="grid gap-3 md:grid-cols-3">
+                        {dayRoutine.map((item) => (
+                          <Card key={item?._id || Math.random()}>
+                            <CardContent className="p-4">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <div className="font-semibold text-lg">{item?.subject || "Unknown Subject"}</div>
+                                  <div className="text-xs text-muted-foreground">Period {item?.period ?? "-"} &middot; {item?.shift || "-"}</div>
+                                </div>
+                                {isAdmin && (
+                                  <div className="flex gap-1">
+                                    <button
+                                      onClick={() => handleEdit(item)}
+                                      className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200 font-bold p-1 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDelete(item._id)}
+                                      className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 font-bold p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-all"
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
                                   </div>
-                                  {isAdmin && (
-                                    <div className="flex gap-1">
-                                      <button
-                                        onClick={() => handleEdit(item)}
-                                        className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-200 font-bold p-1 rounded hover:bg-indigo-50 dark:hover:bg-indigo-900/30 transition-all"
-                                      >
-                                        <Edit className="h-4 w-4" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDelete(item._id)}
-                                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-200 font-bold p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-all"
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </button>
-                                    </div>
-                                  )}
+                                )}
+                              </div>
+                              <div className="text-muted-foreground text-sm mb-2">
+                                {item?.teacherId?.name || "Unknown Teacher"}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-4 text-sm">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="h-4 w-4" />
+                                  {item?.startTime || "-"} - {item?.endTime || "-"}
                                 </div>
-                                <div className="text-muted-foreground text-sm mb-2">
-                                  {item?.teacherId?.name || "Unknown Teacher"}
-                                </div>
-                                <div className="flex flex-wrap items-center gap-4 text-sm">
+                                {item?.room && (
                                   <div className="flex items-center gap-1">
-                                    <Clock className="h-4 w-4" />
-                                    {item?.startTime || "-"} - {item?.endTime || "-"}
+                                    <MapPin className="h-4 w-4" />
+                                    Room {item.room}
                                   </div>
-                                  {item?.room && (
-                                    <div className="flex items-center gap-1">
-                                      <MapPin className="h-4 w-4" />
-                                      Room {item.room}
-                                    </div>
-                                  )}
-                                </div>
-                              </CardContent>
-                            </Card>
+                                )}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center text-muted-foreground py-6">
+                        No classes on {dayNames[activeDay]}
+                      </div>
+                    );
+                  })()}
+                </CardContent>
+              </Card>
+
+              {/* 🖨️ ২. শুধুমাত্র প্রিন্ট ভিউ (সবগুলো দিন আলাদা পাতায় ল্যান্ডস্কেপ হবে) */}
+              <div className="hidden print:block space-y-0">
+                {daysOfWeek.map((day) => {
+                  const dayRoutine = getRoutineByDay(day).slice().sort((a, b) => (a.period || 0) - (b.period || 0));
+                  return (
+                    <div key={day} className="print-page-break p-6 bg-white text-black mb-8">
+                      <h2 className="text-2xl font-bold text-center mb-6 border-b-2 border-black pb-2 uppercase tracking-wider">
+                        {dayNames[day]} Class Routine {className ? `(${className}${section ? ` - ${section}` : ""})` : ""}
+                      </h2>
+                      {dayRoutine.length > 0 ? (
+                        <div className="grid grid-cols-3 gap-4">
+                          {dayRoutine.map((item) => (
+                            <div key={item?._id || Math.random()} className="border-2 border-gray-400 p-4 rounded-lg bg-gray-50">
+                              <div className="font-bold text-xl mb-1 text-black">{item?.subject || "Unknown Subject"}</div>
+                              <div className="text-sm font-semibold text-gray-800 mb-2">Period {item?.period ?? "-"} ({item?.shift || "-"})</div>
+                              <div className="text-md text-gray-700 mb-2 font-bold">Teacher: {item?.teacherId?.name || "Unknown Teacher"}</div>
+                              <div className="text-sm text-gray-600 font-mono font-medium">
+                                Time: {item?.startTime || "-"} - {item?.endTime || "-"} {item?.room ? ` | Room: ${item.room}` : ""}
+                              </div>
+                            </div>
                           ))}
                         </div>
                       ) : (
-                        <div className="text-center text-muted-foreground py-6">
-                          No classes on {dayNames[day]}
+                        <div className="text-center text-gray-400 py-12 text-lg italic border border-dashed border-gray-300 rounded-lg">
+                          No classes scheduled for {dayNames[day]}
                         </div>
                       )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                    </div>
+                  );
+                })}
+              </div>
+
             </div>
           )}
         </>
+
       )}
 
-      {tab === "shiftSetup" && <ShiftSetupPanel />}
+      {tab === "shiftSetup" && (
+        <ShiftSetupPanel
+          currentSchoolId={user?.schoolId || selectedSchoolId || "6ae0289e2ce6ddb4bf328daa"}
+        />
+      )}
       {tab === "teacherGrid" && <TeacherAvailabilityGrid />}
       {tab === "classGrid" && <ClassPeriodSubjectGrid />}
     </div>
@@ -746,24 +938,132 @@ useEffect(() => {
 // This is what feeds the routine table header and gives a live count of how
 // many periods/classes a shift has while the admin edits it.
 // ---------------------------------------------------------------------------
-function ShiftSetupPanel() {
+// ১. এখানে currentSchoolId প্রপ্স হিসেবে রিসিভ করা হলো
+// function ShiftSetupPanel({ currentSchoolId }) {
+//   const NEW_SHIFT = "__new__";
+//   const [templates, setTemplates] = useState([]);
+//   const [selectedId, setSelectedId] = useState("");
+//   const [shiftName, setShiftName] = useState("");
+//   const [periods, setPeriods] = useState([]);
+//   const [loading, setLoading] = useState(true);
+//   const [saving, setSaving] = useState(false);
+//   const [deleting, setDeleting] = useState(false);
+//   const [msg, setMsg] = useState("");
+
+//   const load = async (keepSelection) => {
+//     setLoading(true);
+//     try {
+//       const list = await getShiftTemplates();
+//       setTemplates(list);
+//       if (!keepSelection) {
+//         if (list.length > 0) {
+//           setSelectedId(list[0]._id);
+//           setShiftName(list[0].shift);
+//           setPeriods((list[0].periods || []).slice().sort((a, b) => a.period - b.period));
+//         } else {
+//           setSelectedId(NEW_SHIFT);
+//           setShiftName("");
+//           setPeriods([]);
+//         }
+//       }
+//     } catch (err) {
+//       setMsg(err?.response?.data?.message || err.message);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   useEffect(() => {
+//     load(false);
+//   }, []);
+
+//   const handleSelectShift = (id) => {
+//     setMsg("");
+//     setSelectedId(id);
+//     if (id === NEW_SHIFT) {
+//       setShiftName("");
+//       setPeriods([]);
+//     } else {
+//       const current = templates.find((t) => t._id === id);
+//       setShiftName(current?.shift || "");
+//       setPeriods((current?.periods || []).slice().sort((a, b) => a.period - b.period));
+//     }
+//   };
+
+//   const addPeriod = () => {
+//     const nextNum = periods.length > 0 ? Math.max(...periods.map((p) => p.period)) + 1 : 1;
+//     setPeriods([...periods, { period: nextNum, startTime: "", endTime: "" }]);
+//   };
+
+//   const removePeriod = (period) => {
+//     setPeriods(periods.filter((p) => p.period !== period));
+//   };
+
+//   const updatePeriod = (period, field, value) => {
+//     setPeriods(periods.map((p) => (p.period === period ? { ...p, [field]: value } : p)));
+//   };
+
+//   // 🌟 ফিক্সড ডাটা সেভিং লজিক
+//   const handleSave = async () => {
+//     if (!shiftName.trim()) {
+//       setMsg("Shift name is required (e.g. 'Morning Shift').");
+//       return;
+//     }
+//     if (periods.length === 0) {
+//       setMsg("Add at least one period with a start and end time.");
+//       return;
+//     }
+//     setSaving(true);
+//     setMsg("");
+//     try {
+//       if (selectedId === NEW_SHIFT) {
+//         // এখানে একটি সিঙ্গেল অবজেক্টে schoolId সহ পাঠানো হচ্ছে
+//         const res = await createShiftTemplate({
+//           shift: shiftName.trim(),
+//           periods,
+//           schoolId: currentSchoolId
+//         });
+//         setMsg("✅ Shift created successfully");
+//         await load(false);
+//         if (res?.shiftTemplate?._id) setSelectedId(res.shiftTemplate._id);
+//       } else {
+//         // আপডেট করার সময়ও schoolId সেফটি হিসেবে পাঠানো হলো
+//         await updateShiftTemplate(selectedId, {
+//           shift: shiftName.trim(),
+//           periods,
+//           schoolId: currentSchoolId
+//         });
+//         setMsg("✅ Shift updated successfully");
+//         await load(true);
+//       }
+//     } catch (err) {
+//       setMsg(err?.response?.data?.message || err.message);
+//     } finally {
+//       setSaving(false);
+//     }
+//   };
+// }
+function ShiftSetupPanel({ currentSchoolId }) {
   const NEW_SHIFT = "__new__";
-  const [templates, setTemplates] = useState([]); // every shift the school has created
-  const [selectedId, setSelectedId] = useState(""); // _id of the shift being edited, or NEW_SHIFT
-  const [shiftName, setShiftName] = useState(""); // editable name box (for both new + rename)
+  const [templates, setTemplates] = useState([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [shiftName, setShiftName] = useState("");
   const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [msg, setMsg] = useState("");
 
+  // 🌟 ১. পরিবর্তন: স্কুল আইডি দিয়ে ফিল্টার করার জন্য এপিআই কলে অবজেক্ট পাস করা হলো
   const load = async (keepSelection) => {
     setLoading(true);
     try {
-      const list = await getShiftTemplates();
+      // এখানে { schoolId: currentSchoolId } পাঠানো হচ্ছে যাতে সঠিক স্কুলের শিফট আসে
+      const list = await getShiftTemplates({ schoolId: currentSchoolId });
       setTemplates(list);
       if (!keepSelection) {
         if (list.length > 0) {
+          // list[0]._id ফিক্স করা হলো (আগে list._id ছিল যাতে বাগ হওয়ার চান্স ছিল)
           setSelectedId(list[0]._id);
           setShiftName(list[0].shift);
           setPeriods((list[0].periods || []).slice().sort((a, b) => a.period - b.period));
@@ -780,10 +1080,11 @@ function ShiftSetupPanel() {
     }
   };
 
+  // 🌟 ২. পরিবর্তন: ডিপেন্ডেন্সি অ্যারেতে currentSchoolId দেওয়া হলো
+  // এর ফলে ড্রপডাউনে স্কুল চেঞ্জ করলেই এই প্যানেলের শিফট ডাটা স্বয়ংক্রিয়ভাবে রিলোড হবে
   useEffect(() => {
     load(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentSchoolId]); 
 
   const handleSelectShift = (id) => {
     setMsg("");
@@ -824,15 +1125,27 @@ function ShiftSetupPanel() {
     setMsg("");
     try {
       if (selectedId === NEW_SHIFT) {
-        const res = await createShiftTemplate(shiftName.trim(), periods);
+        const res = await createShiftTemplate({
+          shift: shiftName.trim(),
+          periods,
+          schoolId: currentSchoolId
+        });
         setMsg("✅ Shift created successfully");
         await load(false);
-        if (res?.shiftTemplate?._id) setSelectedId(res.shiftTemplate._id);
+        
+        // এক্সিওস রেসপন্স হ্যান্ডেলিং সেফটি নেট
+        const newId = res?.shiftTemplate?._id || res?.data?.shiftTemplate?._id;
+        if (newId) setSelectedId(newId);
       } else {
-        await updateShiftTemplate(selectedId, { shift: shiftName.trim(), periods });
-        setMsg("✅ Shift updated successfully");
-        await load(true);
-      }
+  // 🌟 আপডেট করার সময়ও অবজেক্টের সাথে schoolId পাস করা নিশ্চিত করুন
+  await updateShiftTemplate(selectedId, {
+    shift: shiftName.trim(),
+    periods,
+    schoolId: currentSchoolId // 👈 এটি অবশ্যই থাকতে হবে
+  });
+  setMsg("✅ Shift updated successfully");
+  await load(true);
+}
     } catch (err) {
       setMsg(err?.response?.data?.message || err.message);
     } finally {
@@ -840,28 +1153,13 @@ function ShiftSetupPanel() {
     }
   };
 
-  const handleDelete = async () => {
-    if (selectedId === NEW_SHIFT) return;
-    if (!window.confirm(`Delete the shift "${shiftName}"? This cannot be undone.`)) return;
-    setDeleting(true);
-    setMsg("");
-    try {
-      await deleteShiftTemplate(selectedId);
-      setMsg("✅ Shift deleted");
-      await load(false);
-    } catch (err) {
-      setMsg(err?.response?.data?.message || err.message);
-    } finally {
-      setDeleting(false);
-    }
-  };
-
+  // 🌟 ৩. পরিবর্তন: আপনার প্রোভাইড করা কোডে রিটার্ন (JSX UI) সেকশনটি মিসিং ছিল, সেটি নিচে যুক্ত করা হলো
   return (
     <Card>
       <CardHeader>
         <CardTitle>Shift Time Slots</CardTitle>
         <CardDescription>
-          Create as many shifts as your school runs (e.g. Morning, Day, Evening), then set each one's periods and clock times. Saturday–Thursday; Friday is a holiday.
+          Create as many shifts as your school runs (e.g. Morning, Day, Evening), then set each one's periods and clock times.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -947,16 +1245,6 @@ function ShiftSetupPanel() {
                 {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                 {selectedId === NEW_SHIFT ? "Create Shift" : "Save Changes"}
               </button>
-              {selectedId !== NEW_SHIFT && (
-                <button
-                  onClick={handleDelete}
-                  disabled={deleting}
-                  className="bg-red-50 hover:bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 disabled:opacity-50"
-                >
-                  {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                  Delete Shift
-                </button>
-              )}
             </div>
           </>
         )}
@@ -964,6 +1252,7 @@ function ShiftSetupPanel() {
     </Card>
   );
 }
+
 
 // ---------------------------------------------------------------------------
 // Teacher Availability Grid — rows = teachers on the selected shift,
@@ -1120,19 +1409,30 @@ function ClassPeriodSubjectGrid() {
       .catch((err) => console.error("Fetch shift templates error:", err));
   }, []);
 
-  const load = async () => {
-    if (!shift) return;
+   const load = async (keepSelection) => {
     setLoading(true);
     try {
-      const res = await getRoutineMatrix(shift, day);
-      setData(res);
+      const list = await getShiftTemplates({ schoolId: currentSchoolId });
+      setTemplates(list);
+      if (!keepSelection) {
+        if (list.length > 0) {
+          // 🌟 ফিক্সড: list-এর প্রথম উপাদানের আইডি সেট করা হলো
+          setSelectedId(list[0]._id); 
+          setShiftName(list[0].shift);
+          setPeriods((list[0].periods || []).slice().sort((a, b) => a.period - b.period));
+        } else {
+          setSelectedId(NEW_SHIFT);
+          setShiftName("");
+          setPeriods([]);
+        }
+      }
     } catch (err) {
-      console.error("Load class grid error:", err);
-      setData(null);
+      setMsg(err?.response?.data?.message || err.message);
     } finally {
       setLoading(false);
     }
   };
+
 
   useEffect(() => {
     load();

@@ -8,10 +8,25 @@ import { getAccessToken, clearAccessToken, refreshAccessToken } from "./tokenSto
 // whether the env var was set with or without it (this previously caused
 // every request in production to 404 when VITE_API_BASE_URL was set to
 // "https://gfmsc-backend.onrender.com" without the trailing "/api").
-const rawBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
-const normalizedBase = rawBase.replace(/\/+$/, "");
-const API_BASE_URL = normalizedBase.endsWith("/api") ? normalizedBase : `${normalizedBase}/api`;
 
+// const rawBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+// const normalizedBase = rawBase.replace(/\/+$/, "");
+// const API_BASE_URL = normalizedBase.endsWith("/api") ? normalizedBase : `${normalizedBase}/api`;
+
+const getAutoBaseUrl = () => {
+  // যদি ইউজার লোকালহোস্টে প্রজেক্ট চালায় (Development Mode)
+  if (
+    typeof window !== "undefined" && 
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+  ) {
+    return "http://localhost:5000/api"; // আপনার লোকাল ব্যাকএন্ড ইউআরএল
+  }
+  
+  // লাইভ বা প্রোডাকশন এনভায়রনমেন্টের জন্য অনলাইন রেন্ডার সার্ভার
+  return "https://onrender.com";
+};
+
+const API_BASE_URL = getAutoBaseUrl();
 console.log(`[GFMSC System Engine] Active Network Gateway Bound To: ${API_BASE_URL}`);
 
 const api = axios.create({

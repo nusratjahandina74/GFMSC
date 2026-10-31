@@ -9,7 +9,7 @@ import {
 import { objectIdParam } from "../middleware/validate.js";
 
 const router = express.Router();
-router.param("id", objectIdParam);
+// router.param("id", objectIdParam);
 
 router.get("/", authMiddleware(["schoolAdmin", "superAdmin", "teacher"]), listShiftTemplates);
 router.post("/", authMiddleware(["schoolAdmin", "superAdmin"]), createShiftTemplate);

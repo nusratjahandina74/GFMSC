@@ -23,7 +23,7 @@ const getAutoBaseUrl = () => {
   }
   
   // লাইভ বা প্রোডাকশন এনভায়রনমেন্টের জন্য অনলাইন রেন্ডার সার্ভার
-  return "https://onrender.com";
+  return "https://gfmsc-backend.onrender.com/api";
 };
 
 const API_BASE_URL = getAutoBaseUrl();

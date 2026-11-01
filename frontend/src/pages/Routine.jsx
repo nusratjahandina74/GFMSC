@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "../components/ui/card";
+import { Button } from "../components/ui/button";
 import {
   Select,
   SelectContent,
@@ -171,24 +172,6 @@ export default function RoutinePage() {
       console.error("Fetch class subjects error:", err);
     }
   };
-
-  // useEffect(() => {
-  //   const fetchSchools = async () => {
-  //     if (role === "superAdmin") {
-  //       try {
-  //         const res = await getAllSchools();
-  //         const schoolList = Array.isArray(res.data) ? res.data : res.data?.schools || [];
-  //         setSchools(schoolList);
-  //         if (schoolList.length > 0) {
-  //           setSelectedSchoolId(schoolList[0]._id);
-  //         }
-  //       } catch (err) {
-  //         console.error("Schools load error:", err);
-  //       }
-  //     }
-  //   };
-  //   fetchSchools();
-  // }, [role]);
   useEffect(() => {
     const fetchSchools = async () => {
       if (role === "superAdmin") {
@@ -800,8 +783,8 @@ export default function RoutinePage() {
                   type="button"
                   onClick={() => setActiveDay(day)}
                   className={`px-4 py-2 rounded-md font-semibold text-sm transition-all ${activeDay === day
-                      ? "bg-emerald-600 text-white shadow-md"
-                      : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
+                    ? "bg-emerald-600 text-white shadow-md"
+                    : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700"
                     }`}
                 >
                   {dayNames[day]}
@@ -927,122 +910,20 @@ export default function RoutinePage() {
           currentSchoolId={user?.schoolId || selectedSchoolId || "6ae0289e2ce6ddb4bf328daa"}
         />
       )}
-      {tab === "teacherGrid" && <TeacherAvailabilityGrid />}
-      {tab === "classGrid" && <ClassPeriodSubjectGrid />}
+      {tab === "teacherGrid" && (
+        <TeacherAvailabilityGrid
+          currentSchoolId={user?.schoolId || selectedSchoolId || "6ae0289e2ce6ddb4bf328daa"}
+        />
+      )}
+      {tab === "classGrid" && ( 
+        <ClassPeriodSubjectGrid
+          currentSchoolId={user?.schoolId || selectedSchoolId || "6ae0289e2ce6ddb4bf328daa"}
+        />
+      )}
     </div>
   );
 }
 
-// ---------------------------------------------------------------------------
-// Shift Time Slots — define, per shift, the period numbers and clock times.
-// This is what feeds the routine table header and gives a live count of how
-// many periods/classes a shift has while the admin edits it.
-// ---------------------------------------------------------------------------
-// ১. এখানে currentSchoolId প্রপ্স হিসেবে রিসিভ করা হলো
-// function ShiftSetupPanel({ currentSchoolId }) {
-//   const NEW_SHIFT = "__new__";
-//   const [templates, setTemplates] = useState([]);
-//   const [selectedId, setSelectedId] = useState("");
-//   const [shiftName, setShiftName] = useState("");
-//   const [periods, setPeriods] = useState([]);
-//   const [loading, setLoading] = useState(true);
-//   const [saving, setSaving] = useState(false);
-//   const [deleting, setDeleting] = useState(false);
-//   const [msg, setMsg] = useState("");
-
-//   const load = async (keepSelection) => {
-//     setLoading(true);
-//     try {
-//       const list = await getShiftTemplates();
-//       setTemplates(list);
-//       if (!keepSelection) {
-//         if (list.length > 0) {
-//           setSelectedId(list[0]._id);
-//           setShiftName(list[0].shift);
-//           setPeriods((list[0].periods || []).slice().sort((a, b) => a.period - b.period));
-//         } else {
-//           setSelectedId(NEW_SHIFT);
-//           setShiftName("");
-//           setPeriods([]);
-//         }
-//       }
-//     } catch (err) {
-//       setMsg(err?.response?.data?.message || err.message);
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
-
-//   useEffect(() => {
-//     load(false);
-//   }, []);
-
-//   const handleSelectShift = (id) => {
-//     setMsg("");
-//     setSelectedId(id);
-//     if (id === NEW_SHIFT) {
-//       setShiftName("");
-//       setPeriods([]);
-//     } else {
-//       const current = templates.find((t) => t._id === id);
-//       setShiftName(current?.shift || "");
-//       setPeriods((current?.periods || []).slice().sort((a, b) => a.period - b.period));
-//     }
-//   };
-
-//   const addPeriod = () => {
-//     const nextNum = periods.length > 0 ? Math.max(...periods.map((p) => p.period)) + 1 : 1;
-//     setPeriods([...periods, { period: nextNum, startTime: "", endTime: "" }]);
-//   };
-
-//   const removePeriod = (period) => {
-//     setPeriods(periods.filter((p) => p.period !== period));
-//   };
-
-//   const updatePeriod = (period, field, value) => {
-//     setPeriods(periods.map((p) => (p.period === period ? { ...p, [field]: value } : p)));
-//   };
-
-//   // 🌟 ফিক্সড ডাটা সেভিং লজিক
-//   const handleSave = async () => {
-//     if (!shiftName.trim()) {
-//       setMsg("Shift name is required (e.g. 'Morning Shift').");
-//       return;
-//     }
-//     if (periods.length === 0) {
-//       setMsg("Add at least one period with a start and end time.");
-//       return;
-//     }
-//     setSaving(true);
-//     setMsg("");
-//     try {
-//       if (selectedId === NEW_SHIFT) {
-//         // এখানে একটি সিঙ্গেল অবজেক্টে schoolId সহ পাঠানো হচ্ছে
-//         const res = await createShiftTemplate({
-//           shift: shiftName.trim(),
-//           periods,
-//           schoolId: currentSchoolId
-//         });
-//         setMsg("✅ Shift created successfully");
-//         await load(false);
-//         if (res?.shiftTemplate?._id) setSelectedId(res.shiftTemplate._id);
-//       } else {
-//         // আপডেট করার সময়ও schoolId সেফটি হিসেবে পাঠানো হলো
-//         await updateShiftTemplate(selectedId, {
-//           shift: shiftName.trim(),
-//           periods,
-//           schoolId: currentSchoolId
-//         });
-//         setMsg("✅ Shift updated successfully");
-//         await load(true);
-//       }
-//     } catch (err) {
-//       setMsg(err?.response?.data?.message || err.message);
-//     } finally {
-//       setSaving(false);
-//     }
-//   };
-// }
 function ShiftSetupPanel({ currentSchoolId }) {
   const NEW_SHIFT = "__new__";
   const [templates, setTemplates] = useState([]);
@@ -1084,7 +965,7 @@ function ShiftSetupPanel({ currentSchoolId }) {
   // এর ফলে ড্রপডাউনে স্কুল চেঞ্জ করলেই এই প্যানেলের শিফট ডাটা স্বয়ংক্রিয়ভাবে রিলোড হবে
   useEffect(() => {
     load(false);
-  }, [currentSchoolId]); 
+  }, [currentSchoolId]);
 
   const handleSelectShift = (id) => {
     setMsg("");
@@ -1132,20 +1013,20 @@ function ShiftSetupPanel({ currentSchoolId }) {
         });
         setMsg("✅ Shift created successfully");
         await load(false);
-        
+
         // এক্সিওস রেসপন্স হ্যান্ডেলিং সেফটি নেট
         const newId = res?.shiftTemplate?._id || res?.data?.shiftTemplate?._id;
         if (newId) setSelectedId(newId);
       } else {
-  // 🌟 আপডেট করার সময়ও অবজেক্টের সাথে schoolId পাস করা নিশ্চিত করুন
-  await updateShiftTemplate(selectedId, {
-    shift: shiftName.trim(),
-    periods,
-    schoolId: currentSchoolId // 👈 এটি অবশ্যই থাকতে হবে
-  });
-  setMsg("✅ Shift updated successfully");
-  await load(true);
-}
+        // 🌟 আপডেট করার সময়ও অবজেক্টের সাথে schoolId পাস করা নিশ্চিত করুন
+        await updateShiftTemplate(selectedId, {
+          shift: shiftName.trim(),
+          periods,
+          schoolId: currentSchoolId // 👈 এটি অবশ্যই থাকতে হবে
+        });
+        setMsg("✅ Shift updated successfully");
+        await load(true);
+      }
     } catch (err) {
       setMsg(err?.response?.data?.message || err.message);
     } finally {
@@ -1258,28 +1139,37 @@ function ShiftSetupPanel({ currentSchoolId }) {
 // Teacher Availability Grid — rows = teachers on the selected shift,
 // columns = periods, cell = tick if they have a class that period that day.
 // ---------------------------------------------------------------------------
-function TeacherAvailabilityGrid() {
+
+function TeacherAvailabilityGrid({ currentSchoolId }) {
   const [shiftOptions, setShiftOptions] = useState([]);
   const [shift, setShift] = useState("");
   const [day, setDay] = useState("saturday");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
   useEffect(() => {
-    getShiftTemplates()
+    if (!currentSchoolId) return;
+    getShiftTemplates({ schoolId: currentSchoolId })
       .then((list) => {
-        setShiftOptions(list.map((t) => t.shift));
-        setShift((prev) => prev || list[0]?.shift || "");
+        const fetchedShifts = list.map((t) => t.name || t.shiftName || t.shift);
+        const validShifts = fetchedShifts.filter(Boolean);
+        setShiftOptions(validShifts);
+        setShift((prev) => prev || validShifts[0] || "");
       })
       .catch((err) => console.error("Fetch shift templates error:", err));
-  }, []);
+  }, [currentSchoolId]);
 
   const load = async () => {
-    if (!shift) return;
+    const schoolIdToUse = currentSchoolId || "6ae0289e2ce6ddb4bf328daa";
+    if (!shift || !schoolIdToUse) return;
     setLoading(true);
     try {
-      const res = await getRoutineMatrix(shift, day);
+      const res = await getRoutineMatrix(shift, day, schoolIdToUse);
       setData(res);
+      setCurrentPage(1);
     } catch (err) {
       console.error("Load teacher grid error:", err);
       setData(null);
@@ -1290,12 +1180,21 @@ function TeacherAvailabilityGrid() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shift, day]);
+  }, [shift, day, currentSchoolId]);
 
   const periods = data?.periods || [];
   const teacherGrid = data?.teacherGrid || [];
-  const busyCount = teacherGrid.reduce((sum, t) => sum + Object.values(t.cells).filter((c) => c.busy).length, 0);
+  const selectedShiftKeyword = shift.toLowerCase().includes('morning') ? 'morning' : 'day';
+  const filteredTeachers = teacherGrid.filter(teacher => {
+    const teacherShift = teacher.shift || teacher.shiftName || "";
+    return teacherShift.toLowerCase().includes(selectedShiftKeyword);
+  });
+
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentTeachers = filteredTeachers.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredTeachers.length / itemsPerPage);
+  const busyCount = filteredTeachers.reduce((sum, t) => sum + Object.values(t.cells).filter((c) => c.busy).length, 0);
 
   return (
     <Card>
@@ -1324,20 +1223,25 @@ function TeacherAvailabilityGrid() {
             </Select>
           </div>
         </div>
-
-        {shiftOptions.length === 0 ? (
+        {loading && shiftOptions.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+          </div>
+        ) : shiftOptions.length === 0 ? (
           <div className="text-center text-muted-foreground py-8 text-sm">
             No shifts created yet. Go to "Shift Time Slots" and create one first.
           </div>
         ) : loading ? (
-          <div className="p-8 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
+          <div className="p-8 text-center text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+          </div>
         ) : periods.length === 0 ? (
           <div className="text-center text-muted-foreground py-8 text-sm">
             No time slots set for this shift yet. Go to "Shift Time Slots" and add periods first.
           </div>
-        ) : teacherGrid.length === 0 ? (
+        ) : filteredTeachers.length === 0 ? ( // 🔽 ৪. কন্ডিশন teacherGrid থেকে filteredTeachers এ পরিবর্তন করা হয়েছে
           <div className="text-center text-muted-foreground py-8 text-sm">
-            No teachers are set to this shift yet. Set a teacher's shift on the Teachers page.
+            No teachers found for this shift. Set a teacher's shift on the Teachers page.
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -1355,7 +1259,7 @@ function TeacherAvailabilityGrid() {
                 </tr>
               </thead>
               <tbody>
-                {teacherGrid.map((t) => (
+                {currentTeachers.map((t) => (
                   <tr key={t._id}>
                     <td className="border p-2 font-semibold sticky left-0 bg-white dark:bg-gray-900">{t.name}</td>
                     <td className="border p-2 text-xs">{t.email}</td>
@@ -1379,8 +1283,34 @@ function TeacherAvailabilityGrid() {
                 ))}
               </tbody>
             </table>
-            <div className="text-xs text-muted-foreground mt-2">
-              Live count: {busyCount} classes booked across {teacherGrid.length} teachers on {dayNames[day]}.
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4">
+              <div className="text-xs text-muted-foreground">
+                Live count: {busyCount} classes booked across {filteredTeachers.length} teachers on {dayNames[day]}.
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center space-x-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+                    disabled={currentPage === 1}
+                  >
+                    Previous
+                  </Button>
+                  <span className="text-xs font-medium px-2">
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+                    disabled={currentPage === totalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1393,51 +1323,182 @@ function TeacherAvailabilityGrid() {
 // Class-Period Subject Grid — rows = periods, columns = classes that have
 // a routine entry that day/shift, cell = subject + teacher.
 // ---------------------------------------------------------------------------
-function ClassPeriodSubjectGrid() {
+// function ClassPeriodSubjectGrid() {
+//   const [shiftOptions, setShiftOptions] = useState([]);
+//   const [shift, setShift] = useState("");
+//   const [day, setDay] = useState("saturday");
+//   const [data, setData] = useState(null);
+//   const [loading, setLoading] = useState(false);
+
+//   useEffect(() => {
+//     getShiftTemplates()
+//       .then((list) => {
+//         setShiftOptions(list.map((t) => t.shift));
+//         setShift((prev) => prev || list[0]?.shift || "");
+//       })
+//       .catch((err) => console.error("Fetch shift templates error:", err));
+//   }, []);
+
+//   const load = async (keepSelection) => {
+//     setLoading(true);
+//     try {
+//       const list = await getShiftTemplates({ schoolId: currentSchoolId });
+//       setTemplates(list);
+//       if (!keepSelection) {
+//         if (list.length > 0) {
+//           // 🌟 ফিক্সড: list-এর প্রথম উপাদানের আইডি সেট করা হলো
+//           setSelectedId(list[0]._id);
+//           setShiftName(list[0].shift);
+//           setPeriods((list[0].periods || []).slice().sort((a, b) => a.period - b.period));
+//         } else {
+//           setSelectedId(NEW_SHIFT);
+//           setShiftName("");
+//           setPeriods([]);
+//         }
+//       }
+//     } catch (err) {
+//       setMsg(err?.response?.data?.message || err.message);
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+
+//   useEffect(() => {
+//     load();
+//     // eslint-disable-next-line react-hooks/exhaustive-deps
+//   }, [shift, day]);
+
+//   const classes = data?.classes || [];
+//   const classGrid = data?.classGrid || [];
+
+//   return (
+//     <Card>
+//       <CardHeader>
+//         <CardTitle className="flex items-center gap-2"><Table2 className="h-5 w-5" /> Class-Period Subject Grid</CardTitle>
+//         <CardDescription>Which class has which subject in which period.</CardDescription>
+//       </CardHeader>
+//       <CardContent className="space-y-4">
+//         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-xl">
+//           <div className="space-y-2">
+//             <Label>Shift</Label>
+//             <Select value={shift} onValueChange={setShift}>
+//               <SelectTrigger><SelectValue placeholder="Select shift" /></SelectTrigger>
+//               <SelectContent>
+//                 {shiftOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+//               </SelectContent>
+//             </Select>
+//           </div>
+//           <div className="space-y-2">
+//             <Label>Day</Label>
+//             <Select value={day} onValueChange={setDay}>
+//               <SelectTrigger><SelectValue /></SelectTrigger>
+//               <SelectContent>
+//                 {daysOfWeek.map((d) => <SelectItem key={d} value={d}>{dayNames[d]}</SelectItem>)}
+//               </SelectContent>
+//             </Select>
+//           </div>
+//         </div>
+
+//         {loading ? (
+//           <div className="p-8 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
+//         ) : classes.length === 0 ? (
+//           <div className="text-center text-muted-foreground py-8 text-sm">
+//             No routine entries found for this shift/day yet.
+//           </div>
+//         ) : (
+//           <div className="overflow-x-auto">
+//             <table className="w-full border-collapse text-sm">
+//               <thead>
+//                 <tr className="bg-gray-50 dark:bg-gray-800">
+//                   <th className="border p-2 text-left sticky left-0 bg-gray-50 dark:bg-gray-800">Period</th>
+//                   {classes.map((c) => (
+//                     <th key={`${c.className}-${c.section}`} className="border p-2 text-center whitespace-nowrap">
+//                       {c.className}{c.section ? `-${c.section}` : ""}
+//                     </th>
+//                   ))}
+//                 </tr>
+//               </thead>
+//               <tbody>
+//                 {classGrid.map((row) => (
+//                   <tr key={row.period}>
+//                     <td className="border p-2 font-semibold sticky left-0 bg-white dark:bg-gray-900 whitespace-nowrap">
+//                       P{row.period}<br /><span className="font-normal text-xs">{row.startTime}-{row.endTime}</span>
+//                     </td>
+//                     {classes.map((c) => {
+//                       const cell = row.cells[`${c.className}||${c.section}`];
+//                       return (
+//                         <td key={`${c.className}-${c.section}`} className="border p-2 text-center">
+//                           {cell ? (
+//                             <div>
+//                               <div className="font-medium">{cell.subject}</div>
+//                               <div className="text-xs text-muted-foreground">{cell.teacherName}</div>
+//                             </div>
+//                           ) : (
+//                             <span className="text-gray-300 dark:text-gray-600">-</span>
+//                           )}
+//                         </td>
+//                       );
+//                     })}
+//                   </tr>
+//                 ))}
+//               </tbody>
+//             </table>
+//           </div>
+//         )}
+//       </CardContent>
+//     </Card>
+//   );
+// }
+function ClassPeriodSubjectGrid({ currentSchoolId }) {
   const [shiftOptions, setShiftOptions] = useState([]);
   const [shift, setShift] = useState("");
   const [day, setDay] = useState("saturday");
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    getShiftTemplates()
-      .then((list) => {
-        setShiftOptions(list.map((t) => t.shift));
-        setShift((prev) => prev || list[0]?.shift || "");
-      })
-      .catch((err) => console.error("Fetch shift templates error:", err));
-  }, []);
+  const schoolIdToUse = currentSchoolId || "6ae0289e2ce6ddb4bf328daa";
 
-   const load = async (keepSelection) => {
+  useEffect(() => {
+    if (!schoolIdToUse) return;
+
+    getShiftTemplates({ schoolId: schoolIdToUse })
+      .then((list) => {
+        if (!list || list.length === 0) {
+          setShiftOptions([]);
+          setShift("");
+          return;
+        }
+        const fetchedShifts = list.map((t) => t.name || t.shiftName || t.shift);
+        const validShifts = fetchedShifts.filter(Boolean);
+
+        setShiftOptions(validShifts);
+        setShift((prev) => prev || validShifts[0] || "");
+      })
+      .catch((err) => {
+        console.error("Fetch shift templates error in grid:", err);
+        setShiftOptions([]);
+        setShift("");
+      });
+  }, [schoolIdToUse]);
+
+  const load = async () => {
+    if (!shift || !schoolIdToUse) return;
     setLoading(true);
     try {
-      const list = await getShiftTemplates({ schoolId: currentSchoolId });
-      setTemplates(list);
-      if (!keepSelection) {
-        if (list.length > 0) {
-          // 🌟 ফিক্সড: list-এর প্রথম উপাদানের আইডি সেট করা হলো
-          setSelectedId(list[0]._id); 
-          setShiftName(list[0].shift);
-          setPeriods((list[0].periods || []).slice().sort((a, b) => a.period - b.period));
-        } else {
-          setSelectedId(NEW_SHIFT);
-          setShiftName("");
-          setPeriods([]);
-        }
-      }
+      const res = await getRoutineMatrix(shift, day, schoolIdToUse);
+      setData(res);
     } catch (err) {
-      setMsg(err?.response?.data?.message || err.message);
+      console.error("Load class-period grid error:", err);
+      setData(null);
     } finally {
       setLoading(false);
     }
   };
 
-
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shift, day]);
+  }, [shift, day, schoolIdToUse]);
 
   const classes = data?.classes || [];
   const classGrid = data?.classGrid || [];
@@ -1445,7 +1506,9 @@ function ClassPeriodSubjectGrid() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Table2 className="h-5 w-5" /> Class-Period Subject Grid</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Table2 className="h-5 w-5" /> Class-Period Subject Grid
+        </CardTitle>
         <CardDescription>Which class has which subject in which period.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -1470,8 +1533,18 @@ function ClassPeriodSubjectGrid() {
           </div>
         </div>
 
-        {loading ? (
-          <div className="p-8 text-center text-muted-foreground"><Loader2 className="h-6 w-6 animate-spin mx-auto" /></div>
+        {loading && shiftOptions.length === 0 ? (
+          <div className="p-8 text-center text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+          </div>
+        ) : shiftOptions.length === 0 ? (
+          <div className="text-center text-muted-foreground py-8 text-sm">
+            No shifts created yet. Go to "Shift Time Slots" and create one first.
+          </div>
+        ) : loading ? (
+          <div className="p-8 text-center text-muted-foreground">
+            <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+          </div>
         ) : classes.length === 0 ? (
           <div className="text-center text-muted-foreground py-8 text-sm">
             No routine entries found for this shift/day yet.
@@ -1520,3 +1593,4 @@ function ClassPeriodSubjectGrid() {
     </Card>
   );
 }
+

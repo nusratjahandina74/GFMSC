@@ -36,8 +36,10 @@ export const takeAttendance = async (req, res) => {
     const schoolId = req.user.schoolId;
     if (!schoolId) return res.status(400).json({ message: "Your account is not linked to a school." });
 
-    if (req.user.role !== "superAdmin" && req.user.role !== "schoolAdmin") {
-      if (req.user.role !== "teacher") return res.status(403).json({ message: "Access denied. Unauthorized role." });
+    // Attendance is written ONLY by the class teacher of that class+section.
+    // School admin / super admin can view reports but never mark or edit.
+    {
+      if (req.user.role !== "teacher") return res.status(403).json({ message: "Only the class teacher can take attendance." });
 
       const teacher = await Teacher.findOne({ userId: req.user.userId, schoolId });
       if (!teacher) return res.status(403).json({ message: "You are not authorized to take attendance. Teacher profile not found." });
@@ -89,16 +91,50 @@ export const takeAttendance = async (req, res) => {
 };
 
 // 📄 Get attendance
+// export const getAttendance = async (req, res) => {
+//   try {
+//     const { date, className, section } = req.query;
+
+//     if (!date || !className) {
+//       return res.status(400).json({ message: "Missing required fields: date and className are required" });
+//     }
+
+//     const attendance = await Attendance.findOne({
+//       schoolId: req.user.schoolId,
+//       date,
+//       className,
+//       section: section || "",
+//     }).populate("records.studentId", "studentName classRoll");
+
+//     res.json({ attendance });
+//   } catch (err) {
+//     console.error("Get attendance error:", err);
+//     res.status(500).json({ message: "Something went wrong. Please try again." });
+//   }
+// };
+// 📄 Get attendance (আপডেট করা ফাংশন)
 export const getAttendance = async (req, res) => {
   try {
-    const { date, className, section } = req.query;
+    const { date, className, section, schoolId: querySchoolId } = req.query;
 
     if (!date || !className) {
       return res.status(400).json({ message: "Missing required fields: date and className are required" });
     }
 
+    // রোল অনুযায়ী schoolId নির্ধারণ
+    let targetSchoolId;
+    if (req.user.role === "superAdmin") {
+      targetSchoolId = querySchoolId || req.user.schoolId; // SuperAdmin চাইলে যেকোনো schoolId দিয়ে খুঁজতে পারবে
+    } else {
+      targetSchoolId = req.user.schoolId; // SchoolAdmin বা Teacher শুধু তাদের নিজস্ব স্কুলের ডেটা পাবে
+    }
+
+    if (!targetSchoolId) {
+      return res.status(400).json({ message: "School ID is required" });
+    }
+
     const attendance = await Attendance.findOne({
-      schoolId: req.user.schoolId,
+      schoolId: targetSchoolId,
       date,
       className,
       section: section || "",

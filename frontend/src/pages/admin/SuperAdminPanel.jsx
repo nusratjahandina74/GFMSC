@@ -726,13 +726,7 @@ const SuperAdminPanel = () => {
                 <p className="text-xs text-gray-500">Students log in with their Student ID, not email.</p>
               )}
             </div>
-            {/* <div className="space-y-2">
-              <Label>Phone</Label>
-              <Input
-                value={accountEditForm.phone}
-                onChange={(e) => setAccountEditForm({ ...accountEditForm, phone: e.target.value })}
-              />
-            </div> */}
+        
             {accountEditTarget?.role !== "superAdmin" && (
               <div className="space-y-2">
                 <Label>School</Label>

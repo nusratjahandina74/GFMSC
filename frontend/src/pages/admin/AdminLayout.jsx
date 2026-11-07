@@ -7,9 +7,8 @@ import { School } from "lucide-react";
 export default function AdminLayout() {
   const location = useLocation();
   const user = getUser();
-  const role = getRole(); // ইউজারের রোল গেট করা হচ্ছে
+  const role = getRole(); 
 
-  // কন্ডিশন আপডেট: ইউজার যদি superAdmin বা superadmin হয়, তাহলে needsSchoolSetup সবসময় false হবে
   const isSuperAdmin = role === "superAdmin" || role === "superadmin";
   const needsSchoolSetup = 
     user && 

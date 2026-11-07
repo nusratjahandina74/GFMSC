@@ -39,6 +39,7 @@ import MyLeaves from "./pages/MyLeaves";
 import Unauthorized from "./pages/Unauthorized";
 import LibraryPage from "./pages/admin/Library";
 import StaffAttendanceOverview from "./pages/admin/StaffAttendanceOverview";
+import StudentAttendanceOverview from "./pages/admin/StudentAttendanceOverview";
 import AdmissionsPage from "./pages/admin/Admissions";
 import IdCardsPage from "./pages/admin/IdCards";
 import PublicAdmissionApply from "./pages/PublicAdmissionApply";
@@ -54,7 +55,8 @@ import VerifyEmail from "./pages/Auth/VerifyEmail";
 // real, live counts from the backend instead of hardcoded placeholder numbers.
 
 const AdminRoutine = () => <Routine />;
-const AdminAttendance = () => <Attendance />;
+// Admin/SuperAdmin get the READ-ONLY overview; only teachers mark attendance.
+const AdminAttendance = () => <StudentAttendanceOverview />;
 const AdminExams = () => <ExamsPage />;
 const AdminMarksEntry = () => <MarksEntry />;
 const AdminReportCards = () => <ReportCard />;
@@ -479,7 +481,7 @@ export default function App() {
             <Route
               path="attendance"
               element={
-                <RequireRole allowedRoles={["teacher", "schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["teacher"]}>
                   <Attendance />
                 </RequireRole>
               }

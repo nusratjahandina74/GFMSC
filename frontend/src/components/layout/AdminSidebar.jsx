@@ -95,7 +95,7 @@ export default function AdminSidebar() {
       roles: ["schoolAdmin", "superAdmin"],
     },
     {
-      name: "Attendance",
+      name: "Student Attendance",
       path: "/admin/attendance",
       icon: CheckSquare,
       roles: ["schoolAdmin", "superAdmin"],

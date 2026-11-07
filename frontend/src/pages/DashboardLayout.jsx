@@ -133,7 +133,7 @@ function DashboardLayout() {
         ...(isClassTeacher
           ? [
               {
-                name: "Attendance",
+                name: "Student Attendance",
                 path: "/dashboard/attendance",
                 icon: Users,
               },
@@ -180,7 +180,7 @@ function DashboardLayout() {
           icon: Calendar,
         },
         {
-          name: "Attendance",
+          name: "Student Attendance",
           path: "/dashboard/attendance",
           icon: Users,
         },

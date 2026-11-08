@@ -79,7 +79,9 @@ setTimeout(seedSuperAdmin, 5000);
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
-  "https://gfmsc.vercel.app" 
+  "https://gfmsc.vercel.app",
+  // Extra origins (e.g. a custom domain or a Vercel preview URL), comma separated in Render env: CORS_ORIGINS
+  ...String(process.env.CORS_ORIGINS || "").split(",").map((o) => o.trim().replace(/\/+$/, "")).filter(Boolean),
 ];
 
 app.use(

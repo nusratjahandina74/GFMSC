@@ -3,12 +3,61 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../styles/landing.css";
+import { API_BASE_URL } from "../api/baseUrl.js";
+import SchoolLoader from "../components/SchoolLoader.jsx";
 
-const API_BASE = (
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api"
-).replace(/\/+$/, "");
+const API_BASE = API_BASE_URL;
 
 const SLUG = "gfmsc";
+
+// Last good copy of the landing page. On a repeat visit the page paints instantly from this while
+// fresh data loads in the background; it also keeps the page usable if the server is slow/asleep.
+const CACHE_KEY = "gfmsc_landing_cache_v1";
+
+// Shown only when the server cannot be reached (or has no page saved yet), so visitors never get
+// stuck on a "Loading..." screen. Real data from the database always replaces it.
+const DEFAULT_PAGE = {
+  school: { name: "GFMSC" },
+  ticker: [],
+  hero: {
+    title: "Welcome to GFMSC",
+    subtitle: "School Management System",
+    description: "Sign in to access your dashboard.",
+    buttonText: "Login",
+    buttonLink: "/login",
+  },
+  about: { title: "About", description: "" },
+  features: [],
+  notices: [],
+  blogs: [],
+  faqs: [],
+};
+
+function readCachedPage() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function fetchWithTimeout(url, ms) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 function useTheme() {
   const [dark, setDark] = useState(() => {
@@ -86,14 +135,16 @@ export default function LandingPage() {
   const nav = useNavigate();
   const { dark, setDark } = useTheme();
 
-  const [page, setPage] = useState(null);
+  const [cachedPage] = useState(readCachedPage);
+  const [page, setPage] = useState(cachedPage);
   const [slide, setSlide] = useState(0);
 
   const [toast, setToast] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const [pageLoading, setPageLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(!cachedPage);
   const [pageError, setPageError] = useState("");
+  const [slowLoad, setSlowLoad] = useState(false);
 
   /*
    * Load landing page from MongoDB
@@ -107,58 +158,54 @@ export default function LandingPage() {
   useEffect(() => {
     let mounted = true;
 
+    // After 4s of waiting, tell the visitor the server is just waking up (free hosting sleeps).
+    const slowTimer = setTimeout(() => {
+      if (mounted) setSlowLoad(true);
+    }, 4000);
+
     async function loadLandingPage() {
-      setPageLoading(true);
-      setPageError("");
+      const url = `${API_BASE}/landingpages/${encodeURIComponent(SLUG)}`;
+      const MAX_ATTEMPTS = 4; // a cold start can take ~60s, so we keep trying instead of giving up
 
       try {
-        const url = `${API_BASE}/landingpages/${encodeURIComponent(
-          SLUG
-        )}`;
+        for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+          try {
+            const res = await fetchWithTimeout(url, 30000);
 
-        const res = await fetch(url, {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
-        });
+            // No page saved in the database yet -> show the default page, no point retrying.
+            if (res.status === 404) {
+              if (mounted) setPage((prev) => prev || DEFAULT_PAGE);
+              return;
+            }
 
-        const raw = await res.text();
+            if (!res.ok) throw new Error(`Could not load landing page (${res.status}).`);
 
-        let data = {};
+            const data = await res.json();
+            if (!mounted) return;
 
-        try {
-          data = JSON.parse(raw || "{}");
-        } catch {
-          data = {};
+            setPage(data);
+            setPageError("");
+            try {
+              localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+            } catch {
+              // Ignore localStorage errors
+            }
+            return;
+          } catch (err) {
+            console.error(`Landing page load error (attempt ${attempt}/${MAX_ATTEMPTS}):`, err);
+            if (!mounted) return;
+
+            if (attempt === MAX_ATTEMPTS) {
+              // Still show a usable page, with a small notice, instead of an error wall.
+              setPage((prev) => prev || DEFAULT_PAGE);
+              setPageError("Could not reach the server. Showing a basic version of the page.");
+              return;
+            }
+            await sleep(1500 * attempt);
+          }
         }
-
-        if (!res.ok) {
-          throw new Error(
-            data?.message ||
-              `Could not load landing page (${res.status}).`
-          );
-        }
-
-        if (!mounted) return;
-
-        setPage(data);
-      } catch (err) {
-        if (!mounted) return;
-
-        console.error(
-          "Landing page load error:",
-          err
-        );
-
-        setPageError(
-          err?.message ||
-            "Could not load landing page. Please try again."
-        );
       } finally {
-        if (mounted) {
-          setPageLoading(false);
-        }
+        if (mounted) setPageLoading(false);
       }
     }
 
@@ -166,6 +213,7 @@ export default function LandingPage() {
 
     return () => {
       mounted = false;
+      clearTimeout(slowTimer);
     };
   }, []);
 
@@ -183,27 +231,32 @@ export default function LandingPage() {
     let mounted = true;
 
     async function loadImages(kind, setter) {
-      try {
-        const res = await fetch(
-          `${API_BASE}/${kind}?slug=${encodeURIComponent(SLUG)}`,
-          { headers: { Accept: "application/json" } }
-        );
-        if (!res.ok) return;
+      for (let attempt = 1; attempt <= 3; attempt += 1) {
+        try {
+          const res = await fetchWithTimeout(
+            `${API_BASE}/${kind}?slug=${encodeURIComponent(SLUG)}`,
+            30000
+          );
+          if (!res.ok) return;
 
-        const data = await res.json();
-        if (!mounted || !Array.isArray(data?.images)) return;
+          const data = await res.json();
+          if (!mounted || !Array.isArray(data?.images)) return;
 
-        setter(
-          data.images
-            .filter((img) => img?.imageUrl)
-            .map((img) => ({
-              url: img.imageUrl,
-              alt: img.title || "",
-              isCover: Boolean(img.isCover),
-            }))
-        );
-      } catch (err) {
-        console.error(`Could not load ${kind} images:`, err);
+          setter(
+            data.images
+              .filter((img) => img?.imageUrl)
+              .map((img) => ({
+                url: img.imageUrl,
+                alt: img.title || "",
+                isCover: Boolean(img.isCover),
+              }))
+          );
+          return;
+        } catch (err) {
+          console.error(`Could not load ${kind} images (attempt ${attempt}):`, err);
+          if (!mounted) return;
+          await sleep(2000 * attempt);
+        }
       }
     }
 
@@ -352,7 +405,7 @@ export default function LandingPage() {
 
       const timeoutId = setTimeout(() => {
         controller.abort();
-      }, 15000);
+      }, 45000);
 
       const res = await fetch(
         `${API_BASE}/contact`,
@@ -413,61 +466,13 @@ export default function LandingPage() {
    * Loading state
    */
   if (pageLoading) {
-    return (
-      <div>
-        <header className="topbar">
-          <div className="container">
-            <div className="navRow">
-              <div className="brand">
-                <div>
-                  <div className="brandTitle">
-                    Loading...
-                  </div>
-                </div>
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  alignItems: "center",
-                }}
-              >
-                <button
-                  className="btn"
-                  title="Toggle theme"
-                  onClick={() =>
-                    setDark(!dark)
-                  }
-                >
-                  {dark ? (
-                    <SunIcon />
-                  ) : (
-                    <MoonIcon />
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </header>
-
-        <section className="section">
-          <div className="container">
-            <div className="box">
-              <p className="small">
-                Loading landing page...
-              </p>
-            </div>
-          </div>
-        </section>
-      </div>
-    );
+    return <SchoolLoader slow={slowLoad} />;
   }
 
   /*
    * Error state
    */
-  if (pageError || !page) {
+  if (!page) {
     return (
       <div>
         <header className="topbar">
@@ -553,6 +558,28 @@ export default function LandingPage() {
 
   return (
     <div>
+      {pageError && (
+        <div
+          role="status"
+          style={{
+            padding: "8px 16px",
+            textAlign: "center",
+            fontSize: 13,
+            background: "#fff7ed",
+            color: "#9a3412",
+            borderBottom: "1px solid #fed7aa",
+          }}
+        >
+          {pageError}{" "}
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{ textDecoration: "underline", background: "none", border: 0, color: "inherit", cursor: "pointer" }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
       {/* =========================
           TOPBAR
       ========================== */}

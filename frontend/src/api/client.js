@@ -1,4 +1,5 @@
 import axios from "axios";
+import { API_BASE_URL as SHARED_API_BASE_URL } from "./baseUrl.js";
 import { getAccessToken, clearAccessToken, refreshAccessToken } from "./tokenStore.js";
 
 // Single source of truth for the API base URL. Reads VITE_API_BASE_URL from
@@ -13,21 +14,8 @@ import { getAccessToken, clearAccessToken, refreshAccessToken } from "./tokenSto
 // const normalizedBase = rawBase.replace(/\/+$/, "");
 // const API_BASE_URL = normalizedBase.endsWith("/api") ? normalizedBase : `${normalizedBase}/api`;
 
-const getAutoBaseUrl = () => {
-  // যদি ইউজার লোকালহোস্টে প্রজেক্ট চালায় (Development Mode)
-  if (
-    typeof window !== "undefined" && 
-    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
-  ) {
-    return "http://localhost:5000/api"; // আপনার লোকাল ব্যাকএন্ড ইউআরএল
-  }
-  
-  // লাইভ বা প্রোডাকশন এনভায়রনমেন্টের জন্য অনলাইন রেন্ডার সার্ভার
-  return "https://gfmsc-backend.onrender.com/api";
-};
-
-const API_BASE_URL = getAutoBaseUrl();
-console.log(`[GFMSC System Engine] Active Network Gateway Bound To: ${API_BASE_URL}`);
+const API_BASE_URL = SHARED_API_BASE_URL;
+console.log(`[GFMSC] API base: ${API_BASE_URL}`);
 
 const api = axios.create({
   baseURL: API_BASE_URL,

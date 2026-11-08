@@ -23,7 +23,7 @@ const ownFilter = (req, id) => {
 // ফ্রন্টএন্ড ঠিক যেভাবে রিকোয়েস্ট পাঠাচ্ছে (landingpages/gfmsc), এটি সেভাবে ডেটা রিটার্ন করবে
 router.get("/landingpages/:slug", async (req, res) => {
   try {
-    const { slug } = req.params; // ফ্রন্টএন্ড থেকে পাঠানো 'gfmsc' স্ল্যাগটি ধরবে
+    const slug = cleanSlug(req.params.slug); // ফ্রন্টএন্ড থেকে পাঠানো 'gfmsc' স্ল্যাগটি ধরবে
     
     const page = await LandingPage.findOne({ 
       slug: slug // ডাটাবেজে gfmsc নামের স্ল্যাগটি খুঁজবে

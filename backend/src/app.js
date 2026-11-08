@@ -45,6 +45,9 @@ import libraryRoutes from "./routes/libraryRoutes.js";
 import admissionRoutes from "./routes/admissionRoutes.js";
 import idCardRoutes from "./routes/idCardRoutes.js";
 import landingPageRoutes from "./routes/landingPages.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
+import sliderRoutes from "./routes/sliderRoutes.js";
+import galleryRoutes from "./routes/galleryRoutes.js";
 import User from "./models/User.js";
 const app = express();
 const seedSuperAdmin = async () => {
@@ -202,12 +205,16 @@ app.use("/api/routines", routineRoutes);
 app.use("/api/class-subjects", classSubjectRoutes);
 app.use("/api/class-teachers", classTeacherRoutes);
 app.use("/api/leaves", leaveRoutes);
+app.use("/api/uploads", uploadRoutes);
 app.use("/api/guardians", guardianRoutes);
 app.use("/api/shift-templates", shiftTemplateRoutes);
 app.use("/api/exam-duties", examDutyRoutes);
 app.use("/api/library", libraryRoutes);
 app.use("/api/admissions", admissionRoutes);
 app.use("/api/id-cards", idCardRoutes);
+app.use("/api/slider", sliderRoutes);
+app.use("/api/gallery", galleryRoutes);
+app.use("/api/landing-pages", landingPageRoutes);
 app.use("/api", landingPageRoutes);
 
 app.get("/", (req, res) => {

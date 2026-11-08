@@ -13,6 +13,7 @@ const PUBLIC_ALLOWLIST = new Set([
   "POST /api/auth/refresh", "POST /api/auth/logout", "GET /api/auth/verify-email", "POST /api/auth/verify-email",
   "POST /api/auth/resend-verification", "POST /api/auth/forgot-password", "POST /api/auth/reset-password",
   "GET /api/contact/ping", "POST /api/contact", "GET /api/landing-pages/:slug",
+  "GET /api/slider", "GET /api/gallery", // public homepage images (active only)
   "POST /api/payments/sslcommerz/success", "POST /api/payments/sslcommerz/fail", "POST /api/payments/sslcommerz/cancel",
   "POST /api/payments/sslcommerz/ipn", "GET /api/payments/bkash/callback", "POST /api/payments/bkash/callback",
   "GET /api/schools/by-subdomain/:subdomain",

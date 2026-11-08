@@ -42,6 +42,9 @@ import StaffAttendanceOverview from "./pages/admin/StaffAttendanceOverview";
 import StudentAttendanceOverview from "./pages/admin/StudentAttendanceOverview";
 import AdmissionsPage from "./pages/admin/Admissions";
 import IdCardsPage from "./pages/admin/IdCards";
+import LandingEditor from "./pages/admin/LandingEditor";
+import SliderManager from "./pages/admin/SliderManager";
+import GalleryManager from "./pages/admin/GalleryManager";
 import PublicAdmissionApply from "./pages/PublicAdmissionApply";
 import SuperAdminPanel from "./pages/admin/SuperAdminPanel";
 import { getRole, isLoggedIn, getUser } from "./api/auth";
@@ -286,6 +289,30 @@ export default function App() {
               element={
                 <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
                   <AdmissionsPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="landing-page"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <LandingEditor />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="slider-images"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <SliderManager />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="gallery-images"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <GalleryManager />
                 </RequireRole>
               }
             />

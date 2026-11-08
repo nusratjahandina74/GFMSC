@@ -22,6 +22,9 @@ import {
   UserPlus,
   IdCard,
   CalendarCheck,
+  Image as ImageIcon,
+  GalleryHorizontal,
+  Images,
 } from "lucide-react";
 import { getRole, logout, getUser } from "../../api/auth";
 import { useContext } from "react";
@@ -158,6 +161,24 @@ export default function AdminSidebar() {
       name: "ID Cards",
       path: "/admin/id-cards",
       icon: IdCard,
+      roles: ["schoolAdmin", "superAdmin"],
+    },
+    {
+      name: "Landing Page",
+      path: "/admin/landing-page",
+      icon: ImageIcon,
+      roles: ["schoolAdmin", "superAdmin"],
+    },
+    {
+      name: "Slider Images",
+      path: "/admin/slider-images",
+      icon: GalleryHorizontal,
+      roles: ["schoolAdmin", "superAdmin"],
+    },
+    {
+      name: "Gallery Images",
+      path: "/admin/gallery-images",
+      icon: Images,
       roles: ["schoolAdmin", "superAdmin"],
     },
     {

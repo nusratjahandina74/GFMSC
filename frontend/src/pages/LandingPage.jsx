@@ -170,6 +170,52 @@ export default function LandingPage() {
   }, []);
 
   /*
+   * Slider + gallery images uploaded from the admin dashboard
+   *
+   * Backend (public, active images only, cover image first):
+   * GET /api/slider?slug=gfmsc
+   * GET /api/gallery?slug=gfmsc
+   */
+  const [sliderImages, setSliderImages] = useState([]);
+  const [galleryImages, setGalleryImages] = useState([]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadImages(kind, setter) {
+      try {
+        const res = await fetch(
+          `${API_BASE}/${kind}?slug=${encodeURIComponent(SLUG)}`,
+          { headers: { Accept: "application/json" } }
+        );
+        if (!res.ok) return;
+
+        const data = await res.json();
+        if (!mounted || !Array.isArray(data?.images)) return;
+
+        setter(
+          data.images
+            .filter((img) => img?.imageUrl)
+            .map((img) => ({
+              url: img.imageUrl,
+              alt: img.title || "",
+              isCover: Boolean(img.isCover),
+            }))
+        );
+      } catch (err) {
+        console.error(`Could not load ${kind} images:`, err);
+      }
+    }
+
+    loadImages("slider", setSliderImages);
+    loadImages("gallery", setGalleryImages);
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  /*
    * Database data
    */
 
@@ -179,13 +225,19 @@ export default function LandingPage() {
     ? page.ticker.filter(Boolean)
     : [];
 
-  const slides = Array.isArray(page?.slides)
+  // Images uploaded from Admin > Slider Images win; the old landing-page
+  // list is only a fallback while nothing has been uploaded yet.
+  const legacySlides = Array.isArray(page?.slides)
     ? page.slides.filter((item) => item?.url)
     : [];
 
-  const gallery = Array.isArray(page?.gallery)
+  const slides = sliderImages.length > 0 ? sliderImages : legacySlides;
+
+  const legacyGallery = Array.isArray(page?.gallery)
     ? page.gallery.filter((item) => item?.url)
     : [];
+
+  const gallery = galleryImages.length > 0 ? galleryImages : legacyGallery;
 
   const features = Array.isArray(page?.features)
     ? page.features.filter((item) => item?.title)

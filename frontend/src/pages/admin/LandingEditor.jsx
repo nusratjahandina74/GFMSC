@@ -56,6 +56,38 @@ function ImageField({ label, value, onChange, folder = "landing", onError }) {
   );
 }
 
+const PER_PAGE = 5;
+
+// The editor is split into pages so it is not one endless scroll.
+const SECTIONS = ["Basics", "Gallery & Blog", "Chairman & Notice", "Branches", "Footer"];
+
+function Pager({ page, pages, onChange }) {
+  if (pages <= 1) return null;
+  const nums = Array.from({ length: pages }, (_, i) => i + 1);
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-1 pt-1">
+      <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+        Prev
+      </Button>
+      {nums.map((n) => (
+        <Button
+          key={n}
+          type="button"
+          size="sm"
+          variant={n === page ? "default" : "outline"}
+          className={n === page ? "bg-green-600 text-white hover:bg-green-700" : ""}
+          onClick={() => onChange(n)}
+        >
+          {n}
+        </Button>
+      ))}
+      <Button type="button" variant="outline" size="sm" disabled={page >= pages} onClick={() => onChange(page + 1)}>
+        Next
+      </Button>
+    </div>
+  );
+}
+
 // Editable list of { label, url } rows (footer links, services, top action links)
 function LinkList({ items, onChange, labelPh = "Label", urlPh = "Link (/page, https://..., #contact)", addText = "Add link" }) {
   const list = items || [];
@@ -85,6 +117,13 @@ export default function LandingEditor() {
   const [slug, setSlug] = useState("gfmsc");
   const [msg, setMsg] = useState("");
   const [msgType, setMsgType] = useState("success");
+  const [pg, setPg] = useState({ gallery: 1, blogs: 1, branches: 1 });
+  const [sec, setSec] = useState(1);
+  const topRef = useRef(null);
+  const goSec = (n) => {
+    setSec(Math.min(SECTIONS.length, Math.max(1, n)));
+    setTimeout(() => topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 0);
+  };
 
   const say = (text, type = "success") => {
     setMsg(text);
@@ -126,6 +165,19 @@ export default function LandingEditor() {
     setPage((p) => ({ ...p, [list]: (p[list] || []).map((it, idx) => (idx === i ? { ...it, ...patch } : it)) }));
   const addListItem = (list, item) => setPage((p) => ({ ...p, [list]: [...(p[list] || []), item] }));
   const removeListItem = (list, i) => setPage((p) => ({ ...p, [list]: (p[list] || []).filter((_, idx) => idx !== i) }));
+
+  // Pagination for long lists (5 per page). `i` stays the real index in the full list, so edit/delete hit the right item.
+  const pagesOf = (list) => Math.max(1, Math.ceil((page?.[list] || []).length / PER_PAGE));
+  const curOf = (list) => Math.min(pg[list] || 1, pagesOf(list));
+  const pagedOf = (list) =>
+    (page?.[list] || [])
+      .map((it, i) => ({ it, i }))
+      .slice((curOf(list) - 1) * PER_PAGE, curOf(list) * PER_PAGE);
+  const addPaged = (list, item) => {
+    const n = (page?.[list] || []).length + 1;
+    addListItem(list, item);
+    setPg((p) => ({ ...p, [list]: Math.ceil(n / PER_PAGE) })); // jump to the page with the new item
+  };
 
   // list that lives inside a section object, e.g. footer.importantLinks or leadership.members
   const setNestedList = (section, key, list) => setPage((p) => ({ ...p, [section]: { ...(p[section] || {}), [key]: list } }));
@@ -214,6 +266,24 @@ export default function LandingEditor() {
             </div>
           )}
 
+          {/* Section pagination (top) */}
+          <div ref={topRef} className="flex flex-wrap items-center justify-center gap-2">
+            {SECTIONS.map((name, idx) => (
+              <Button
+                key={name}
+                type="button"
+                size="sm"
+                variant={sec === idx + 1 ? "default" : "outline"}
+                className={sec === idx + 1 ? "bg-green-600 text-white hover:bg-green-700" : ""}
+                onClick={() => goSec(idx + 1)}
+              >
+                {idx + 1}. {name}
+              </Button>
+            ))}
+          </div>
+
+          {sec === 1 && (
+            <>
           <Card>
             <CardHeader>
               <CardTitle>School logo</CardTitle>
@@ -260,12 +330,17 @@ export default function LandingEditor() {
             </CardContent>
           </Card>
 
+            </>
+          )}
+
+          {sec === 2 && (
+            <>
           <Card>
             <CardHeader>
               <CardTitle>Gallery</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {(page.gallery || []).map((g, i) => (
+              {pagedOf("gallery").map(({ it: g, i }) => (
                 <div key={i} className="flex items-start justify-between gap-3 border-b pb-3">
                   <div className="space-y-2">
                     <ImageField value={g.url} onChange={(u) => setListItem("gallery", i, { url: u })} onError={err} />
@@ -276,7 +351,8 @@ export default function LandingEditor() {
                   </Button>
                 </div>
               ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => addListItem("gallery", { url: "", alt: "" })}>
+              <Pager page={curOf("gallery")} pages={pagesOf("gallery")} onChange={(n) => setPg((p) => ({ ...p, gallery: n }))} />
+              <Button type="button" variant="outline" size="sm" onClick={() => addPaged("gallery", { url: "", alt: "" })}>
                 <Plus className="h-4 w-4" /> Add gallery image
               </Button>
             </CardContent>
@@ -287,7 +363,7 @@ export default function LandingEditor() {
               <CardTitle>Blog posts</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {(page.blogs || []).map((b, i) => (
+              {pagedOf("blogs").map(({ it: b, i }) => (
                 <div key={i} className="space-y-2 border-b pb-3">
                   <div className="flex gap-2">
                     <Input placeholder="Title" value={b.title || ""} onChange={(e) => setListItem("blogs", i, { title: e.target.value })} />
@@ -300,12 +376,18 @@ export default function LandingEditor() {
                   <ImageField value={b.image} onChange={(u) => setListItem("blogs", i, { image: u })} onError={err} />
                 </div>
               ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => addListItem("blogs", { title: "", image: "", description: "", date: "" })}>
+              <Pager page={curOf("blogs")} pages={pagesOf("blogs")} onChange={(n) => setPg((p) => ({ ...p, blogs: n }))} />
+              <Button type="button" variant="outline" size="sm" onClick={() => addPaged("blogs", { title: "", image: "", description: "", date: "" })}>
                 <Plus className="h-4 w-4" /> Add blog post
               </Button>
             </CardContent>
           </Card>
 
+            </>
+          )}
+
+          {sec === 3 && (
+            <>
           {/* ---------- Chairman / Principal ---------- */}
           <Card>
             <CardHeader>
@@ -357,15 +439,20 @@ export default function LandingEditor() {
             </CardContent>
           </Card>
 
+            </>
+          )}
+
+          {sec === 4 && (
+            <>
           {/* ---------- Branches ---------- */}
           <Card>
             <CardHeader>
               <CardTitle>Our branches</CardTitle>
-              <CardDescription>Branch numbers (01, 02...) follow the order below.</CardDescription>
+              <CardDescription>Branch numbers (01, 02...) follow the order below (5 per page here).</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <Input placeholder="Section heading (Our Branch)" value={page.branchesTitle || ""} onChange={(e) => setPage((p) => ({ ...p, branchesTitle: e.target.value }))} />
-              {(page.branches || []).map((b, i) => (
+              {pagedOf("branches").map(({ it: b, i }) => (
                 <div key={i} className="space-y-2 border-b pb-3">
                   <div className="flex gap-2">
                     <Input placeholder="Branch name" value={b.name || ""} onChange={(e) => setListItem("branches", i, { name: e.target.value })} />
@@ -378,12 +465,18 @@ export default function LandingEditor() {
                   <ImageField label="Branch photo" value={b.image} onChange={(u) => setListItem("branches", i, { image: u })} folder="branches" onError={err} />
                 </div>
               ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => addListItem("branches", { name: "", address: "", phone: "", image: "" })}>
+              <Pager page={curOf("branches")} pages={pagesOf("branches")} onChange={(n) => setPg((p) => ({ ...p, branches: n }))} />
+              <Button type="button" variant="outline" size="sm" onClick={() => addPaged("branches", { name: "", address: "", phone: "", image: "" })}>
                 <Plus className="h-4 w-4" /> Add branch
               </Button>
             </CardContent>
           </Card>
 
+            </>
+          )}
+
+          {sec === 5 && (
+            <>
           {/* ---------- Footer ---------- */}
           <Card>
             <CardHeader>
@@ -453,10 +546,26 @@ export default function LandingEditor() {
             </CardContent>
           </Card>
 
+            </>
+          )}
+
+          {/* Section pagination (bottom) */}
+          <div className="flex items-center justify-between gap-2">
+            <Button type="button" variant="outline" size="sm" disabled={sec <= 1} onClick={() => goSec(sec - 1)}>
+              Prev
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {sec} of {SECTIONS.length} - {SECTIONS[sec - 1]}
+            </span>
+            <Button type="button" variant="outline" size="sm" disabled={sec >= SECTIONS.length} onClick={() => goSec(sec + 1)}>
+              Next
+            </Button>
+          </div>
+
           {/* Sticky save bar: always visible at the bottom of the screen. Colours are explicit because landing.css
               redefines --primary and makes the default (bg-primary) Button invisible. */}
           <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-between gap-3 border-t bg-white/95 px-4 py-3 backdrop-blur dark:bg-gray-900/95">
-            <p className="text-xs text-muted-foreground">All sections on this page are saved together.</p>
+            <p className="text-xs text-muted-foreground">Changes on all pages are saved together - you can switch pages before saving.</p>
             <Button onClick={save} disabled={saving} className="bg-green-600 text-white hover:bg-green-700">
               {saving && <Loader2 className="h-4 w-4 animate-spin" />} Save changes
             </Button>

@@ -246,7 +246,7 @@ html.dark .leadMsg h3{ color: var(--gf-green); }
 .nbLeft h2{ margin:0; font-size:34px; font-weight:700; color:#fff; text-shadow:0 2px 6px rgba(0,0,0,.18); }
 .nbLeft p{ margin:0; color:#f0fbe6; font-size:16px; max-width:280px; line-height:1.5; }
 .nbMega{ position:absolute; right:-6px; top:0; width:120px; opacity:.22; pointer-events:none; }
-.nbListBox{ background:#fff; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.18); padding:8px; height:280px; overflow:hidden; position:relative; }
+.nbListBox{ background:#fff; border-radius:10px; box-shadow:0 10px 30px rgba(0,0,0,.18); padding:8px; min-height:280px; position:relative; display:flex; flex-direction:column; }
 .nbScroll{ display:flex; flex-direction:column; gap:6px; }
 .nbScroll.run{ animation: nbUp var(--nb-dur, 24s) linear infinite; }
 .nbListBox:hover .nbScroll.run{ animation-play-state: paused; }
@@ -295,3 +295,13 @@ html.dark .leadMsg h3{ color: var(--gf-green); }
 .gfSocial a{ color:#fff; font-weight:700; font-size:13px; }
 .gfCopy{ text-align:center; padding:6px 0 26px; font-size:13px; line-height:1.7; }
 .gfCopy a{ color:#9be37a; }
+
+/* ---------- Pagination ---------- */
+.pgBar{ display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px; padding:10px 0 4px; }
+.pgBtn{ min-width:32px; height:32px; padding:0 10px; border-radius:8px; border:1px solid #cfe3c0; background:#fff; color: var(--gf-green-dark); font-weight:600; font-size:13px; cursor:pointer; }
+.pgBtn:hover:not(:disabled){ background:#eef7e6; }
+.pgBtn.active{ background: var(--gf-green-dark); border-color: var(--gf-green-dark); color:#fff; }
+.pgBtn:disabled{ opacity:.45; cursor:default; }
+.pgGap{ color:#64748b; padding:0 2px; }
+html.dark .gfPgWrap .pgBtn{ background:transparent; color:var(--text); border-color:var(--border); }
+html.dark .gfPgWrap .pgBtn.active{ background: var(--gf-green-dark); color:#fff; }

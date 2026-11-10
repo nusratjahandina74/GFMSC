@@ -38,7 +38,7 @@ router.get("/landingpages/:slug", async (req, res) => {
     try {
       const nf = { targetAudience: "all" };
       if (page.schoolId) nf.schoolId = page.schoolId;
-      const rows = await Notice.find(nf).sort({ publishDate: -1, createdAt: -1 }).limit(20).select("title publishDate createdAt").lean();
+      const rows = await Notice.find(nf).sort({ publishDate: -1, createdAt: -1 }).limit(50).select("title publishDate createdAt").lean();
       page.liveNotices = rows.map((n) => ({
         id: String(n._id),
         title: n.title,

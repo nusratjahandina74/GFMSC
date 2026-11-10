@@ -104,6 +104,45 @@ function SmartLink({ to, className, children }) {
   );
 }
 
+// Page numbers with "..." for long lists: 1 ... 4 5 6 ... 12
+function pageWindow(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const set = new Set([1, total, current - 1, current, current + 1]);
+  const nums = [...set].filter((n) => n >= 1 && n <= total).sort((a, b) => a - b);
+  const out = [];
+  nums.forEach((n, i) => {
+    if (i > 0 && n - nums[i - 1] > 1) out.push("gap" + n);
+    out.push(n);
+  });
+  return out;
+}
+
+function Pager({ page, pages, onChange }) {
+  if (pages <= 1) return null;
+  return (
+    <div className="pgBar">
+      <button type="button" className="pgBtn" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+        ‹ Prev
+      </button>
+      {pageWindow(page, pages).map((n) =>
+        typeof n === "string" ? (
+          <span key={n} className="pgGap">…</span>
+        ) : (
+          <button key={n} type="button" className={"pgBtn" + (n === page ? " active" : "")} onClick={() => onChange(n)}>
+            {n}
+          </button>
+        )
+      )}
+      <button type="button" className="pgBtn" disabled={page >= pages} onClick={() => onChange(page + 1)}>
+        Next ›
+      </button>
+    </div>
+  );
+}
+
+const NOTICES_PER_PAGE = 5;
+const GALLERY_PER_PAGE = 6;
+
 function useTheme() {
   const [dark, setDark] = useState(() => {
     try {
@@ -318,6 +357,8 @@ export default function LandingPage() {
    * POST /api/landingpages/:slug/visit  ->  { total, today }
    */
   const [visits, setVisits] = useState(null);
+  const [noticePage, setNoticePage] = useState(1);
+  const [galleryPage, setGalleryPage] = useState(1);
 
   useEffect(() => {
     let mounted = true;
@@ -403,6 +444,15 @@ export default function LandingPage() {
   const footerServices = Array.isArray(footer.services) ? footer.services.filter((x) => x?.label) : [];
   const contactBlocks = Array.isArray(footer.contactBlocks) ? footer.contactBlocks.filter((x) => x?.label) : [];
   const visitNums = visits || (page?.visitStats?.total ? page.visitStats : null);
+
+  // Pagination (page numbers are clamped, so deleting items never leaves an empty page)
+  const noticePages = Math.max(1, Math.ceil(notices.length / NOTICES_PER_PAGE));
+  const noticeCur = Math.min(noticePage, noticePages);
+  const pagedNotices = notices.slice((noticeCur - 1) * NOTICES_PER_PAGE, noticeCur * NOTICES_PER_PAGE);
+
+  const galleryPages = Math.max(1, Math.ceil(gallery.length / GALLERY_PER_PAGE));
+  const galleryCur = Math.min(galleryPage, galleryPages);
+  const pagedGallery = gallery.slice((galleryCur - 1) * GALLERY_PER_PAGE, galleryCur * GALLERY_PER_PAGE);
 
   /*
    * Keep slide index valid
@@ -1202,32 +1252,27 @@ export default function LandingPage() {
 
             <div className="nbListBox">
               {notices.length > 0 ? (
-                <div
-                  className={"nbScroll" + (notices.length > 4 ? " run" : "")}
-                  style={{ "--nb-dur": `${Math.max(notices.length * 4, 16)}s` }}
-                >
-                  {(notices.length > 4 ? [...notices, ...notices] : notices).map((notice, index) => {
-                    const d = splitDate(notice.date);
-                    const inner = (
-                      <>
-                        <div className="nbDate">
-                          {d.day && <b>{d.day}</b>}
-                          <span>{d.mon}</span>
-                        </div>
-                        <div className="nbTitle">{notice.title}</div>
-                      </>
-                    );
-                    return (
-                      <SmartLink
-                        key={`${notice.title}-${index}`}
-                        className="nbItem"
-                        to={notice.link || "/notices"}
-                      >
-                        {inner}
-                      </SmartLink>
-                    );
-                  })}
-                </div>
+                <>
+                  <div className="nbScroll" style={{ flex: 1 }}>
+                    {pagedNotices.map((notice, index) => {
+                      const d = splitDate(notice.date);
+                      return (
+                        <SmartLink
+                          key={`${notice.title}-${noticeCur}-${index}`}
+                          className="nbItem"
+                          to={notice.link || "/notices"}
+                        >
+                          <div className="nbDate">
+                            {d.day && <b>{d.day}</b>}
+                            <span>{d.mon}</span>
+                          </div>
+                          <div className="nbTitle">{notice.title}</div>
+                        </SmartLink>
+                      );
+                    })}
+                  </div>
+                  <Pager page={noticeCur} pages={noticePages} onChange={setNoticePage} />
+                </>
               ) : (
                 <div className="nbEmpty">No notices available.</div>
               )}
@@ -1300,7 +1345,7 @@ export default function LandingPage() {
 
           {gallery.length > 0 ? (
             <div className="grid3">
-              {gallery.map(
+              {pagedGallery.map(
                 (image, index) => (
                   <div
                     className="card"
@@ -1341,6 +1386,10 @@ export default function LandingPage() {
               </p>
             </div>
           )}
+
+          <div className="gfPgWrap">
+            <Pager page={galleryCur} pages={galleryPages} onChange={setGalleryPage} />
+          </div>
 
           <div
             style={{

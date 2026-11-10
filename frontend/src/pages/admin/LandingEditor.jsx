@@ -59,7 +59,7 @@ function ImageField({ label, value, onChange, folder = "landing", onError }) {
 const PER_PAGE = 5;
 
 // The editor is split into pages so it is not one endless scroll.
-const SECTIONS = ["Basics", "Gallery & Blog", "Chairman & Notice", "Branches", "Footer"];
+const SECTIONS = ["Basics", "Features & FAQ", "Gallery & Blog", "Chairman & Notice", "Branches", "Footer"];
 
 function Pager({ page, pages, onChange }) {
   if (pages <= 1) return null;
@@ -117,7 +117,7 @@ export default function LandingEditor() {
   const [slug, setSlug] = useState("gfmsc");
   const [msg, setMsg] = useState("");
   const [msgType, setMsgType] = useState("success");
-  const [pg, setPg] = useState({ gallery: 1, blogs: 1, branches: 1 });
+  const [pg, setPg] = useState({ gallery: 1, blogs: 1, branches: 1, features: 1, faqs: 1 });
   const [sec, setSec] = useState(1);
   const topRef = useRef(null);
   const goSec = (n) => {
@@ -194,6 +194,8 @@ export default function LandingEditor() {
         slides: (page.slides || []).filter((s) => s.url),
         gallery: (page.gallery || []).filter((g) => g.url),
         blogs: (page.blogs || []).filter((b) => b.title),
+        features: (page.features || []).filter((f) => f.title),
+        faqs: (page.faqs || []).filter((f) => f.question && f.answer),
         noticeBoard: page.noticeBoard || {},
         branchesTitle: page.branchesTitle || "",
         branches: (page.branches || []).filter((b) => b.name),
@@ -335,6 +337,59 @@ export default function LandingEditor() {
 
           {sec === 2 && (
             <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Features</CardTitle>
+                  <CardDescription>Cards in the "Features" section of the home page. Icon can be an emoji (e.g. 🎓 📚 🏫).</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {pagedOf("features").map(({ it: f, i }) => (
+                    <div key={i} className="space-y-2 border-b pb-3">
+                      <div className="flex gap-2">
+                        <Input placeholder="Icon" className="w-20 text-center" value={f.icon || ""} onChange={(e) => setListItem("features", i, { icon: e.target.value })} />
+                        <Input placeholder="Title" value={f.title || ""} onChange={(e) => setListItem("features", i, { title: e.target.value })} />
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeListItem("features", i)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <Textarea placeholder="Description" value={f.description || ""} onChange={(e) => setListItem("features", i, { description: e.target.value })} />
+                    </div>
+                  ))}
+                  <Pager page={curOf("features")} pages={pagesOf("features")} onChange={(n) => setPg((p) => ({ ...p, features: n }))} />
+                  <Button type="button" variant="outline" size="sm" onClick={() => addPaged("features", { icon: "", title: "", description: "" })}>
+                    <Plus className="h-4 w-4" /> Add feature
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>FAQ</CardTitle>
+                  <CardDescription>Both question and answer are needed, otherwise the row is skipped when saving.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {pagedOf("faqs").map(({ it: f, i }) => (
+                    <div key={i} className="space-y-2 border-b pb-3">
+                      <div className="flex gap-2">
+                        <Input placeholder="Question" value={f.question || ""} onChange={(e) => setListItem("faqs", i, { question: e.target.value })} />
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeListItem("faqs", i)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <Textarea placeholder="Answer" value={f.answer || ""} onChange={(e) => setListItem("faqs", i, { answer: e.target.value })} />
+                    </div>
+                  ))}
+                  <Pager page={curOf("faqs")} pages={pagesOf("faqs")} onChange={(n) => setPg((p) => ({ ...p, faqs: n }))} />
+                  <Button type="button" variant="outline" size="sm" onClick={() => addPaged("faqs", { question: "", answer: "" })}>
+                    <Plus className="h-4 w-4" /> Add FAQ
+                  </Button>
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {sec === 3 && (
+            <>
           <Card>
             <CardHeader>
               <CardTitle>Gallery</CardTitle>
@@ -386,7 +441,7 @@ export default function LandingEditor() {
             </>
           )}
 
-          {sec === 3 && (
+          {sec === 4 && (
             <>
           {/* ---------- Chairman / Principal ---------- */}
           <Card>
@@ -442,7 +497,7 @@ export default function LandingEditor() {
             </>
           )}
 
-          {sec === 4 && (
+          {sec === 5 && (
             <>
           {/* ---------- Branches ---------- */}
           <Card>
@@ -475,7 +530,7 @@ export default function LandingEditor() {
             </>
           )}
 
-          {sec === 5 && (
+          {sec === 6 && (
             <>
           {/* ---------- Footer ---------- */}
           <Card>

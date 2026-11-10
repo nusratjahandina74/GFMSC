@@ -7,6 +7,34 @@ import api from "../../api/client";
 
 const MAX_LEN = 200;
 const SLUG = "gfmsc";
+const PER_PAGE = 5;
+
+function Pager({ page, pages, onChange }) {
+  if (pages <= 1) return null;
+  const nums = Array.from({ length: pages }, (_, i) => i + 1);
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-1 pt-2">
+      <Button type="button" variant="outline" size="sm" disabled={page <= 1} onClick={() => onChange(page - 1)}>
+        Prev
+      </Button>
+      {nums.map((n) => (
+        <Button
+          key={n}
+          type="button"
+          size="sm"
+          variant={n === page ? "default" : "outline"}
+          className={n === page ? "bg-green-600 text-white hover:bg-green-700" : ""}
+          onClick={() => onChange(n)}
+        >
+          {n}
+        </Button>
+      ))}
+      <Button type="button" variant="outline" size="sm" disabled={page >= pages} onClick={() => onChange(page + 1)}>
+        Next
+      </Button>
+    </div>
+  );
+}
 
 export default function TickerManager() {
   const [loading, setLoading] = useState(true);
@@ -14,6 +42,7 @@ export default function TickerManager() {
   const [page, setPage] = useState(null);
   const [items, setItems] = useState([]);
   const [newText, setNewText] = useState("");
+  const [pg, setPg] = useState(1);
   const [editIdx, setEditIdx] = useState(-1);
   const [editText, setEditText] = useState("");
   const [msg, setMsg] = useState("");
@@ -66,7 +95,10 @@ export default function TickerManager() {
     const t = newText.trim();
     if (!t) return;
     if (items.length >= 30) return say("You can keep at most 30 ticker messages.", "error");
-    if (await persist([...items, t], "Added. Refresh the home page to see it.")) setNewText("");
+    if (await persist([...items, t], "Added. Refresh the home page to see it.")) {
+      setNewText("");
+      setPg(Math.ceil((items.length + 1) / PER_PAGE));
+    }
   };
 
   const startEdit = (i) => {
@@ -93,6 +125,10 @@ export default function TickerManager() {
     setEditIdx(-1);
     await persist(next, "Order updated.");
   };
+
+  const pages = Math.max(1, Math.ceil(items.length / PER_PAGE));
+  const cur = Math.min(pg, pages); // stays valid after deleting the last item of a page
+  const visible = items.map((text, i) => ({ text, i })).slice((cur - 1) * PER_PAGE, cur * PER_PAGE);
 
   if (loading) {
     return (
@@ -144,7 +180,7 @@ export default function TickerManager() {
               onKeyDown={(e) => e.key === "Enter" && add()}
               disabled={!page || busy}
             />
-            <Button type="button" onClick={add} disabled={!page || busy || !newText.trim()}>
+            <Button type="button" className="bg-green-600 text-white hover:bg-green-700" onClick={add} disabled={!page || busy || !newText.trim()}>
               {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Add
             </Button>
           </div>
@@ -160,7 +196,7 @@ export default function TickerManager() {
             <p className="text-sm text-muted-foreground">No messages yet. The ticker is hidden on the home page until you add one.</p>
           )}
 
-          {items.map((text, i) => (
+          {visible.map(({ text, i }) => (
             <div key={`${i}-${text}`} className="flex items-center gap-2 rounded-md border p-2">
               {editIdx === i ? (
                 <>
@@ -174,7 +210,7 @@ export default function TickerManager() {
                       if (e.key === "Escape") setEditIdx(-1);
                     }}
                   />
-                  <Button type="button" size="sm" onClick={saveEdit} disabled={busy}>
+                  <Button type="button" size="sm" className="bg-green-600 text-white hover:bg-green-700" onClick={saveEdit} disabled={busy}>
                     <Check className="h-4 w-4" /> Save
                   </Button>
                   <Button type="button" size="sm" variant="outline" onClick={() => setEditIdx(-1)} disabled={busy}>
@@ -200,6 +236,7 @@ export default function TickerManager() {
               )}
             </div>
           ))}
+          <Pager page={cur} pages={pages} onChange={(n) => { setEditIdx(-1); setPg(n); }} />
         </CardContent>
       </Card>
     </div>

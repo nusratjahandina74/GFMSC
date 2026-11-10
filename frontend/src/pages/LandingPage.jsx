@@ -865,18 +865,21 @@ export default function LandingPage() {
         {ticker.length > 0 && (
           <div className="noticeTicker">
             <div className="container">
-              <div className="tickerInner">
-                {[
-                  ...ticker,
-                  ...ticker,
-                ].map((text, index) => (
-                  <span
-                    key={`${text}-${index}`}
-                  >
-                    📌 {text}
-                  </span>
-                ))}
-              </div>
+              {(() => {
+                // Repeat the list until one "set" is wide enough, then double it
+                // so the -50% scroll loops seamlessly. Speed scales with length.
+                const chars = ticker.reduce((n, t) => n + String(t).length + 6, 0) || 1;
+                const reps = Math.max(1, Math.ceil(220 / chars));
+                const set = Array.from({ length: reps }, () => ticker).flat();
+                const duration = Math.max(14, Math.round((chars * reps) / 4));
+                return (
+                  <div className="tickerInner" style={{ animationDuration: `${duration}s` }}>
+                    {[...set, ...set].map((text, index) => (
+                      <span key={`${text}-${index}`}>📌 {text}</span>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         )}

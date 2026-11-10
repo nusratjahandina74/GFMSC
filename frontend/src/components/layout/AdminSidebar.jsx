@@ -25,6 +25,7 @@ import {
   Image as ImageIcon,
   GalleryHorizontal,
   Images,
+  Megaphone,
 } from "lucide-react";
 import { getRole, logout, getUser } from "../../api/auth";
 import { useContext } from "react";
@@ -167,6 +168,12 @@ export default function AdminSidebar() {
       name: "Landing Page",
       path: "/admin/landing-page",
       icon: ImageIcon,
+      roles: ["schoolAdmin", "superAdmin"],
+    },
+    {
+      name: "Notice Ticker",
+      path: "/admin/ticker",
+      icon: Megaphone,
       roles: ["schoolAdmin", "superAdmin"],
     },
     {

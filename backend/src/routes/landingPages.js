@@ -11,6 +11,11 @@ router.param("id", objectIdParam);
 // H24: only these fields may ever be written from a request body (no raw ...req.body spread).
 const EDITABLE = ["isPublished", "school", "ticker", "slides", "hero", "about", "features", "gallery", "notices", "blogs", "faqs", "footerText", "noticeBoard", "branchesTitle", "branches", "leadership", "footer"];
 const pickEditable = (body = {}) => Object.fromEntries(EDITABLE.filter((k) => body[k] !== undefined).map((k) => [k, body[k]]));
+// Scrolling notice ticker: trim, drop blanks, cap length and count.
+const normalizeTicker = (v) =>
+  Array.isArray(v)
+    ? v.map((t) => String(t ?? "").trim().slice(0, 200)).filter(Boolean).slice(0, 30)
+    : [];
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const cleanSlug = (v) => String(v || "").trim().toLowerCase();
 // H17: the real roles. (The old code used role "admin", which does not exist, so NOBODY could manage pages.)
@@ -116,7 +121,9 @@ router.post("/", authMiddleware(ADMINS), async (req, res) => {
       if (!mongoose.isValidObjectId(req.body.schoolId)) return res.status(400).json({ message: "Invalid schoolId" });
       schoolId = req.body.schoolId;
     }
-    const page = await LandingPage.create({ ...pickEditable(req.body), slug, schoolId });
+    const data = pickEditable(req.body);
+    if (data.ticker !== undefined) data.ticker = normalizeTicker(data.ticker);
+    const page = await LandingPage.create({ ...data, slug, schoolId });
     res.status(201).json(page);
   } catch (error) {
     if (error.code === 11000) return res.status(409).json({ message: "Slug already exists." });
@@ -131,6 +138,7 @@ router.put("/:id", authMiddleware(ADMINS), async (req, res) => {
   try {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid id" });
     const update = pickEditable(req.body);
+    if (update.ticker !== undefined) update.ticker = normalizeTicker(update.ticker);
     if (req.body?.slug !== undefined) {
       const slug = cleanSlug(req.body.slug);
       if (!SLUG_RE.test(slug) || slug.length > 60) return res.status(400).json({ message: "Invalid slug." });

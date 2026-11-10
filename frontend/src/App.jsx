@@ -44,6 +44,7 @@ import AdmissionsPage from "./pages/admin/Admissions";
 import IdCardsPage from "./pages/admin/IdCards";
 import LandingEditor from "./pages/admin/LandingEditor";
 import SliderManager from "./pages/admin/SliderManager";
+import TickerManager from "./pages/admin/TickerManager";
 import GalleryManager from "./pages/admin/GalleryManager";
 import PublicAdmissionApply from "./pages/PublicAdmissionApply";
 import SuperAdminPanel from "./pages/admin/SuperAdminPanel";
@@ -297,6 +298,14 @@ export default function App() {
               element={
                 <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
                   <LandingEditor />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="ticker"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <TickerManager />
                 </RequireRole>
               }
             />

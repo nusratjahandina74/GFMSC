@@ -80,12 +80,14 @@ a{ color:inherit; text-decoration:none; }
   overflow:hidden;
 }
 .tickerInner{
-  display:flex; gap:40px; padding:10px 0;
+  display:flex; width:max-content; padding:10px 0;
   white-space:nowrap;
   animation: ticker 18s linear infinite;
   color: var(--muted);
   font-weight:600;
 }
+.tickerInner span{ padding-right:40px; }
+.tickerInner:hover{ animation-play-state: paused; }
 @keyframes ticker{ from{ transform:translateX(0);} to{ transform:translateX(-50%);} }
 
 .hero{ padding:36px 0 26px; }

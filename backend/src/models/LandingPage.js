@@ -45,6 +45,42 @@ const blogSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const branchSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    address: { type: String, default: "" },
+    phone: { type: String, default: "" },
+    image: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+const leaderSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    designation: { type: String, default: "" },
+    photo: { type: String, default: "" },
+    message: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+const linkSchema = new mongoose.Schema(
+  {
+    label: { type: String, required: true },
+    url: { type: String, default: "" },
+  },
+  { _id: false }
+);
+
+const infoBlockSchema = new mongoose.Schema(
+  {
+    label: { type: String, required: true },
+    value: { type: String, default: "" }, // several lines allowed (one per line)
+  },
+  { _id: false }
+);
+
 const landingPageSchema = new mongoose.Schema(
   {
     // H18: owner school. Optional only for legacy/platform pages created before this field existed.
@@ -113,6 +149,52 @@ const landingPageSchema = new mongoose.Schema(
     footerText: {
       type: String,
       default: "",
+    },
+
+    // "Our Notice Board" heading block (the notice items themselves are `notices`)
+    noticeBoard: {
+      title: { type: String, default: "" },
+      subtitle: { type: String, default: "" },
+    },
+
+    // "Our Branch" section
+    branchesTitle: { type: String, default: "" },
+    branches: [branchSchema],
+
+    // School intro + Chairman / Principal (photos + message)
+    leadership: {
+      title: { type: String, default: "" },
+      description: { type: String, default: "" },
+      members: [leaderSchema],
+    },
+
+    // Big footer
+    footer: {
+      backgroundImage: { type: String, default: "" },
+      actions: [linkSchema], // top row: Get Appointment / Contact Us Today / Take a School Tour
+      aboutTitle: { type: String, default: "" },
+      aboutText: { type: String, default: "" },
+      aboutButtonText: { type: String, default: "" },
+      aboutButtonLink: { type: String, default: "" },
+      importantLinksTitle: { type: String, default: "" },
+      importantLinks: [linkSchema],
+      servicesTitle: { type: String, default: "" },
+      services: [linkSchema],
+      contactBlocks: [infoBlockSchema], // Contact Info, Working hours, Help line, Email ...
+      showVisitorCounter: { type: Boolean, default: true },
+      facebook: { type: String, default: "" },
+      twitter: { type: String, default: "" },
+      linkedin: { type: String, default: "" },
+      youtube: { type: String, default: "" },
+      copyright: { type: String, default: "" },
+      poweredBy: { type: String, default: "" },
+    },
+
+    // Updated only by the public visit endpoint - NOT editable from the dashboard.
+    visitStats: {
+      total: { type: Number, default: 0 },
+      today: { type: Number, default: 0 },
+      day: { type: String, default: "" },
     },
   },
   {

@@ -59,6 +59,51 @@ async function fetchWithTimeout(url, ms) {
   }
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+// Notice date text -> { day, mon } for the little date badge (falls back to the raw text)
+function splitDate(value) {
+  const d = new Date(value);
+  if (value && !Number.isNaN(d.getTime())) {
+    return { day: String(d.getDate()).padStart(2, "0"), mon: MONTHS[d.getMonth()] };
+  }
+  return { day: "", mon: String(value || "") };
+}
+
+const isExternal = (url) => /^(https?:|mailto:|tel:)/i.test(url || "");
+
+// One link component for everything editable from the dashboard:
+// external url -> <a>, "#section" -> smooth scroll, "/path" -> router Link, empty -> plain text.
+function SmartLink({ to, className, children }) {
+  if (!to) return <span className={className}>{children}</span>;
+  if (to.startsWith("#")) {
+    return (
+      <a
+        className={className}
+        href={to}
+        onClick={(e) => {
+          e.preventDefault();
+          document.getElementById(to.slice(1))?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
+      >
+        {children}
+      </a>
+    );
+  }
+  if (isExternal(to)) {
+    return (
+      <a className={className} href={to} target="_blank" rel="noreferrer">
+        {children}
+      </a>
+    );
+  }
+  return (
+    <Link className={className} to={to}>
+      {children}
+    </Link>
+  );
+}
+
 function useTheme() {
   const [dark, setDark] = useState(() => {
     try {
@@ -269,6 +314,37 @@ export default function LandingPage() {
   }, []);
 
   /*
+   * Visitor counter: counts one visit per browser session
+   * POST /api/landingpages/:slug/visit  ->  { total, today }
+   */
+  const [visits, setVisits] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        // Already counted in this browser session -> the numbers come with the page data (page.visitStats).
+        if (sessionStorage.getItem("gfmsc_visit_counted") === "1") return;
+
+        const res = await fetch(`${API_BASE}/landingpages/${encodeURIComponent(SLUG)}/visit`, {
+          method: "POST",
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) return;
+
+        const data = await res.json();
+        if (mounted) setVisits(data);
+        sessionStorage.setItem("gfmsc_visit_counted", "1");
+      } catch {
+        // visitor counter is optional - never break the page
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  /*
    * Database data
    */
 
@@ -296,9 +372,15 @@ export default function LandingPage() {
     ? page.features.filter((item) => item?.title)
     : [];
 
-  const notices = Array.isArray(page?.notices)
+  // Notice board: real notices from the dashboard (Admin > Notices) come first;
+  // the old hand-typed landing-page list is only a fallback while there are none.
+  const liveNotices = Array.isArray(page?.liveNotices)
+    ? page.liveNotices.filter((item) => item?.title)
+    : [];
+  const legacyNotices = Array.isArray(page?.notices)
     ? page.notices.filter((item) => item?.title)
     : [];
+  const notices = liveNotices.length > 0 ? liveNotices : legacyNotices;
 
   const blogs = Array.isArray(page?.blogs)
     ? page.blogs.filter((item) => item?.title)
@@ -310,6 +392,17 @@ export default function LandingPage() {
 
   const hero = page?.hero || {};
   const about = page?.about || {};
+
+  const noticeBoard = page?.noticeBoard || {};
+  const branches = Array.isArray(page?.branches) ? page.branches.filter((b) => b?.name) : [];
+  const leadership = page?.leadership || {};
+  const members = Array.isArray(leadership.members) ? leadership.members.filter((m) => m?.name) : [];
+  const footer = page?.footer || {};
+  const footerActions = Array.isArray(footer.actions) ? footer.actions.filter((x) => x?.label) : [];
+  const importantLinks = Array.isArray(footer.importantLinks) ? footer.importantLinks.filter((x) => x?.label) : [];
+  const footerServices = Array.isArray(footer.services) ? footer.services.filter((x) => x?.label) : [];
+  const contactBlocks = Array.isArray(footer.contactBlocks) ? footer.contactBlocks.filter((x) => x?.label) : [];
+  const visitNums = visits || (page?.visitStats?.total ? page.visitStats : null);
 
   /*
    * Keep slide index valid
@@ -641,6 +734,17 @@ export default function LandingPage() {
                 Notice
               </button>
 
+              {branches.length > 0 && (
+                <button
+                  className="navLink"
+                  onClick={() =>
+                    scrollTo("branches")
+                  }
+                >
+                  Branches
+                </button>
+              )}
+
               {blogs.length > 0 && (
                 <button
                   className="navLink"
@@ -960,6 +1064,60 @@ export default function LandingPage() {
       </section>
 
       {/* =========================
+          LEADERSHIP (school intro + Chairman / Principal)
+      ========================== */}
+
+      {(leadership.title || leadership.description || members.length > 0) && (
+        <section id="leadership" className="section">
+          <div className="container">
+            <div className="leadGrid">
+              <div>
+                {leadership.title && <h2 className="leadTitle">{leadership.title}</h2>}
+                {leadership.description && <p className="leadText">{leadership.description}</p>}
+              </div>
+
+              {members.length > 0 && (
+                <div className="leadPeople">
+                  {members.map((m, index) => (
+                    <div className="leadPerson" key={`${m.name}-${index}`}>
+                      {m.photo ? (
+                        <img
+                          className="leadPhoto"
+                          src={m.photo}
+                          alt={m.name}
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      ) : (
+                        <div className="leadPhotoEmpty">No photo</div>
+                      )}
+                      <div className="leadName">{m.name}</div>
+                      {m.designation && <div className="leadRole">{m.designation}</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {members.some((m) => m.message) && (
+              <div className="leadMsgs">
+                {members
+                  .filter((m) => m.message)
+                  .map((m, index) => (
+                    <div className="leadMsg" key={`${m.name}-msg-${index}`}>
+                      <h3>{m.name}</h3>
+                      {m.designation && <div className="leadMsgRole">{m.designation}</div>}
+                      <p>{m.message}</p>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* =========================
           FEATURES
       ========================== */}
 
@@ -1028,111 +1186,102 @@ export default function LandingPage() {
         className="section"
       >
         <div className="container">
-          <h2 className="sectionTitle">
-            Notice Board
-          </h2>
+          <div className="nbWrap">
+            <div className="nbLeft">
+              <svg className="nbMega" viewBox="0 0 24 24" fill="#fff" aria-hidden="true">
+                <path d="M3 10v4a1 1 0 001 1h2l4 4h2v-4l8 3V6l-8 3H4a1 1 0 00-1 1z" />
+              </svg>
+              <h2>{noticeBoard.title || "Our Notice Board"}</h2>
+              <p>{noticeBoard.subtitle || "Will get all kind of latest news and update."}</p>
+              <div>
+                <Link className="btn" to="/notices" style={{ background: "#fff", color: "#1f6b3a", border: "none" }}>
+                  View All Notices
+                </Link>
+              </div>
+            </div>
 
-          <p className="sectionSub">
-            Latest updates and
-            announcements.
-          </p>
-
-          {notices.length > 0 ? (
-            <div className="split">
-              {notices.map(
-                (notice, index) => (
-                  <div
-                    className="listItem"
-                    key={`${notice.title}-${index}`}
-                  >
-                    <div>
-                      <b>
-                        {notice.title}
-                      </b>
-
-                      {notice.date && (
-                        <div className="small">
-                          Publish date:{" "}
-                          {notice.date}
+            <div className="nbListBox">
+              {notices.length > 0 ? (
+                <div
+                  className={"nbScroll" + (notices.length > 4 ? " run" : "")}
+                  style={{ "--nb-dur": `${Math.max(notices.length * 4, 16)}s` }}
+                >
+                  {(notices.length > 4 ? [...notices, ...notices] : notices).map((notice, index) => {
+                    const d = splitDate(notice.date);
+                    const inner = (
+                      <>
+                        <div className="nbDate">
+                          {d.day && <b>{d.day}</b>}
+                          <span>{d.mon}</span>
                         </div>
-                      )}
-
-                      {notice.description && (
-                        <div
-                          className="small"
-                          style={{
-                            marginTop: 4,
-                          }}
-                        >
-                          {
-                            notice.description
-                          }
-                        </div>
-                      )}
-                    </div>
-
-                    {notice.link ? (
-                      notice.link.startsWith(
-                        "http://"
-                      ) ||
-                      notice.link.startsWith(
-                        "https://"
-                      ) ? (
-                        <a
-                          className="pill"
-                          href={
-                            notice.link
-                          }
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          Details
-                        </a>
-                      ) : (
-                        <Link
-                          className="pill"
-                          to={
-                            notice.link
-                          }
-                        >
-                          Details
-                        </Link>
-                      )
-                    ) : (
-                      <Link
-                        className="pill"
-                        to="/notices"
+                        <div className="nbTitle">{notice.title}</div>
+                      </>
+                    );
+                    return (
+                      <SmartLink
+                        key={`${notice.title}-${index}`}
+                        className="nbItem"
+                        to={notice.link || "/notices"}
                       >
-                        Details
-                      </Link>
-                    )}
-                  </div>
-                )
+                        {inner}
+                      </SmartLink>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="nbEmpty">No notices available.</div>
               )}
             </div>
-          ) : (
-            <div className="box">
-              <p className="small">
-                No notices
-                available.
-              </p>
-            </div>
-          )}
-
-          <div
-            style={{
-              marginTop: 28,
-            }}
-          >
-            <Link
-              className="btn"
-              to="/notices"
-            >
-              View All Notices
-            </Link>
           </div>
         </div>
       </section>
+
+      {/* =========================
+          BRANCHES
+      ========================== */}
+
+      {branches.length > 0 && (
+        <section id="branches" className="section">
+          <div className="container">
+            <h2 className="sectionTitle" style={{ textAlign: "center" }}>
+              {page.branchesTitle || "Our Branch"}
+            </h2>
+
+            <div className="brGrid">
+              {branches.map((b, index) => (
+                <div className="brCard" key={`${b.name}-${index}`}>
+                  {b.image && (
+                    <img
+                      className="brImg"
+                      src={b.image}
+                      alt={b.name}
+                      onError={(e) => {
+                        e.currentTarget.style.display = "none";
+                      }}
+                    />
+                  )}
+                  <div className="brBody">
+                    <div className="brBadge">
+                      <small>Branch</small>
+                      <span>{String(index + 1).padStart(2, "0")}</span>
+                    </div>
+                    <div className="brName">{b.name}</div>
+                    <div className="brRow">
+                      <div>{b.address}</div>
+                      {b.phone && (
+                        <div className="brPhone">
+                          Phone:
+                          <b>{b.phone}</b>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* =========================
           GALLERY
@@ -1578,26 +1727,93 @@ export default function LandingPage() {
           FOOTER
       ========================== */}
 
-      <footer className="footer">
-        <div
-          className="container"
-          style={{
-            display: "flex",
-            justifyContent:
-              "space-between",
-            gap: 10,
-            flexWrap: "wrap",
-          }}
-        >
-          <div>
-            ©{" "}
-            {new Date().getFullYear()}{" "}
-            {school.name ||
-              "GFMSC"}
+      <footer
+        className="gfFooter"
+        style={footer.backgroundImage ? { backgroundImage: `url(${footer.backgroundImage})` } : undefined}
+      >
+        <div className="container">
+          {footerActions.length > 0 && (
+            <div className="gfActions">
+              {footerActions.map((a, index) => (
+                <SmartLink key={`${a.label}-${index}`} to={a.url}>
+                  {a.label}
+                </SmartLink>
+              ))}
+            </div>
+          )}
+
+          <div className="gfCols">
+            <div>
+              <h5 className="gfAbout">{footer.aboutTitle || "About us"}</h5>
+              <p>{footer.aboutText || about.description || school.name || ""}</p>
+              {footer.aboutButtonText && (
+                <SmartLink className="gfBtn" to={footer.aboutButtonLink || "#contact"}>
+                  {footer.aboutButtonText}
+                </SmartLink>
+              )}
+            </div>
+
+            <div>
+              <h5>{footer.importantLinksTitle || "Important Link"}</h5>
+              {importantLinks.map((l, index) => (
+                <SmartLink key={`${l.label}-${index}`} to={l.url}>
+                  {l.label}
+                </SmartLink>
+              ))}
+            </div>
+
+            <div>
+              <h5>{footer.servicesTitle || "Services"}</h5>
+              {footerServices.map((l, index) => (
+                <SmartLink key={`${l.label}-${index}`} to={l.url}>
+                  {l.label}
+                </SmartLink>
+              ))}
+            </div>
+
+            <div>
+              {contactBlocks.length > 0 ? (
+                contactBlocks.map((c, index) => (
+                  <div className="gfBlock" key={`${c.label}-${index}`}>
+                    <b>{c.label}</b>
+                    <div>{c.value}</div>
+                  </div>
+                ))
+              ) : (
+                <>
+                  <div className="gfBlock">
+                    <b>Contact Info</b>
+                    <div>{[school.phone, school.email, school.address].filter(Boolean).join("\n")}</div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div>
+              {footer.showVisitorCounter !== false && visitNums && (
+                <>
+                  <h5>Visitor Counter</h5>
+                  <p>Today Total Visitors : <b>{visitNums.today}</b></p>
+                  <p>Grand Total : <b>{visitNums.total}</b></p>
+                </>
+              )}
+            </div>
           </div>
 
-          <div>
-            {page.footerText || ""}
+          {(footer.facebook || footer.twitter || footer.linkedin || footer.youtube) && (
+            <div className="gfSocial">
+              {footer.facebook && <a href={footer.facebook} target="_blank" rel="noreferrer">Facebook</a>}
+              {footer.twitter && <a href={footer.twitter} target="_blank" rel="noreferrer">Twitter</a>}
+              {footer.linkedin && <a href={footer.linkedin} target="_blank" rel="noreferrer">LinkedIn</a>}
+              {footer.youtube && <a href={footer.youtube} target="_blank" rel="noreferrer">YouTube</a>}
+            </div>
+          )}
+
+          <div className="gfCopy">
+            <div>
+              {footer.copyright || `© ${new Date().getFullYear()} ${school.name || "GFMSC"}, All Rights Reserved`}
+            </div>
+            {(footer.poweredBy || page.footerText) && <div>{footer.poweredBy || page.footerText}</div>}
           </div>
         </div>
       </footer>

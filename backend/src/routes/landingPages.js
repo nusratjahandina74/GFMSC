@@ -1,6 +1,7 @@
 import express from "express";
 import mongoose from "mongoose";
 import LandingPage from "../models/LandingPage.js";
+import Notice from "../models/Notice.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { objectIdParam } from "../middleware/validate.js";
 
@@ -8,7 +9,7 @@ const router = express.Router();
 router.param("id", objectIdParam);
 
 // H24: only these fields may ever be written from a request body (no raw ...req.body spread).
-const EDITABLE = ["isPublished", "school", "ticker", "slides", "hero", "about", "features", "gallery", "notices", "blogs", "faqs", "footerText"];
+const EDITABLE = ["isPublished", "school", "ticker", "slides", "hero", "about", "features", "gallery", "notices", "blogs", "faqs", "footerText", "noticeBoard", "branchesTitle", "branches", "leadership", "footer"];
 const pickEditable = (body = {}) => Object.fromEntries(EDITABLE.filter((k) => body[k] !== undefined).map((k) => [k, body[k]]));
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const cleanSlug = (v) => String(v || "").trim().toLowerCase();
@@ -25,14 +26,31 @@ router.get("/landingpages/:slug", async (req, res) => {
   try {
     const slug = cleanSlug(req.params.slug); // ফ্রন্টএন্ড থেকে পাঠানো 'gfmsc' স্ল্যাগটি ধরবে
     
-    const page = await LandingPage.findOne({ 
-      slug: slug // ডাটাবেজে gfmsc নামের স্ল্যাগটি খুঁজবে
-    }).select("-schoolId").lean();
+    const page = await LandingPage.findOne({ slug }).lean();
 
     if (!page) {
       return res.status(404).json({ message: "Landing page not found in database." });
     }
-    
+
+    // Notice board = the real notices created in the dashboard (Admin > Notices).
+    // Only public ("all" audience) notices of THIS page's school are ever exposed.
+    // A failure here must never break the landing page, so it falls back to [].
+    try {
+      const nf = { targetAudience: "all" };
+      if (page.schoolId) nf.schoolId = page.schoolId;
+      const rows = await Notice.find(nf).sort({ publishDate: -1, createdAt: -1 }).limit(20).select("title publishDate createdAt").lean();
+      page.liveNotices = rows.map((n) => ({
+        id: String(n._id),
+        title: n.title,
+        date: new Date(n.publishDate || n.createdAt).toISOString(),
+        link: `/notices/${n._id}`,
+      }));
+    } catch (e) {
+      console.error("Landing page notices error:", e);
+      page.liveNotices = [];
+    }
+
+    delete page.schoolId;
     res.json(page);
   } catch (error) {
     console.error("Landing page GET error:", error);
@@ -41,6 +59,38 @@ router.get("/landingpages/:slug", async (req, res) => {
 });
 
 
+
+// PUBLIC  POST /api/landingpages/:slug/visit -> counts one visit, returns { total, today }
+router.post("/landingpages/:slug/visit", async (req, res) => {
+  try {
+    const slug = cleanSlug(req.params.slug);
+    const day = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Dhaka" }); // YYYY-MM-DD
+    const page = await LandingPage.findOneAndUpdate(
+      { slug },
+      [
+        {
+          $set: {
+            "visitStats.today": {
+              $cond: [
+                { $eq: ["$visitStats.day", day] },
+                { $add: [{ $ifNull: ["$visitStats.today", 0] }, 1] },
+                1,
+              ],
+            },
+            "visitStats.total": { $add: [{ $ifNull: ["$visitStats.total", 0] }, 1] },
+            "visitStats.day": day,
+          },
+        },
+      ],
+      { new: true, projection: { visitStats: 1 }, timestamps: false }
+    ).lean();
+    if (!page) return res.status(404).json({ message: "Landing page not found." });
+    res.json({ total: page.visitStats?.total || 0, today: page.visitStats?.today || 0 });
+  } catch (error) {
+    console.error("Landing page visit error:", error);
+    res.status(500).json({ message: "Could not count visit." });
+  }
+});
 
 /* ADMIN  GET /api/landing-pages — own school's pages (superAdmin: all) */
 router.get("/", authMiddleware(ADMINS), async (req, res) => {

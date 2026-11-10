@@ -56,6 +56,28 @@ function ImageField({ label, value, onChange, folder = "landing", onError }) {
   );
 }
 
+// Editable list of { label, url } rows (footer links, services, top action links)
+function LinkList({ items, onChange, labelPh = "Label", urlPh = "Link (/page, https://..., #contact)", addText = "Add link" }) {
+  const list = items || [];
+  const patch = (i, p) => onChange(list.map((it, idx) => (idx === i ? { ...it, ...p } : it)));
+  return (
+    <div className="space-y-2">
+      {list.map((it, i) => (
+        <div key={i} className="flex gap-2">
+          <Input placeholder={labelPh} value={it.label || ""} onChange={(e) => patch(i, { label: e.target.value })} />
+          <Input placeholder={urlPh} value={it.url || ""} onChange={(e) => patch(i, { url: e.target.value })} />
+          <Button type="button" variant="ghost" size="sm" onClick={() => onChange(list.filter((_, idx) => idx !== i))}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      ))}
+      <Button type="button" variant="outline" size="sm" onClick={() => onChange([...list, { label: "", url: "" }])}>
+        <Plus className="h-4 w-4" /> {addText}
+      </Button>
+    </div>
+  );
+}
+
 export default function LandingEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -105,6 +127,11 @@ export default function LandingEditor() {
   const addListItem = (list, item) => setPage((p) => ({ ...p, [list]: [...(p[list] || []), item] }));
   const removeListItem = (list, i) => setPage((p) => ({ ...p, [list]: (p[list] || []).filter((_, idx) => idx !== i) }));
 
+  // list that lives inside a section object, e.g. footer.importantLinks or leadership.members
+  const setNestedList = (section, key, list) => setPage((p) => ({ ...p, [section]: { ...(p[section] || {}), [key]: list } }));
+  const setNestedItem = (section, key, i, patch) =>
+    setNestedList(section, key, ((page?.[section]?.[key]) || []).map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
+
   const save = async () => {
     setSaving(true);
     say("");
@@ -115,6 +142,20 @@ export default function LandingEditor() {
         slides: (page.slides || []).filter((s) => s.url),
         gallery: (page.gallery || []).filter((g) => g.url),
         blogs: (page.blogs || []).filter((b) => b.title),
+        noticeBoard: page.noticeBoard || {},
+        branchesTitle: page.branchesTitle || "",
+        branches: (page.branches || []).filter((b) => b.name),
+        leadership: {
+          ...(page.leadership || {}),
+          members: (page.leadership?.members || []).filter((m) => m.name),
+        },
+        footer: {
+          ...(page.footer || {}),
+          actions: (page.footer?.actions || []).filter((x) => x.label),
+          importantLinks: (page.footer?.importantLinks || []).filter((x) => x.label),
+          services: (page.footer?.services || []).filter((x) => x.label),
+          contactBlocks: (page.footer?.contactBlocks || []).filter((x) => x.label),
+        },
       };
       const res = await api.put(`/landing-pages/${page._id}`, body);
       setPage(res.data);
@@ -139,8 +180,8 @@ export default function LandingEditor() {
   return (
     <div className="space-y-6 p-4 max-w-4xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold">Landing Page Images</h1>
-        <p className="text-sm text-muted-foreground">Images are stored permanently on Cloudinary and shown on the public home page.</p>
+        <h1 className="text-2xl font-bold">Landing Page</h1>
+        <p className="text-sm text-muted-foreground">Everything here (images, notices, branches, Chairman/Principal, footer) is shown on the public home page. Add, change or delete, then press Save changes.</p>
       </div>
 
       {msg && (
@@ -265,10 +306,157 @@ export default function LandingEditor() {
             </CardContent>
           </Card>
 
+          {/* ---------- Chairman / Principal ---------- */}
+          <Card>
+            <CardHeader>
+              <CardTitle>School intro, Chairman &amp; Principal</CardTitle>
+              <CardDescription>Text on the left, photos on the right. Add a message to show it below the photos.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Title</Label>
+                <Input value={page.leadership?.title || ""} onChange={(e) => setField("leadership", "title", e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea rows={6} value={page.leadership?.description || ""} onChange={(e) => setField("leadership", "description", e.target.value)} />
+              </div>
+              {(page.leadership?.members || []).map((m, i) => (
+                <div key={i} className="space-y-2 border-b pb-3">
+                  <div className="flex gap-2">
+                    <Input placeholder="Name" value={m.name || ""} onChange={(e) => setNestedItem("leadership", "members", i, { name: e.target.value })} />
+                    <Input placeholder="Designation (e.g. Chairman)" value={m.designation || ""} onChange={(e) => setNestedItem("leadership", "members", i, { designation: e.target.value })} />
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setNestedList("leadership", "members", (page.leadership?.members || []).filter((_, idx) => idx !== i))}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Textarea placeholder="Message (optional)" value={m.message || ""} onChange={(e) => setNestedItem("leadership", "members", i, { message: e.target.value })} />
+                  <ImageField label="Photo" value={m.photo} onChange={(u) => setNestedItem("leadership", "members", i, { photo: u })} folder="people" onError={err} />
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" onClick={() => setNestedList("leadership", "members", [...(page.leadership?.members || []), { name: "", designation: "", photo: "", message: "" }])}>
+                <Plus className="h-4 w-4" /> Add person
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* ---------- Notice board ---------- */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Notice board</CardTitle>
+              <CardDescription>Heading of the green notice board on the home page.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input placeholder="Heading (Our Notice Board)" value={page.noticeBoard?.title || ""} onChange={(e) => setField("noticeBoard", "title", e.target.value)} />
+                <Input placeholder="Small text under heading" value={page.noticeBoard?.subtitle || ""} onChange={(e) => setField("noticeBoard", "subtitle", e.target.value)} />
+              </div>
+              <p className="text-sm text-muted-foreground">
+                The notices themselves come automatically from the dashboard notice page (Notices). Add, edit or delete a notice there and it appears on the home page notice board (only notices for "All" audience).
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* ---------- Branches ---------- */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Our branches</CardTitle>
+              <CardDescription>Branch numbers (01, 02...) follow the order below.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Input placeholder="Section heading (Our Branch)" value={page.branchesTitle || ""} onChange={(e) => setPage((p) => ({ ...p, branchesTitle: e.target.value }))} />
+              {(page.branches || []).map((b, i) => (
+                <div key={i} className="space-y-2 border-b pb-3">
+                  <div className="flex gap-2">
+                    <Input placeholder="Branch name" value={b.name || ""} onChange={(e) => setListItem("branches", i, { name: e.target.value })} />
+                    <Input placeholder="Phone" className="w-48" value={b.phone || ""} onChange={(e) => setListItem("branches", i, { phone: e.target.value })} />
+                    <Button type="button" variant="ghost" size="sm" onClick={() => removeListItem("branches", i)}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Input placeholder="Address" value={b.address || ""} onChange={(e) => setListItem("branches", i, { address: e.target.value })} />
+                  <ImageField label="Branch photo" value={b.image} onChange={(u) => setListItem("branches", i, { image: u })} folder="branches" onError={err} />
+                </div>
+              ))}
+              <Button type="button" variant="outline" size="sm" onClick={() => addListItem("branches", { name: "", address: "", phone: "", image: "" })}>
+                <Plus className="h-4 w-4" /> Add branch
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* ---------- Footer ---------- */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Footer</CardTitle>
+              <CardDescription>Big green footer at the bottom of the home page.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <ImageField label="Background image (optional)" value={page.footer?.backgroundImage} onChange={(u) => setField("footer", "backgroundImage", u)} folder="footer" onError={err} />
+
+              <div className="space-y-2">
+                <Label>Top links (Get Appointment, Contact Us Today, Take a School Tour...)</Label>
+                <LinkList items={page.footer?.actions} onChange={(l) => setNestedList("footer", "actions", l)} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>About column</Label>
+                <Input placeholder="Heading (About us)" value={page.footer?.aboutTitle || ""} onChange={(e) => setField("footer", "aboutTitle", e.target.value)} />
+                <Textarea rows={4} placeholder="About text" value={page.footer?.aboutText || ""} onChange={(e) => setField("footer", "aboutText", e.target.value)} />
+                <div className="flex gap-2">
+                  <Input placeholder="Button text (Contact us)" value={page.footer?.aboutButtonText || ""} onChange={(e) => setField("footer", "aboutButtonText", e.target.value)} />
+                  <Input placeholder="Button link (#contact)" value={page.footer?.aboutButtonLink || ""} onChange={(e) => setField("footer", "aboutButtonLink", e.target.value)} />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Important links</Label>
+                <Input placeholder="Column heading (Important Link)" value={page.footer?.importantLinksTitle || ""} onChange={(e) => setField("footer", "importantLinksTitle", e.target.value)} />
+                <LinkList items={page.footer?.importantLinks} onChange={(l) => setNestedList("footer", "importantLinks", l)} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Services</Label>
+                <Input placeholder="Column heading (Services)" value={page.footer?.servicesTitle || ""} onChange={(e) => setField("footer", "servicesTitle", e.target.value)} />
+                <LinkList items={page.footer?.services} onChange={(l) => setNestedList("footer", "services", l)} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Contact info blocks (phone, working hours, help line, email...)</Label>
+                {(page.footer?.contactBlocks || []).map((c, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <Input className="w-56" placeholder="Heading" value={c.label || ""} onChange={(e) => setNestedItem("footer", "contactBlocks", i, { label: e.target.value })} />
+                    <Textarea rows={2} placeholder="Text (one item per line)" value={c.value || ""} onChange={(e) => setNestedItem("footer", "contactBlocks", i, { value: e.target.value })} />
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setNestedList("footer", "contactBlocks", (page.footer?.contactBlocks || []).filter((_, idx) => idx !== i))}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={() => setNestedList("footer", "contactBlocks", [...(page.footer?.contactBlocks || []), { label: "", value: "" }])}>
+                  <Plus className="h-4 w-4" /> Add block
+                </Button>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={page.footer?.showVisitorCounter !== false} onChange={(e) => setField("footer", "showVisitorCounter", e.target.checked)} />
+                Show visitor counter
+              </label>
+
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input placeholder="Facebook link" value={page.footer?.facebook || ""} onChange={(e) => setField("footer", "facebook", e.target.value)} />
+                <Input placeholder="Twitter link" value={page.footer?.twitter || ""} onChange={(e) => setField("footer", "twitter", e.target.value)} />
+                <Input placeholder="LinkedIn link" value={page.footer?.linkedin || ""} onChange={(e) => setField("footer", "linkedin", e.target.value)} />
+                <Input placeholder="YouTube link" value={page.footer?.youtube || ""} onChange={(e) => setField("footer", "youtube", e.target.value)} />
+              </div>
+
+              <Input placeholder="Copyright line (© 2026 ..., All Rights Reserved)" value={page.footer?.copyright || ""} onChange={(e) => setField("footer", "copyright", e.target.value)} />
+              <Input placeholder="Second line (Powered by ...)" value={page.footer?.poweredBy || ""} onChange={(e) => setField("footer", "poweredBy", e.target.value)} />
+            </CardContent>
+          </Card>
+
           {/* Sticky save bar: always visible at the bottom of the screen. Colours are explicit because landing.css
               redefines --primary and makes the default (bg-primary) Button invisible. */}
           <div className="sticky bottom-0 z-10 -mx-4 flex items-center justify-between gap-3 border-t bg-white/95 px-4 py-3 backdrop-blur dark:bg-gray-900/95">
-            <p className="text-xs text-muted-foreground">Text and image changes on this page are saved together.</p>
+            <p className="text-xs text-muted-foreground">All sections on this page are saved together.</p>
             <Button onClick={save} disabled={saving} className="bg-green-600 text-white hover:bg-green-700">
               {saving && <Loader2 className="h-4 w-4 animate-spin" />} Save changes
             </Button>

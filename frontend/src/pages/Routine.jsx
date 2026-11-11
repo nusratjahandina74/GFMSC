@@ -17,14 +17,15 @@ import {
 import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "../components/ui/dialog";
-import { Clock, MapPin, Plus, Edit, Trash2, Loader2, Printer, Check, X, Save, Table2 } from "lucide-react";
-import { getClassRoutine, getTeacherRoutine, createRoutine, updateRoutine, deleteRoutine, getAllSchools } from "../api/routines";
+import { Clock, MapPin, Plus, Edit, Trash2, Loader2, Printer, Check, X, Save, Table2, ShieldCheck, CalendarOff } from "lucide-react";
+import { getClassRoutine, getMyRoutine, createRoutine, updateRoutine, deleteRoutine, getAllSchools } from "../api/routines";
 import { getRoutineMatrix } from "../api/routineMatrix";
 import { getShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate } from "../api/shiftTemplates";
 import { getTeachers } from "../api/teachers";
 import { getClassSubjects } from "../api/classSubjects";
 import { CLASS_LIST, SECTION_LIST } from "../lib/constants";
 import { AuthContext } from "../App";
+import { prettyDate, prettyTime, dayLabelOf } from "../lib/examDates";
 
 const daysOfWeek = ["saturday", "sunday", "monday", "tuesday", "wednesday", "thursday"];
 const dayNames = {
@@ -35,6 +36,63 @@ const dayNames = {
   wednesday: "Wednesday",
   thursday: "Thursday",
 };
+const hhmmToMin = (t) => {
+  const m = String(t || "").match(/^(\d{1,2}):(\d{2})/);
+  return m ? parseInt(m[1], 10) * 60 + parseInt(m[2], 10) : null;
+};
+const timesTouch = (aS, aE, bS, bE) => {
+  const [a1, a2, b1, b2] = [aS, aE, bS, bE].map(hhmmToMin);
+  if ([a1, a2, b1, b2].some((v) => v === null)) return true; // can't tell -> treat as touching the duty
+  return a1 < b2 && b1 < a2;
+};
+// Today's weekday in Bangladesh time, as a routine day (Friday has no classes -> start on Saturday)
+const todayRoutineDay = () => {
+  const names = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const d = names[new Date(Date.now() + 6 * 3600 * 1000).getUTCDay()];
+  return d === "friday" ? "saturday" : d;
+};
+
+// Upcoming exams with their routine (subject / date / time) — read-only panel under the day tabs
+function UpcomingExamsPanel({ exams }) {
+  if (!exams || exams.length === 0) return null;
+  return (
+    <Card className="no-print border-sky-300 dark:border-sky-800">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base"><CalendarOff className="h-5 w-5" /> Upcoming exams — regular classes are off on exam days</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {exams.slice(0, 4).map((ex) => (
+          <div key={ex._id} className="border rounded-lg p-3">
+            <div className="flex flex-wrap justify-between gap-2">
+              <div className="font-semibold">{ex.title || ex.name} <span className="text-xs text-muted-foreground">({ex.className}{ex.section ? `-${ex.section}` : ""})</span></div>
+              <div className="text-sm text-muted-foreground">{prettyDate(ex.startDate)}{ex.endDate && ex.endDate !== ex.startDate ? ` → ${prettyDate(ex.endDate)}` : ""}</div>
+            </div>
+            {ex.schedule?.length > 0 ? (
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead><tr className="text-left text-muted-foreground"><th className="py-1 pr-3">Date</th><th className="py-1 pr-3">Day</th><th className="py-1 pr-3">Subject</th><th className="py-1">Time</th></tr></thead>
+                  <tbody>
+                    {ex.schedule.map((p, i) => (
+                      <tr key={i} className="border-t">
+                        <td className="py-1 pr-3 whitespace-nowrap">{prettyDate(p.date)}</td>
+                        <td className="py-1 pr-3">{dayLabelOf(p.date)}</td>
+                        <td className="py-1 pr-3 font-medium">{p.subject}</td>
+                        <td className="py-1 whitespace-nowrap">{prettyTime(p.startTime)} - {prettyTime(p.endTime)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground mt-1">Exam routine not published yet.</div>
+            )}
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
 // Shifts are no longer hardcoded — each school creates its own shifts
 // (e.g. "Morning Shift", "Day Shift") on the "Shift Time Slots" tab below.
 // This component fetches the school's live shift list from the backend.
@@ -70,7 +128,8 @@ export default function RoutinePage() {
 
   const [schools, setSchools] = useState([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState("");
-  const [activeDay, setActiveDay] = useState("saturday");
+  const [activeDay, setActiveDay] = useState(todayRoutineDay());
+  const [examInfo, setExamInfo] = useState(null); // exam-off days of this week, upcoming exams, teacher duties
   const fetchShiftTemplates = async () => {
     try {
       const list = await getShiftTemplates();
@@ -97,18 +156,16 @@ export default function RoutinePage() {
     try {
       let res;
       if (role === "teacher") {
-        const teacherId = user?.teacherId || user?._id;
-        if (!teacherId) {
-          setRoutine([]);
-          return;
-        }
-        res = await getTeacherRoutine(teacherId);
+        // the server resolves the logged-in teacher's profile itself
+        res = await getMyRoutine();
         setRoutine(res.data?.routine || []);
+        setExamInfo(res.data?.examInfo || null);
         return;
       }
 
       if (!className) {
         setRoutine([]);
+        setExamInfo(null);
         return;
       }
 
@@ -126,6 +183,7 @@ export default function RoutinePage() {
       res = await getClassRoutine(params);
       const routineData = Array.isArray(res.data?.routine) ? res.data.routine : [];
       setRoutine(routineData);
+      setExamInfo(res.data?.examInfo || null);
 
       const existingShifts = [
         ...new Set(routineData.map((item) => item?.shift).filter(Boolean)),
@@ -146,6 +204,7 @@ export default function RoutinePage() {
     } catch (err) {
       console.error("Fetch routine error:", err);
       setRoutine([]);
+      setExamInfo(null);
     } finally {
       setLoading(false);
     }
@@ -300,6 +359,14 @@ export default function RoutinePage() {
   };
 
   const getRoutineByDay = (day) => (routine || []).filter((item) => item?.day === day);
+
+  // ---- exam time: classes are OFF on the exam days of their class; teachers also see their exam duties ----
+  const sameScope = (a, b) => !a || !b || a === b;
+  const examOffFor = (item) =>
+    (examInfo?.weekOffs || []).find((o) => o.day === item?.day && o.className === item?.className && sameScope(o.section, item?.section));
+  const examOffsOn = (day) => (examInfo?.weekOffs || []).filter((o) => o.day === day);
+  const dutiesOn = (day) => (examInfo?.duties || []).filter((d) => d.inThisWeek && d.day === day);
+  const dutyClash = (item) => dutiesOn(item?.day).find((d) => timesTouch(item?.startTime, item?.endTime, d.startTime, d.endTime));
 
   const handlePrint = () => {
     window.print();
@@ -807,19 +874,61 @@ export default function RoutinePage() {
               {/* 🖥️ ১. শুধুমাত্র স্ক্রিন ভিউ (বর্তমানে সিলেক্ট করা দিনটি দেখাবে) */}
               <Card className="print:hidden">
                 <CardHeader>
-                  <CardTitle>{dayNames[activeDay]}</CardTitle>
+                  <CardTitle>
+                    {dayNames[activeDay]}
+                    {examInfo?.weekDates?.[activeDay] && (
+                      <span className="ml-2 text-sm font-normal text-muted-foreground">{prettyDate(examInfo.weekDates[activeDay])}</span>
+                    )}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
+                  {/* Exam day: regular classes of that class are off */}
+                  {examOffsOn(activeDay).map((o) => (
+                    <div key={`${o.examId}-${o.date}`} className="mb-4 p-4 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/20 text-amber-900 dark:text-amber-200">
+                      <div className="font-semibold flex items-center gap-2">
+                        <CalendarOff className="h-4 w-4" />
+                        Exam day — regular classes are off{role === "teacher" || isAdmin ? ` for ${o.className}${o.section ? `-${o.section}` : ""}` : ""}
+                      </div>
+                      <div className="text-sm mt-1">{o.title || o.name}</div>
+                      {o.papers?.length > 0 && (
+                        <ul className="text-sm mt-1 list-disc pl-5">
+                          {o.papers.map((p, i) => (
+                            <li key={i}>{p.subject}: {prettyTime(p.startTime)} - {prettyTime(p.endTime)}</li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                  {/* Teacher: exam duty on this day */}
+                  {dutiesOn(activeDay).map((d) => (
+                    <div key={d._id} className="mb-4 p-4 rounded-lg border border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20 text-emerald-900 dark:text-emerald-200">
+                      <div className="font-semibold flex items-center gap-2"><ShieldCheck className="h-4 w-4" /> Exam duty — {d.examTitle || d.examName}</div>
+                      <div className="text-sm mt-1">
+                        Room {d.room} · {d.className}{d.section ? `-${d.section}` : ""}
+                        {d.startTime && d.endTime ? ` · ${prettyTime(d.startTime)} - ${prettyTime(d.endTime)}` : ""}
+                      </div>
+                    </div>
+                  ))}
                   {(() => {
                     const dayRoutine = getRoutineByDay(activeDay).slice().sort((a, b) => (a.period || 0) - (b.period || 0));
                     return dayRoutine.length > 0 ? (
                       <div className="grid gap-3 md:grid-cols-3">
                         {dayRoutine.map((item) => (
-                          <Card key={item?._id || Math.random()}>
+                          <Card key={item?._id || Math.random()} className={examOffFor(item) ? "opacity-60 border-dashed" : ""}>
                             <CardContent className="p-4">
+                              {examOffFor(item) && (
+                                <div className="mb-2 inline-block text-xs font-semibold px-2 py-0.5 rounded bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+                                  Class off — exam day
+                                </div>
+                              )}
+                              {!examOffFor(item) && dutyClash(item) && (
+                                <div className="mb-2 inline-block text-xs font-semibold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300">
+                                  You are on exam duty at this time
+                                </div>
+                              )}
                               <div className="flex justify-between items-start">
                                 <div>
-                                  <div className="font-semibold text-lg">{item?.subject || "Unknown Subject"}</div>
+                                  <div className={`font-semibold text-lg ${examOffFor(item) ? "line-through" : ""}`}>{item?.subject || "Unknown Subject"}</div>
                                   <div className="text-xs text-muted-foreground">Period {item?.period ?? "-"} &middot; {item?.shift || "-"}</div>
                                 </div>
                                 {isAdmin && (
@@ -867,6 +976,8 @@ export default function RoutinePage() {
                 </CardContent>
               </Card>
 
+              <UpcomingExamsPanel exams={examInfo?.upcoming} />
+
               {/* 🖨️ ২. শুধুমাত্র প্রিন্ট ভিউ (সবগুলো দিন আলাদা পাতায় ল্যান্ডস্কেপ হবে) */}
               <div className="hidden print:block space-y-0">
                 {daysOfWeek.map((day) => {
@@ -876,6 +987,11 @@ export default function RoutinePage() {
                       <h2 className="text-2xl font-bold text-center mb-6 border-b-2 border-black pb-2 uppercase tracking-wider">
                         {dayNames[day]} Class Routine {className ? `(${className}${section ? ` - ${section}` : ""})` : ""}
                       </h2>
+                      {examOffsOn(day).length > 0 && (
+                        <div className="mb-4 p-3 border-2 border-gray-500 text-center font-bold">
+                          EXAM DAY — regular classes are off ({examOffsOn(day).map((o) => o.title || o.name).join(", ")})
+                        </div>
+                      )}
                       {dayRoutine.length > 0 ? (
                         <div className="grid grid-cols-3 gap-4">
                           {dayRoutine.map((item) => (

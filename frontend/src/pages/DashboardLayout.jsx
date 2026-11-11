@@ -14,6 +14,7 @@ import {
   Bell,
   Calendar,
   CalendarDays,
+  ShieldCheck,
   Loader2,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
@@ -143,6 +144,11 @@ function DashboardLayout() {
           name: "Exams",
           path: "/dashboard/exams",
           icon: FileText,
+        },
+        {
+          name: "Exam Duties",
+          path: "/dashboard/exam-duties",
+          icon: ShieldCheck,
         },
         ...(isClassTeacher
           ? [

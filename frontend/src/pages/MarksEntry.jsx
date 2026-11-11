@@ -30,6 +30,7 @@ import { Label } from "../components/ui/label";
 import { Loader2, Save } from "lucide-react";
 import { CLASS_LIST, SECTION_LIST } from "../lib/constants";
 import { getSubjectsForClass } from "../api/classSubjects";
+import { todayBD } from "../lib/examDates";
 
 // Class-wise bulk marks entry: pick Class, Section, Subject and Exam and
 // every enrolled student's row appears automatically with a single numeric
@@ -137,10 +138,19 @@ export default function MarksEntry() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [className, section]);
 
+  // Full / pass marks of the chosen subject in the chosen exam (from the exam routine; default 100 / 33)
+  const examPaper = (exams.find((x) => x._id === examId)?.schedule || []).find(
+    (p) => String(p.subject).trim().toLowerCase() === String(subject).trim().toLowerCase()
+  );
+  const fullMarks = examPaper?.fullMarks || 100;
+  const passMarks = examPaper?.passMarks ?? Math.round(fullMarks * 0.33);
+  const pickedExam = exams.find((x) => x._id === examId);
+  const deadlinePassed = !!pickedExam?.marksDeadline && pickedExam.marksDeadline < todayBD();
+
   const handleMarkChange = (studentId, value) => {
-    // Clamp to 0-100 as the student types
+    // Clamp to 0 - full marks of this paper as the user types
     let num = value === "" ? "" : Number(value);
-    if (num !== "" && num > 100) num = 100;
+    if (num !== "" && num > fullMarks) num = fullMarks;
     if (num !== "" && num < 0) num = 0;
     setMarksByStudent((prev) => ({ ...prev, [studentId]: num }));
   };
@@ -294,7 +304,12 @@ export default function MarksEntry() {
                 <CardTitle>
                   {className} {section && `- ${section}`} — {subject} Marks
                 </CardTitle>
-                <CardDescription>Enter a score (0-100) for each student. Blank rows are skipped on save.</CardDescription>
+                <CardDescription>Enter a score (0-{fullMarks}, pass {passMarks}) for each student. Blank rows are skipped on save.</CardDescription>
+                {deadlinePassed && (
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    The marks entry deadline ({pickedExam.marksDeadline}) has passed — only the school admin can save marks for this exam now.
+                  </p>
+                )}
               </CardHeader>
               <CardContent className="p-0">
                 {loadingStudents ? (
@@ -313,7 +328,7 @@ export default function MarksEntry() {
                         <TableRow>
                           <TableHead className="w-24">Roll</TableHead>
                           <TableHead>Name</TableHead>
-                          <TableHead className="w-40 text-right">Marks (0-100)</TableHead>
+                          <TableHead className="w-40 text-right">Marks (0-{fullMarks})</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -325,7 +340,7 @@ export default function MarksEntry() {
                               <Input
                                 type="number"
                                 min="0"
-                                max="100"
+                                max={fullMarks}
                                 value={marksByStudent[s._id] ?? ""}
                                 onChange={(e) => handleMarkChange(s._id, e.target.value)}
                                 className="w-24 ml-auto text-right"

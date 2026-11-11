@@ -19,6 +19,7 @@ router.use(authMiddleware(["schoolAdmin", "teacher", "student", "superAdmin"]));
 router.post("/", authMiddleware(["schoolAdmin", "superAdmin"]), createRoutine);
 router.get("/class", getClassRoutine);
 router.get("/matrix", getRoutineMatrix);
+router.get("/my", getTeacherRoutine); // logged-in teacher's own routine (resolved server-side)
 router.get("/teacher/:teacherId", getTeacherRoutine);
 router.patch("/:routineId", authMiddleware(["schoolAdmin", "superAdmin"]), updateRoutine);
 router.delete("/:routineId", authMiddleware(["schoolAdmin", "superAdmin"]), deleteRoutine);

@@ -28,6 +28,7 @@ import AdminClassSubjects from "./pages/admin/ClassSubjects";
 import AdminClassTeachers from "./pages/admin/ClassTeachers";
 import ExamsPage from "./pages/ExamsPage";
 import ExamDuties from "./pages/admin/ExamDuties";
+import MyExamDuties from "./pages/teacher/MyExamDuties";
 import AdminLeaves from "./pages/admin/Leaves";
 import AdminFeesDues from "./pages/admin/FeesDues";
 import MarksEntry from "./pages/MarksEntry";
@@ -511,6 +512,14 @@ export default function App() {
               element={
                 <RequireRole allowedRoles={["student", "teacher", "schoolAdmin", "superAdmin"]}>
                   <Routine />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="exam-duties"
+              element={
+                <RequireRole allowedRoles={["teacher"]}>
+                  <MyExamDuties />
                 </RequireRole>
               }
             />

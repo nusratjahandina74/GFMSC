@@ -24,6 +24,17 @@ const schoolSchema = new mongoose.Schema(
     plan: { type: String, enum: ["FREE", "BASIC", "PREMIUM"], default: "FREE" },
     subscriptionExpiresAt: { type: Date, default: null },
 
+    // Per-school exam rules (each school sets its own terms, default marks and grading scale)
+    examSettings: {
+      terms: { type: [String], default: [] }, // e.g. ["2026", "2027"]; empty = last 2 years + next year
+      defaultFullMarks: { type: Number, default: 100, min: 1, max: 1000 },
+      defaultPassPercent: { type: Number, default: 33, min: 0, max: 100 },
+      gradingScale: {
+        type: [{ _id: false, min: Number, grade: String, gpa: Number }],
+        default: [], // empty = the standard A+ ... F scale
+      },
+    },
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User", // superAdmin

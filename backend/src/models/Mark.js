@@ -13,6 +13,7 @@ const markSchema = new mongoose.Schema(
     practical: { type: Number, default: 0 },
 
     total: { type: Number, default: 0 },
+    fullMarks: { type: Number, default: 100 }, // full marks of this subject in this exam (default 100)
     grade: { type: String, default: "" },
     gpa: { type: Number, default: 0 },
 

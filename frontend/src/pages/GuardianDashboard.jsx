@@ -3,11 +3,66 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Loader2, Users, Calendar, BookOpen, CheckCircle2, XCircle, DollarSign, Clock } from "lucide-react";
 import api from "../api/client";
+import { getExamInfo } from "../api/exams";
+import { dayLabelOf, prettyDate, prettyTime, examTypeLabel } from "../lib/examDates";
+
+// Exam day / upcoming exam routine (with the child's seat) of ONE child
+function ChildExams({ info }) {
+  if (!info) return null;
+  const todayOff = (info.weekOffs || []).find((o) => o.date === info.today);
+  const upcoming = info.upcoming || [];
+  if (!todayOff && upcoming.length === 0) return null;
+  return (
+    <div>
+      <h4 className="text-lg font-semibold mb-3 flex items-center gap-2">
+        <BookOpen className="h-4 w-4" />
+        Exams
+      </h4>
+      {todayOff && (
+        <div className="mb-3 p-3 rounded-lg border border-amber-400 bg-amber-50 dark:bg-amber-900/20 text-amber-900 dark:text-amber-200 text-sm">
+          Exam day today — regular classes are off ({todayOff.title || todayOff.name}).
+        </div>
+      )}
+      <div className="space-y-3">
+        {upcoming.map((ex) => (
+          <div key={ex._id} className="border rounded-lg p-3">
+            <div className="font-semibold">
+              {ex.title || ex.name} <span className="text-xs text-muted-foreground">({examTypeLabel(ex.examType)} · {prettyDate(ex.startDate)}{ex.endDate && ex.endDate !== ex.startDate ? ` → ${prettyDate(ex.endDate)}` : ""})</span>
+            </div>
+            {ex.seat && <div className="text-xs mt-1">Seat: Room {ex.seat.room}, seat {ex.seat.seatNo}</div>}
+            {(ex.schedule || []).length > 0 ? (
+              <div className="overflow-x-auto mt-2">
+                <Table>
+                  <TableHeader>
+                    <TableRow><TableHead>Date</TableHead><TableHead>Subject</TableHead><TableHead>Time</TableHead><TableHead>Marks</TableHead></TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {ex.schedule.map((p, i) => (
+                      <TableRow key={i}>
+                        <TableCell className="whitespace-nowrap">{prettyDate(p.date)} ({dayLabelOf(p.date)})</TableCell>
+                        <TableCell className="font-medium">{p.subject}</TableCell>
+                        <TableCell className="whitespace-nowrap">{prettyTime(p.startTime)} - {prettyTime(p.endTime)}</TableCell>
+                        <TableCell>{p.fullMarks || 100}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground mt-1">Exam routine not published yet.</div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function GuardianDashboard() {
   const [data, setData] = useState(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(true);
+  const [examsByChild, setExamsByChild] = useState({}); // childId -> exam info (exam days, upcoming routine, seat)
 
   useEffect(() => {
     let isMounted = true;
@@ -23,6 +78,12 @@ export default function GuardianDashboard() {
       }
     };
     fetchData();
+    // exam info is a bonus: a failure here must never break the dashboard
+    getExamInfo()
+      .then((r) => {
+        if (isMounted) setExamsByChild(Object.fromEntries((r.data?.children || []).map((c) => [String(c.studentId), c.info])));
+      })
+      .catch(() => {});
 
     return () => {
       isMounted = false;
@@ -224,6 +285,7 @@ export default function GuardianDashboard() {
                   </div>
                 </div>
               )}
+              <ChildExams info={examsByChild[String(child._id)]} />
             </CardContent>
           </Card>
         ))

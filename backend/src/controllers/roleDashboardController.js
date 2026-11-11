@@ -10,6 +10,9 @@ import Routine from "../models/Routine.js";
 import ClassTeacher from "../models/ClassTeacher.js";
 import ClassSubject from "../models/ClassSubject.js";
 import { calculateGrade } from "../utils/grade.js";
+import ExamDuty from "../models/ExamDuty.js";
+import ExamSeat from "../models/ExamSeat.js";
+import { bdToday, dayNameOf, buildExamInfo } from "../utils/examSchedule.js";
 
 export const schoolAdminDashboard = async (req, res) => {
   try {
@@ -263,13 +266,42 @@ export const teacherDashboard = async (req, res) => {
       }));
       upcomingExams = await Exam.find({
         schoolId,
-        date: { $gte: todayStr },
-        $or: examOrConditions,
+        $and: [
+          { $or: [{ endDate: { $gte: bdToday() } }, { date: { $gte: bdToday() } }] },
+          { $or: examOrConditions },
+        ],
       })
-        .sort({ date: 1, createdAt: 1 })
+        .sort({ startDate: 1, date: 1, createdAt: 1 })
         .limit(5)
-        .select("name term date className")
+        .select("name title term date startDate endDate className section")
         .lean();
+    }
+
+    // Exam duties assigned to this teacher: today's + the next ones, so the portal can say "you have exam duty today"
+    let examDuties = { today: bdToday(), todayDuties: [], upcoming: [] };
+    if (teacher?._id) {
+      const dutyRows = await ExamDuty.find({ schoolId, teacherId: teacher._id, date: { $gte: bdToday() } })
+        .populate("examId", "name title")
+        .sort({ date: 1, startTime: 1 })
+        .limit(30)
+        .lean();
+      const shaped = dutyRows.map((d) => ({
+        _id: d._id,
+        examName: d.examId?.name || "Exam",
+        examTitle: d.examId?.title || "",
+        room: d.room,
+        className: d.className,
+        section: d.section || "",
+        date: d.date,
+        day: d.date ? dayNameOf(d.date) : "",
+        startTime: d.startTime || "",
+        endTime: d.endTime || "",
+      }));
+      examDuties = {
+        today: bdToday(),
+        todayDuties: shaped.filter((d) => d.date === bdToday()),
+        upcoming: shaped.filter((d) => d.date > bdToday()).slice(0, 5),
+      };
     }
 
     const leaveBalance = {
@@ -286,6 +318,7 @@ export const teacherDashboard = async (req, res) => {
       assignedSubjects,
       todayAttendancePct,
       upcomingExams,
+      examDuties,
       leaveBalance,
     });
   } catch (error) {
@@ -455,6 +488,26 @@ export const studentDashboard = async (req, res) => {
         .lean();
     }
 
+    // Exam time: regular classes are off on this class's exam days; also hand over the upcoming exam routine
+    let examToday = null;
+    let upcomingExams = [];
+    try {
+      const info = await buildExamInfo({ schoolId, className: student.className, section: student.section || "", forStudents: true });
+      const off = (info.weekOffs || []).find((o) => o.date === info.today);
+      if (off) {
+        examToday = off;
+        todayRoutine = [];
+      }
+      upcomingExams = (info.upcoming || []).slice(0, 3);
+      if (upcomingExams.length) {
+        const seats = await ExamSeat.find({ studentId: student._id, examId: { $in: upcomingExams.map((x) => x._id) } }).lean();
+        const seatOf = Object.fromEntries(seats.map((x) => [String(x.examId), { room: x.room, seatNo: x.seatNo }]));
+        upcomingExams = upcomingExams.map((x) => ({ ...x, seat: seatOf[String(x._id)] || null }));
+      }
+    } catch (e) {
+      console.error("[studentDashboard] exam info failed:", e);
+    }
+
     res.json({
       student,
       attendanceRate,
@@ -462,6 +515,8 @@ export const studentDashboard = async (req, res) => {
       totalDue,
       latestMarks,
       todayRoutine,
+      examToday,
+      upcomingExams,
     });
   } catch (error) {
     console.error("[studentDashboard] error:", error);
@@ -498,7 +553,7 @@ export const guardianDashboard = async (req, res) => {
           return { _id: doc._id, date: doc.date, status: rec?.status || "unknown" };
         });
 
-        const latestExam = await Exam.findOne({ schoolId, className: child.className }).sort({ date: -1 });
+        const latestExam = await Exam.findOne({ schoolId, className: child.className, $or: [{ examType: { $ne: "Surprise Test" } }, { startDate: { $lte: bdToday() } }] }).sort({ date: -1 });
         const marks = latestExam
           ? await Mark.find({ examId: latestExam._id, studentId: child._id })
           : [];

@@ -247,6 +247,7 @@ export const getReportCard = async (req, res) => {
 
     const totalSubjects = marks.length;
     const totalMarks = marks.reduce((sum, m) => sum + (m.total || 0), 0);
+    const fullTotal = marks.reduce((sum, m) => sum + (m.fullMarks || 100), 0); // papers can have their own full marks
     const hasFailedSubject = marks.some((m) => m.grade === "F");
     // Bangladeshi convention: failing even one subject fails the whole exam
     // and the reported GPA becomes 0.00, regardless of the other subjects.
@@ -268,6 +269,8 @@ export const getReportCard = async (req, res) => {
       summary: {
         totalSubjects,
         totalMarks,
+        fullTotal,
+        percentage: fullTotal > 0 ? Number(((totalMarks / fullTotal) * 100).toFixed(2)) : 0,
         gpa: gpaAvg,
         result: hasFailedSubject ? "Fail" : "Pass",
       },

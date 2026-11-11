@@ -195,7 +195,7 @@ export default function ReportCard() {
                   </div>
                   <div className="p-4 bg-green-50 dark:bg-green-900/30 rounded-lg">
                     <div className="text-sm text-gray-600 dark:text-gray-300">Total Marks</div>
-                    <div className="text-3xl font-bold">{data?.summary?.totalMarks || 0}</div>
+                    <div className="text-3xl font-bold">{data?.summary?.totalMarks || 0}{data?.summary?.fullTotal ? <span className="text-base font-normal text-muted-foreground"> / {data.summary.fullTotal}{data.summary.percentage !== undefined ? ` (${data.summary.percentage}%)` : ""}</span> : null}</div>
                   </div>
                   <div className="p-4 bg-purple-50 dark:bg-purple-900/30 rounded-lg">
                     <div className="text-sm text-gray-600 dark:text-gray-300">GPA</div>
@@ -212,6 +212,7 @@ export default function ReportCard() {
                         <th className="p-3 text-center border">MCQ</th>
                         <th className="p-3 text-center border">Practical</th>
                         <th className="p-3 text-center border">Total</th>
+                        <th className="p-3 text-center border">Full</th>
                         <th className="p-3 text-center border">Grade</th>
                         <th className="p-3 text-center border">GPA</th>
                       </tr>
@@ -224,6 +225,7 @@ export default function ReportCard() {
                           <td className="p-3 text-center border">{m?.mcq || 0}</td>
                           <td className="p-3 text-center border">{m?.practical || 0}</td>
                           <td className="p-3 text-center font-semibold border">{m?.total || 0}</td>
+                          <td className="p-3 text-center border">{m?.fullMarks || 100}</td>
                           <td className="p-3 text-center border">{m?.grade || "-"}</td>
                           <td className="p-3 text-center border">{m?.gpa || 0}</td>
                         </tr>

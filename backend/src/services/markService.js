@@ -6,6 +6,7 @@ import Teacher from "../models/Teacher.js";
 import ClassTeacher from "../models/ClassTeacher.js";
 import ClassSubject from "../models/ClassSubject.js";
 import { calculateGrade } from "../utils/grade.js";
+import { getSchoolExamDefaults, bdToday } from "../utils/examSchedule.js";
 import { withTxn } from "../utils/txn.js";
 import { audit } from "../utils/audit.js";
 
@@ -20,13 +21,21 @@ export class MarkError extends Error {
   constructor(status, message, extra) { super(message); this.status = status; this.extra = extra; }
 }
 
-const toScore = (v, label) => {
+const toScore = (v, label, max = MAX_TOTAL) => {
   if (v === undefined || v === null || v === "") return 0;
   const n = typeof v === "number" ? v : Number(String(v).trim());
   if (!Number.isFinite(n)) throw new Error(`${label} must be a number`);
   if (n < 0) throw new Error(`${label} cannot be negative`);
-  if (n > MAX_TOTAL) throw new Error(`${label} cannot exceed ${MAX_TOTAL}`);
+  if (n > max) throw new Error(`${label} cannot exceed ${max}`);
   return Math.round(n * 100) / 100;
+};
+
+// Full / pass marks of one subject in this exam: from the exam routine row, else the school defaults (100 / 33%).
+const paperMarks = (exam, subject, defaults) => {
+  const row = (exam.schedule || []).find((p) => String(p.subject).trim().toLowerCase() === String(subject).trim().toLowerCase());
+  const fullMarks = row?.fullMarks || defaults.defaultFullMarks || MAX_TOTAL;
+  const passMarks = row?.passMarks ?? Math.round((fullMarks * (defaults.defaultPassPercent ?? 33)) / 100);
+  return { fullMarks, passMarks };
 };
 
 export const loadExamForUser = async (req, examId) => {
@@ -56,8 +65,14 @@ export const saveMarks = async (req, examId, rows) => {
   const exam = await loadExamForUser(req, examId);
   // Published exams are LOCKED for teachers (results are out); only admins may still correct them (audited).
   if (exam.isPublished && req.user.role === "teacher") throw new MarkError(423, "This exam's results are published and locked. Ask the school admin to unpublish or correct the mark.");
+  // Marks entry deadline: teachers can't enter after it; admins still can (recorded as a late entry in the audit log).
+  const lateEntry = Boolean(exam.marksDeadline) && bdToday() > exam.marksDeadline;
+  if (lateEntry && req.user.role === "teacher") {
+    throw new MarkError(423, `The marks entry deadline (${exam.marksDeadline}) has passed. Ask the school admin to enter or reopen it.`);
+  }
   const canEnter = await makeAuthorizer(req, exam);
   const schoolId = exam.schoolId;
+  const defaults = await getSchoolExamDefaults(schoolId);
 
   const cs = await ClassSubject.findOne({ schoolId, className: exam.className }).lean();
   const allowedSubjects = cs?.subjects?.length ? new Set(cs.subjects.map((s) => (typeof s === "string" ? s : s.subjectName))) : null;
@@ -84,15 +99,17 @@ export const saveMarks = async (req, examId, rows) => {
     const key = `${student._id}|${subject}`;
     if (seen.has(key)) { fail("Duplicate student/subject row in the same request"); continue; }
 
+    const { fullMarks, passMarks } = paperMarks(exam, subject, defaults);
     let parts;
     try {
-      parts = Object.fromEntries(PART_KEYS.map((k) => [k, toScore(row[k], k)]));
+      parts = Object.fromEntries(PART_KEYS.map((k) => [k, toScore(row[k], k, fullMarks)]));
       var total = Math.round((parts.written + parts.mcq + parts.practical) * 100) / 100;
-      if (total > MAX_TOTAL) throw new Error(`total (${total}) cannot exceed ${MAX_TOTAL}`);
+      if (total > fullMarks) throw new Error(`total (${total}) cannot exceed the full marks (${fullMarks})`);
     } catch (e) { fail(e.message); continue; }
     seen.add(key); // only a row that PASSED validation reserves the student/subject slot
-    const { grade, gpa } = calculateGrade(total);
-    clean.push({ studentId: student._id, subject, ...parts, total, grade, gpa });
+    // grade is worked out on the PERCENTAGE of the paper's full marks; below the pass marks is always an F
+    const { grade, gpa } = total < passMarks ? { grade: "F", gpa: 0 } : calculateGrade((total / fullMarks) * 100, defaults.gradingScale);
+    clean.push({ studentId: student._id, subject, ...parts, total, fullMarks, grade, gpa });
   }
 
   let saved = [];
@@ -114,7 +131,7 @@ export const saveMarks = async (req, examId, rows) => {
   }
   if (saved.length) {
     await audit(req, "marks.saved", { schoolId, entityType: "Exam", entityId: exam._id, summary: `${saved.length} mark(s) saved for ${exam.name} (${exam.className})`,
-      meta: { saved: saved.length, rejected: failed.length, subjects: [...new Set(clean.map((c) => c.subject))] } });
+      meta: { saved: saved.length, rejected: failed.length, lateEntry, subjects: [...new Set(clean.map((c) => c.subject))] } });
   }
   return { exam, saved, failed };
 };

@@ -3,6 +3,17 @@ import Routine from "../models/Routine.js";
 import Teacher from "../models/Teacher.js";
 import ShiftTemplate from "../models/ShiftTemplate.js";
 import { tenantIdFor } from "../utils/tenant.js";
+import { buildExamInfo } from "../utils/examSchedule.js";
+
+// Exam-off days / exam routine / duties for the routine screens. Never allowed to break the routine itself.
+const safeExamInfo = async (args) => {
+  try {
+    return await buildExamInfo(args);
+  } catch (err) {
+    console.error("Exam info for routine failed:", err);
+    return null;
+  }
+};
 
 const daysOfWeek = [
   "saturday",
@@ -218,8 +229,11 @@ export const getClassRoutine = async (req, res) => {
       })
       .populate("teacherId", "name subject email phone shift");
 
+    const examInfo = await safeExamInfo({ schoolId: targetSchoolId, className, section: section || "", forStudents: req.user?.role === "student" });
+
     return res.json({
       routine,
+      examInfo,
     });
   } catch (err) {
     console.error("Get class routine error:", err);
@@ -232,10 +246,18 @@ export const getClassRoutine = async (req, res) => {
 
 export const getTeacherRoutine = async (req, res) => {
   try {
-    const { teacherId } = req.params;
+    let { teacherId } = req.params;
     const { shift } = req.query;
 
     const targetSchoolId = getTargetSchoolId(req);
+
+    // A teacher always gets THEIR OWN routine: the login only knows the user id, not the teacher-profile id,
+    // so resolve the profile here instead of trusting whatever id the browser sent.
+    if (req.user?.role === "teacher") {
+      const own = await Teacher.findOne({ userId: req.user.userId, schoolId: targetSchoolId }).select("_id").lean();
+      if (!own) return res.status(404).json({ message: "Teacher profile not found for this account." });
+      teacherId = String(own._id);
+    }
 
     if (!teacherId) {
       return res.status(400).json({
@@ -277,8 +299,11 @@ export const getTeacherRoutine = async (req, res) => {
       })
       .populate("teacherId", "name subject email phone shift");
 
+    const examInfo = await safeExamInfo({ schoolId: targetSchoolId, teacherId: teacher._id });
+
     return res.json({
       routine,
+      examInfo,
     });
   } catch (err) {
     console.error("Get teacher routine error:", err);

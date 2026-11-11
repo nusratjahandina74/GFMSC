@@ -15,10 +15,14 @@ import {
   Pencil,
   ClipboardCheck,
   Plane,
+  ShieldCheck,
+  MapPin,
+  Clock,
 } from "lucide-react";
 import api from "../api/client";
 import { getUser } from "../api/auth";
 import SelfCheckInCard from "../components/SelfCheckInCard";
+import { dayLabelOf, prettyDate, prettyTime } from "../lib/examDates";
 
 export default function TeacherDashboard() {
   const [data, setData] = useState(null);
@@ -73,6 +77,8 @@ export default function TeacherDashboard() {
   const myClasses = data?.myClasses ?? [];
   const myStudents = data?.myStudents ?? [];
   const upcomingExams = data?.upcomingExams ?? [];
+  const todayDuties = data?.examDuties?.todayDuties ?? [];
+  const upcomingDuties = data?.examDuties?.upcoming ?? [];
   const leaveTotal = (leaveBalance.casual ?? 0) + (leaveBalance.sick ?? 0) - (leaveBalance.taken ?? 0);
 
   const formatDate = (dateStr) => {
@@ -100,6 +106,31 @@ export default function TeacherDashboard() {
       </div>
 
       <SelfCheckInCard />
+
+      {(todayDuties.length > 0 || upcomingDuties.length > 0) && (
+        <Card className={todayDuties.length > 0 ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-900/10" : ""}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5" />
+              {todayDuties.length > 0 ? "You have exam duty today" : "Your next exam duty"}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {(todayDuties.length > 0 ? todayDuties : upcomingDuties.slice(0, 3)).map((d) => (
+              <div key={d._id} className="flex flex-wrap items-center gap-x-5 gap-y-1 text-sm border rounded-md p-3 bg-background">
+                <span className="font-semibold">{d.examTitle || d.examName}</span>
+                <span>{prettyDate(d.date)} ({dayLabelOf(d.date)})</span>
+                <span className="flex items-center gap-1"><MapPin className="h-4 w-4" /> Room {d.room}</span>
+                <span>Class {d.className}{d.section ? `-${d.section}` : ""}</span>
+                {d.startTime && d.endTime && (
+                  <span className="flex items-center gap-1"><Clock className="h-4 w-4" /> {prettyTime(d.startTime)} - {prettyTime(d.endTime)}</span>
+                )}
+              </div>
+            ))}
+            <Link to="/dashboard/exam-duties" className="text-sm text-emerald-700 dark:text-emerald-400 underline">See all my exam duties</Link>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
@@ -206,7 +237,7 @@ export default function TeacherDashboard() {
                 <TableBody>
                   {upcomingExams.map((exam, i) => (
                     <TableRow key={i}>
-                      <TableCell className="font-medium">{formatDate(exam.date)}</TableCell>
+                      <TableCell className="font-medium">{formatDate(exam.startDate || exam.date)}{exam.endDate && exam.endDate !== (exam.startDate || exam.date) ? ` → ${formatDate(exam.endDate)}` : ""}</TableCell>
                       <TableCell>{exam.name || "-"}</TableCell>
                       <TableCell>{exam.term || "-"}</TableCell>
                       <TableCell>{exam.className || "-"}</TableCell>

@@ -365,7 +365,8 @@ export const getSuperAdminDues = async (req, res) => {
 export const getSuperAdminLeaves = async (req, res) => {
   try {
     const { schoolId, status } = req.query;
-    const filter = {};
+    // Only 2+ day leaves are escalated to the Super Admin; 1-day leaves are handled by each school's admin.
+    const filter = { durationDays: { $gt: 1 } };
     if (schoolId) filter.schoolId = schoolId;
     if (status) filter.status = status;
 
@@ -392,6 +393,9 @@ export const updateSuperAdminLeaveStatus = async (req, res) => {
 
     const leave = await Leave.findById(id);
     if (!leave) return res.status(404).json({ message: "Leave request not found" });
+    if (!(Number(leave.durationDays) > 1)) {
+      return res.status(403).json({ message: "A 1-day leave is handled by the school admin, not the Super Admin." });
+    }
 
     leave.status = status;
     leave.approvedBy = req.user.userId;

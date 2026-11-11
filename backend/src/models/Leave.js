@@ -20,6 +20,11 @@ const leaveSchema = new mongoose.Schema({
   endDate: { type: Date, required: true },
   durationDays: { type: Number, required: true },
   reason: { type: String, required: true },
+  // Optional supporting pictures (medical certificate, prescription, etc.) uploaded to Cloudinary.
+  documents: {
+    type: [{ url: { type: String, required: true }, publicId: { type: String } }],
+    default: [],
+  },
   status: {
     type: String,
     enum: ["Pending", "Approved", "Rejected"],
@@ -35,6 +40,9 @@ const leaveSchema = new mongoose.Schema({
     required: true
   }
 }, { timestamps: true });
+
+leaveSchema.index({ schoolId: 1, createdAt: -1 });
+leaveSchema.index({ durationDays: 1, status: 1, createdAt: -1 });
 
 const Leave = mongoose.model("Leave", leaveSchema);
 

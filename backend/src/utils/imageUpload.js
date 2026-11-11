@@ -73,3 +73,41 @@ export const uploadFilesToCloudinary = async (files, folder) => {
 
 export const destroyCloudinaryAsset = (publicId) =>
   cloudinary.uploader.destroy(publicId, { resource_type: "image", invalidate: true });
+
+// ---- Leave supporting documents (teacher/staff attach a medical paper etc. while applying) ----
+export const MAX_LEAVE_DOCS = 3;
+
+const leaveUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_BYTES, files: MAX_LEAVE_DOCS },
+  fileFilter: (req, file, cb) => {
+    if (!/^image\/(jpeg|png|webp)$/.test(file.mimetype)) {
+      const err = new Error("Only JPG, PNG or WEBP pictures can be attached.");
+      err.status = 400;
+      return cb(err);
+    }
+    cb(null, true);
+  },
+});
+
+// Accepts up to 3 pictures in the multipart field "documents". A plain JSON request (no files) passes straight through.
+export const uploadLeaveDocuments = (req, res, next) => {
+  if (!req.is("multipart/form-data")) return next();
+  leaveUpload.array("documents", MAX_LEAVE_DOCS)(req, res, (err) => {
+    if (!err) return next();
+    let status = err.status || 400;
+    let message = err.message;
+    if (err instanceof multer.MulterError) {
+      if (err.code === "LIMIT_FILE_SIZE") {
+        status = 413;
+        message = `Each picture must be ${MAX_BYTES / 1024 / 1024}MB or smaller.`;
+      } else if (err.code === "LIMIT_FILE_COUNT" || err.code === "LIMIT_UNEXPECTED_FILE") {
+        message = `You can attach up to ${MAX_LEAVE_DOCS} pictures.`;
+      }
+    } else if (!err.status) {
+      status = 500;
+      message = "Upload failed. Please try again.";
+    }
+    return res.status(status).json({ success: false, message });
+  });
+};

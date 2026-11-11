@@ -10,6 +10,7 @@ import { Plus, Loader2, Building2, Pencil, Trash2, Lock, Unlock, Users2 } from "
 import { listSchools, createSchool, updateSchool, deleteSchool } from "../../api/schools";
 import { listAllUsers, updateUserStatus, deleteUserAccount, updateAnyAccount } from "../../api/userManagement";
 import CredentialsModal from "../../components/CredentialsModal";
+import AdminLeaves from "./Leaves";
 import api from "../../api/client";
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
@@ -78,8 +79,6 @@ const SuperAdminPanel = () => {
   const [duesData, setDuesData] = useState([]);
   const [totalDue, setTotalDue] = useState(0);
   const [duesLoading, setDuesLoading] = useState(false);
-  const [leavesData, setLeavesData] = useState([]);
-  const [leavesLoading, setLeavesLoading] = useState(false);
 
   const loadAnalytics = async () => {
     setAnalyticsLoading(true);
@@ -131,33 +130,11 @@ const SuperAdminPanel = () => {
     }
   };
 
-  const loadSuperAdminLeaves = async () => {
-    setLeavesLoading(true);
-    try {
-      const res = await api.get("/dashboard/super-admin/leaves");
-      setLeavesData(res.data.leaves || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLeavesLoading(false);
-    }
-  };
-
-  const handleUpdateLeaveStatus = async (id, status) => {
-    try {
-      await api.patch(`/dashboard/super-admin/leaves/${id}`, { status });
-      await loadSuperAdminLeaves();
-    } catch (err) {
-      alert(err?.response?.data?.message || "Failed to update leave status");
-    }
-  };
-
   useEffect(() => {
     if (tab === "analytics") loadAnalytics();
     if (tab === "results") loadSuperAdminResults();
     if (tab === "attendance") loadSuperAdminAttendance();
     if (tab === "dues") loadSuperAdminDues();
-    if (tab === "leaves") loadSuperAdminLeaves();
   }, [tab]);
 
 // const loadUsers = async (selectedRole = "all", pageNum = 1) => {
@@ -1021,67 +998,15 @@ const SuperAdminPanel = () => {
       )}
 
       {tab === "leaves" && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Teacher & Staff Leave Approvals</CardTitle>
-            <CardDescription>Approve or reject leave applications submitted by teachers or staff</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {leavesLoading ? (
-              <div className="p-6 text-center text-gray-500"><Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" /> Loading leave applications...</div>
-            ) : leavesData.length === 0 ? (
-              <div className="p-6 text-center text-gray-500">No leave applications submitted yet.</div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Applicant</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Dates</TableHead>
-                    <TableHead>Days</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Action</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {leavesData.map((lv) => (
-                    <TableRow key={lv._id}>
-                      <TableCell className="font-medium">{lv.applicantId?.name || "N/A"}</TableCell>
-                      <TableCell className="capitalize">{lv.role}</TableCell>
-                      <TableCell className="text-xs">{new Date(lv.startDate).toLocaleDateString()} - {new Date(lv.endDate).toLocaleDateString()}</TableCell>
-                      <TableCell>{lv.durationDays} day(s)</TableCell>
-                      <TableCell>{lv.reason}</TableCell>
-                      <TableCell>
-                        <span className={`px-2 py-1 rounded text-xs font-semibold ${lv.status === 'Approved' ? 'bg-green-100 text-green-800' : lv.status === 'Rejected' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                          {lv.status}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        {lv.status === "Pending" && (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleUpdateLeaveStatus(lv._id, "Approved")}
-                              className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold hover:bg-green-700 transition-all"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleUpdateLeaveStatus(lv._id, "Rejected")}
-                              className="bg-red-600 text-white px-2 py-1 rounded text-xs font-bold hover:bg-red-700 transition-all"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <div className="space-y-2">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Leave Approvals</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Leaves of 2 or more days from every school, school by school. 1-day leaves are handled by each school's admin.
+            </p>
+          </div>
+          <AdminLeaves embedded />
+        </div>
       )}
 
       <CredentialsModal

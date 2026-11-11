@@ -1,11 +1,15 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
 import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "../components/ui/dialog";
-import { Plus, Loader2, CheckCircle, XCircle, Clock, CalendarDays } from "lucide-react";
+import { Plus, Loader2, CheckCircle, XCircle, Clock, CalendarDays, Paperclip, X } from "lucide-react";
 import { getMyLeaves, applyForLeave } from "../api/leaves";
+
+const MAX_DOCS = 3;
+const MAX_MB = 5;
+const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export default function MyLeaves() {
   const [leaves, setLeaves] = useState([]);
@@ -14,6 +18,45 @@ export default function MyLeaves() {
   const [open, setOpen] = useState(false);
   const [msg, setMsg] = useState("");
   const [formData, setFormData] = useState({ reason: "", startDate: "", endDate: "" });
+  const [docs, setDocs] = useState([]); // [{ file, preview }]
+  const [docError, setDocError] = useState("");
+  const fileRef = useRef(null);
+
+  const clearDocs = () => {
+    setDocs((cur) => {
+      cur.forEach((d) => URL.revokeObjectURL(d.preview));
+      return [];
+    });
+    setDocError("");
+  };
+
+  const addDocs = (fileList) => {
+    const incoming = Array.from(fileList || []);
+    if (!incoming.length) return;
+    const problems = [];
+    const accepted = [];
+    let room = MAX_DOCS - docs.length;
+    for (const file of incoming) {
+      if (!ALLOWED_TYPES.includes(file.type)) problems.push(`${file.name}: only JPG, PNG or WEBP pictures are allowed.`);
+      else if (file.size > MAX_MB * 1024 * 1024) problems.push(`${file.name}: larger than ${MAX_MB}MB.`);
+      else if (room <= 0) problems.push(`${file.name}: you can attach up to ${MAX_DOCS} pictures.`);
+      else {
+        room -= 1;
+        accepted.push({ file, preview: URL.createObjectURL(file) });
+      }
+    }
+    setDocError(problems.join(" "));
+    if (accepted.length) setDocs((cur) => [...cur, ...accepted]);
+    if (fileRef.current) fileRef.current.value = ""; // allow picking the same file again
+  };
+
+  const removeDoc = (index) => {
+    setDocs((cur) => {
+      URL.revokeObjectURL(cur[index].preview);
+      return cur.filter((_, i) => i !== index);
+    });
+    setDocError("");
+  };
 
   const load = async () => {
     setLoading(true);
@@ -44,10 +87,11 @@ export default function MyLeaves() {
     setSubmitting(true);
     setMsg("");
     try {
-      await applyForLeave(formData);
-      setMsg("✅ Leave application submitted");
+      const res = await applyForLeave(formData, docs.map((d) => d.file));
+      setMsg(`✅ ${res?.data?.message || "Leave application submitted"}`);
       setOpen(false);
       setFormData({ reason: "", startDate: "", endDate: "" });
+      clearDocs();
       await load();
     } catch (err) {
       setMsg(err?.response?.data?.message || err.message);
@@ -88,10 +132,19 @@ export default function MyLeaves() {
           </h1>
           <p className="text-muted-foreground mt-1">Apply for leave and track the status of your requests</p>
         </div>
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog
+          open={open}
+          onOpenChange={(v) => {
+            setOpen(v);
+            if (!v) clearDocs();
+          }}
+        >
           <DialogTrigger asChild>
             <button
-              onClick={() => setFormData({ reason: "", startDate: "", endDate: "" })}
+              onClick={() => {
+                setFormData({ reason: "", startDate: "", endDate: "" });
+                clearDocs();
+              }}
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2"
             >
               <Plus className="h-4 w-4" /> Apply for Leave
@@ -123,7 +176,10 @@ export default function MyLeaves() {
                 </div>
               </div>
               {durationDays && (
-                <p className="text-xs text-muted-foreground">{durationDays} day{durationDays !== 1 ? "s" : ""} of leave</p>
+                <p className="text-xs text-muted-foreground">
+                  {durationDays} day{durationDays !== 1 ? "s" : ""} of leave —{" "}
+                  {durationDays > 1 ? "will be sent to the Super Admin for approval" : "will be approved by your school admin"}
+                </p>
               )}
               <div className="space-y-2">
                 <Label>Reason *</Label>
@@ -133,6 +189,47 @@ export default function MyLeaves() {
                   onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
                   required
                 />
+              </div>
+              <div className="space-y-2">
+                <Label>Supporting document / picture (optional)</Label>
+                <p className="text-xs text-muted-foreground">
+                  e.g. medical certificate or prescription. JPG, PNG or WEBP, up to {MAX_DOCS} pictures, {MAX_MB}MB each.
+                </p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => addDocs(e.target.files)}
+                />
+                {docs.length < MAX_DOCS && (
+                  <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    className="inline-flex items-center gap-2 rounded-md border border-dashed border-input px-3 py-2 text-sm hover:bg-muted"
+                  >
+                    <Paperclip className="h-4 w-4" /> Attach picture
+                  </button>
+                )}
+                {docs.length > 0 && (
+                  <div className="flex flex-wrap gap-3">
+                    {docs.map((d, i) => (
+                      <div key={d.preview} className="relative h-20 w-20 overflow-hidden rounded-md border">
+                        <img src={d.preview} alt={d.file.name} className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => removeDoc(i)}
+                          className="absolute right-0.5 top-0.5 rounded-full bg-black/70 p-0.5 text-white"
+                          aria-label="Remove picture"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {docError && <p className="text-xs text-red-600">{docError}</p>}
               </div>
               <div className="flex justify-end gap-2">
                 <DialogClose asChild>
@@ -175,6 +272,7 @@ export default function MyLeaves() {
                   <TableHead>Start Date</TableHead>
                   <TableHead>End Date</TableHead>
                   <TableHead>Days</TableHead>
+                  <TableHead>Documents</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -185,7 +283,27 @@ export default function MyLeaves() {
                     <TableCell>{new Date(lv.startDate).toLocaleDateString()}</TableCell>
                     <TableCell>{new Date(lv.endDate).toLocaleDateString()}</TableCell>
                     <TableCell>{lv.durationDays}</TableCell>
-                    <TableCell>{getStatusBadge(lv.status)}</TableCell>
+                    <TableCell>
+                      {lv.documents?.length ? (
+                        <div className="flex gap-1">
+                          {lv.documents.map((d, i) => (
+                            <a key={d.url} href={d.url} target="_blank" rel="noreferrer" title={`Document ${i + 1}`}>
+                              <img src={d.url} alt={`Document ${i + 1}`} className="h-8 w-8 rounded border object-cover" />
+                            </a>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {getStatusBadge(lv.status)}
+                      {lv.status === "Pending" && (
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          {lv.durationDays > 1 ? "With Super Admin" : "With school admin"}
+                        </div>
+                      )}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

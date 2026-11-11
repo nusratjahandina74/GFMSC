@@ -40,6 +40,10 @@ const studentSchema = new mongoose.Schema(
       required: true
     },
     monthlyFee: { type: Number, default: 0 },
+    // ID card extras (optional so existing students stay valid)
+    bloodGroup: { type: String, enum: ["", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"], default: "" },
+    birthRegNo: { type: String, trim: true, maxlength: 30, default: "" },
+    photoUrl: { type: String, trim: true, maxlength: 500, default: "" },
     isSuspended: { type: Boolean, default: false },
     mustChangePassword: { type: Boolean, default: false },
     resetPasswordToken: { type: String, select: false },

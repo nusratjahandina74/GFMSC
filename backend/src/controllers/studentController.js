@@ -8,7 +8,7 @@ import { safeRegex } from "../utils/safeRegex.js";
 
 // Mass-assignment guard: ONLY these fields can ever be set from a request body.
 const STUDENT_FIELDS = ["studentName", "studentId", "email", "className", "section", "classRoll", "sessionYear",
-  "fathersName", "fathersPhone", "mothersName", "mothersPhone", "monthlyFee"];
+  "fathersName", "fathersPhone", "mothersName", "mothersPhone", "monthlyFee", "bloodGroup", "birthRegNo"];
 const pickStudent = (body) => Object.fromEntries(STUDENT_FIELDS.filter((k) => body[k] !== undefined).map((k) => [k, body[k]]));
 
 

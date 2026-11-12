@@ -4,7 +4,7 @@ import { fileURLToPath } from "url";
 import PDFDocument from "pdfkit";
 import Exam from "../models/Exam.js";
 import Student from "../models/Student.js";
-import Mark from "../models/Mark.js";
+import ExamMark from "../models/ExamMark.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -34,7 +34,7 @@ export const generateTabulationSheet = async (req, res) => {
       section: exam.section || undefined,
     }).sort({ classRoll: 1 });
 
-    const marks = await Mark.find({ schoolId: req.user.schoolId, examId });
+    const marks = await ExamMark.find({ schoolId: req.user.schoolId, examId });
     const marksByStudent = {};
     const subjectSet = new Set();
     marks.forEach((m) => {

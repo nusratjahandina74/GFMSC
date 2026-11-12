@@ -26,6 +26,7 @@ import AdminGuardians from "./pages/admin/Guardians";
 import GuardianDashboard from "./pages/GuardianDashboard";
 import AdminClassSubjects from "./pages/admin/ClassSubjects";
 import AdminClassTeachers from "./pages/admin/ClassTeachers";
+import TeacherAssignments from "./pages/admin/TeacherAssignments";
 import ExamsPage from "./pages/ExamsPage";
 import ExamDuties from "./pages/admin/ExamDuties";
 import MyExamDuties from "./pages/teacher/MyExamDuties";
@@ -33,6 +34,7 @@ import AdminLeaves from "./pages/admin/Leaves";
 import AdminFeesDues from "./pages/admin/FeesDues";
 import MarksEntry from "./pages/MarksEntry";
 import ReportCard from "./pages/ReportCard";
+import VerifyResult from "./pages/VerifyResult";
 import Payments from "./pages/student/Payments";
 import Attendance from "./pages/teacher/Attendance";
 import Routine from "./pages/Routine";
@@ -102,6 +104,19 @@ function RoleHome() {
   return <Navigate to="/login" replace />;
 }
 
+// Marks Entry is a teacher/admin module and lives under two role-scoped
+// namespaces. A bare /marks-entry URL is redirected to the correct one;
+// student / guardian / staff are bounced to their own dashboard. (Typing
+// /marks-entry directly can therefore never expose the module to a role
+// that must not see it.)
+function MarksEntryHome() {
+  const role = getRole();
+  if (role === "schoolAdmin" || role === "superAdmin")
+    return <Navigate to="/admin/marks-entry" replace />;
+  if (role === "teacher") return <Navigate to="/dashboard/marks" replace />;
+  return <Navigate to="/dashboard" replace />;
+}
+
 export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -153,7 +168,22 @@ export default function App() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          {/* PUBLIC (no login): the QR code printed on every report card links
+              here with a signed token. Supports the spec path
+              /verify/report-card/:token plus the ?token= query form. */}
+          <Route path="/verify/report-card/:token" element={<VerifyResult />} />
+          <Route path="/verify-result" element={<VerifyResult />} />
           <Route path="/unauthorized" element={<Unauthorized />} />
+          {/* Bare /marks-entry URL — redirected to the correct role-scoped
+              namespace (student/guardian/staff land on their dashboard). */}
+          <Route
+            path="/marks-entry"
+            element={
+              <RequireAuth>
+                <MarksEntryHome />
+              </RequireAuth>
+            }
+          />
           <Route path="/payments/sandbox-complete" element={<PaymentSandboxComplete />} />
           <Route path="/payment/result" element={<PaymentResult />} />
 
@@ -227,6 +257,14 @@ export default function App() {
               element={
                 <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
                   <AdminClassTeachers />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="teacher-assignments"
+              element={
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                  <TeacherAssignments />
                 </RequireRole>
               }
             />
@@ -548,11 +586,13 @@ export default function App() {
               }
             />
 
-            {/* Exam & Mark Entry (for schoolAdmin and teacher) */}
+            {/* Exam & Mark Entry (schoolAdmin + subject/class teachers).
+                Super Admin is intentionally excluded — use the read-only
+                /admin/marks-entry school-selector view instead. */}
             <Route
               path="marks"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "teacher", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin", "teacher"]}>
                   <MarksEntry />
                 </RequireRole>
               }

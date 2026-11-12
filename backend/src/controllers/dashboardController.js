@@ -4,7 +4,7 @@ import Attendance from "../models/Attendance.js";
 import Staff from "../models/Staff.js";
 import Guardian from "../models/Guardian.js";
 import School from "../models/School.js";
-import Mark from "../models/Mark.js";
+import ExamMark from "../models/ExamMark.js";
 import Exam from "../models/Exam.js";
 import Leave from "../models/Leave.js";
 import Notice from "../models/Notice.js";
@@ -167,7 +167,7 @@ export const getStudentDashboard = async (req, res) => {
     }).sort({ date: -1, createdAt: -1 }).lean();
 
     const latestMarks = latestExam
-      ? await Mark.find({ examId: latestExam._id, studentId }).lean()
+      ? await ExamMark.find({ examId: latestExam._id, studentId }).lean()
       : [];
     let latestGpa = null;
     if (latestMarks.length > 0) {
@@ -291,7 +291,7 @@ export const getSuperAdminResults = async (req, res) => {
     const markFilter = { examId: { $in: examIds } };
     if (schoolId) markFilter.schoolId = schoolId;
 
-    const marks = await Mark.find(markFilter)
+    const marks = await ExamMark.find(markFilter)
       .populate("studentId", "studentName studentId className section classRoll")
       .populate("examId", "name term className section")
       .sort({ createdAt: -1 })

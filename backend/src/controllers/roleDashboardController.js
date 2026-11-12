@@ -2,7 +2,7 @@ import Student from "../models/Student.js";
 import Teacher from "../models/Teacher.js";
 import Attendance from "../models/Attendance.js";
 import Guardian from "../models/Guardian.js";
-import Mark from "../models/Mark.js";
+import ExamMark from "../models/ExamMark.js";
 import Exam from "../models/Exam.js";
 import Result from "../models/Result.js";
 import Invoice from "../models/Invoice.js";
@@ -86,7 +86,7 @@ export const schoolAdminDashboard = async (req, res) => {
     const attendanceTrends = Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date));
 
     // Performance distribution for Bar Chart — class-wise average percentage.
-    const allMarks = await Mark.find({ schoolId }).populate("studentId", "className").lean();
+    const allMarks = await ExamMark.find({ schoolId }).populate("studentId", "className").lean();
     const classPerf = {};
     allMarks.forEach((m) => {
       const cls = m.studentId?.className || "Unknown";
@@ -374,7 +374,7 @@ export const studentDashboard = async (req, res) => {
 
     let latestGpa = 0;
     if (latestExam) {
-      const examMarks = await Mark.find({
+      const examMarks = await ExamMark.find({
         schoolId,
         examId: latestExam._id,
         studentId: student._id,
@@ -408,7 +408,7 @@ export const studentDashboard = async (req, res) => {
       0
     );
 
-    const recentMarks = await Mark.find({
+    const recentMarks = await ExamMark.find({
       schoolId,
       studentId: student._id,
     })
@@ -555,7 +555,7 @@ export const guardianDashboard = async (req, res) => {
 
         const latestExam = await Exam.findOne({ schoolId, className: child.className, $or: [{ examType: { $ne: "Surprise Test" } }, { startDate: { $lte: bdToday() } }] }).sort({ date: -1 });
         const marks = latestExam
-          ? await Mark.find({ examId: latestExam._id, studentId: child._id })
+          ? await ExamMark.find({ examId: latestExam._id, studentId: child._id })
           : [];
 
         // Fee/dues status — part of the original guardian portal spec

@@ -93,6 +93,15 @@ export default function AdminSidebar() {
       roles: ["schoolAdmin", "superAdmin"],
     },
     {
+      // Maps each teacher to the (Class, Section, Subject) triples they may
+      // enter marks for — this drives the teacher's auto-filtered Marks Entry
+      // dropdowns.
+      name: "Teacher Assignments",
+      path: "/admin/teacher-assignments",
+      icon: BookOpen,
+      roles: ["schoolAdmin", "superAdmin"],
+    },
+    {
       name: "Routine",
       path: "/admin/routine",
       icon: Calendar,
@@ -129,10 +138,14 @@ export default function AdminSidebar() {
       roles: ["schoolAdmin", "superAdmin"],
     },
     {
+      // Marks Entry is a school-scoped, write-heavy module; Super Admin has
+      // no business entering marks, so it is hidden from their sidebar. A
+      // direct /admin/marks-entry URL still renders a read-only school
+      // selector for support/debugging (see MarksEntry.jsx).
       name: "Marks Entry",
       path: "/admin/marks-entry",
       icon: BookOpen,
-      roles: ["schoolAdmin", "superAdmin"],
+      roles: ["schoolAdmin"],
     },
     {
       name: "Report Cards",

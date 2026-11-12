@@ -2,11 +2,11 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { request, app, connect, disconnect, makeSchool, makeUser, makeStudent, login, auth } from "./helpers/setup.js";
 
-let A, B, tokA, tokB, tokT, tokT2, exam, examB, s1, s2, sOtherClass, sB, Mark, Exam, ClassSubject;
+let A, B, tokA, tokB, tokT, tokT2, exam, examB, s1, s2, sOtherClass, sB, ExamMark, Exam, ClassSubject;
 
 before(async () => {
   await connect();
-  Mark = (await import("../src/models/Mark.js")).default; Exam = (await import("../src/models/Exam.js")).default;
+  ExamMark = (await import("../src/models/ExamMark.js")).default; Exam = (await import("../src/models/Exam.js")).default;
   ClassSubject = (await import("../src/models/ClassSubject.js")).default;
   const Teacher = (await import("../src/models/Teacher.js")).default;
   const ClassTeacher = (await import("../src/models/ClassTeacher.js")).default;
@@ -30,7 +30,7 @@ after(disconnect);
 const put = (tok, body, path = "/api/results/marks") => request(app).post(path).set(auth(tok)).send(body);
 const row = (o = {}) => ({ examId: String(exam._id), studentId: String(s1._id), subject: "Math", written: 40, mcq: 20, practical: 10, ...o });
 
-for (const path of ["/api/results/marks", "/api/marks"]) {
+for (const path of ["/api/results/marks", "/api/marks-entry/save"]) {
   test(`T08 [${path}] valid mark saved with computed total/grade`, async () => {
     const r = await put(tokA, row({ subject: "English" }), path);
     assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -42,7 +42,7 @@ for (const path of ["/api/results/marks", "/api/marks"]) {
       const r = await put(tokA, row(bad), path);
       assert.equal(r.status, 400, JSON.stringify(bad) + " -> " + r.status);
     }
-    assert.equal(await Mark.countDocuments({ examId: exam._id, total: { $gt: 100 } }), 0);
+    assert.equal(await ExamMark.countDocuments({ examId: exam._id, total: { $gt: 100 } }), 0);
   });
 
   test(`T08 [${path}] teacher authorisation: only the subject teacher / class teacher`, async () => {
@@ -77,7 +77,7 @@ test("T08 bulk: good rows saved, bad rows reported per row; teacher bypass close
   assert.equal(r.body.totalProcessed, 2); assert.equal(r.body.totalFailed, 2);
   const eng = await put(tokT, { examId: String(exam._id), marks: [{ studentId: String(s1._id), subject: "English", written: 99 }] }, "/api/results/marks/bulk");
   assert.equal(eng.status, 403);
-  assert.equal((await Mark.findOne({ examId: exam._id, studentId: s1._id, subject: "English" })).total, 70, "unchanged by the rejected teacher write");
+  assert.equal((await ExamMark.findOne({ examId: exam._id, studentId: s1._id, subject: "English" })).total, 70, "unchanged by the rejected teacher write");
 });
 
 // ---- T03.5: forged schoolId on the other write endpoints ----
@@ -147,10 +147,10 @@ test("T08: deleting a mark needs the same authorisation as entering it (teacher 
   const eng = (await put(tokA, row({ subject: "English", written: 50 }))).body.mark;
   const t = await request(app).delete(`/api/results/marks/${eng._id}`).set(auth(tokT)); // Math teacher vs English mark
   assert.equal(t.status, 403);
-  assert.ok(await Mark.findById(eng._id));
+  assert.ok(await ExamMark.findById(eng._id));
   assert.equal((await request(app).delete(`/api/results/marks/${eng._id}`).set(auth(tokB))).status, 404);
   const ok = await request(app).delete(`/api/results/marks/${eng._id}`).set(auth(tokA));
-  assert.equal(ok.status, 200); assert.equal(await Mark.findById(eng._id), null);
+  assert.equal(ok.status, 200); assert.equal(await ExamMark.findById(eng._id), null);
   const { default: AuditLog } = await import("../src/models/AuditLog.js");
   assert.ok(await AuditLog.findOne({ action: "marks.deleted", entityId: String(eng._id) }));
 });
@@ -158,10 +158,10 @@ test("T08: deleting a mark needs the same authorisation as entering it (teacher 
 test("T08: deleting an exam removes its marks atomically and is audited; same result via both route sets", async () => {
   const e2 = await Exam.create({ schoolId: A._id, name: "Temp", term: "2026", className: "Class 8", section: "A", createdBy: s1._id });
   await put(tokA, { examId: String(e2._id), studentId: String(s1._id), subject: "Math", written: 30 });
-  assert.equal(await Mark.countDocuments({ examId: e2._id }), 1);
+  assert.equal(await ExamMark.countDocuments({ examId: e2._id }), 1);
   const del = await request(app).delete(`/api/results/exams/${e2._id}`).set(auth(tokA));
   assert.equal(del.status, 200);
-  assert.equal(await Mark.countDocuments({ examId: e2._id }), 0); assert.equal(await Exam.findById(e2._id), null);
+  assert.equal(await ExamMark.countDocuments({ examId: e2._id }), 0); assert.equal(await Exam.findById(e2._id), null);
   const { default: AuditLog } = await import("../src/models/AuditLog.js");
   const l = await AuditLog.findOne({ action: "exam.deleted", entityId: String(e2._id) });
   assert.equal(l.meta.removedMarks, 1);

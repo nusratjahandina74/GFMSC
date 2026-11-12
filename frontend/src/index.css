@@ -133,3 +133,89 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     color: #000000 !important;
   }
 }
+
+/* =====================================================================
+ * 🧾 REPORT CARD PRINT STYLES (A4 PORTRAIT, ONE PAGE)
+ * ---------------------------------------------------------------------
+ * The global block above forces landscape for the routine table. A report
+ * card is a portrait document, so it uses a *named page* (`reportcard`)
+ * which only applies to the `.rc-sheet` element. This keeps the routine's
+ * landscape default intact while printing report cards as A4 portrait.
+ *
+ * Only active while the ReportCard page is mounted (`body.rc-print-mode`),
+ * so no other page is affected. Every interactive control on that page is
+ * tagged `.rc-no-print` and disappears from the printout.
+ * ===================================================================== */
+@page reportcard {
+  size: A4 portrait;
+  margin: 10mm;
+}
+
+.rc-sheet {
+  page: reportcard;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* Bulk ("Print / Download All") stacks one sheet per student; each sheet is
+ * forced onto its own A4 page so a whole class+section prints/PDFs cleanly. */
+.rc-bulk-page {
+  break-after: page;
+  page-break-after: always;
+}
+.rc-bulk-page:last-child {
+  break-after: auto;
+  page-break-after: auto;
+}
+
+/* Rendered only when printing — used for the hidden bulk stack so a class of
+ * 40 report cards never bloats the on-screen view. */
+.rc-print-only {
+  display: none;
+}
+
+@media print {
+  /* The sheet itself: drop the screen chrome so it fills the printable area. */
+  .rc-sheet {
+    width: 190mm !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* While on the report card page, hide every control and take the sheet
+     out of the padded/flex layout so it starts at the very top of page 1. */
+  body.rc-print-mode .rc-no-print {
+    display: none !important;
+  }
+  body.rc-print-mode .rc-page,
+  body.rc-print-mode main {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  body.rc-print-mode .rc-print-root {
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Reveal the bulk print stack and hide the on-screen single card while a
+     bulk print/PDF run is in progress. */
+  body.rc-print-mode .rc-print-only {
+    display: block !important;
+  }
+  body.rc-print-mode .rc-suppress-print {
+    display: none !important;
+  }
+  body.rc-print-mode .rc-bulk-page {
+    break-after: page !important;
+    page-break-after: always !important;
+  }
+  body.rc-print-mode .rc-bulk-page:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+  body.rc-print-mode {
+    background: #ffffff !important;
+  }
+}

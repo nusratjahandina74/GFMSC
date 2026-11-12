@@ -18,7 +18,13 @@ export const PERMISSIONS = Object.freeze({
   "exam:publish": ["schoolAdmin"],
   "marks:write": ["schoolAdmin", "teacher"],
   "marks:read": ["schoolAdmin", "teacher"],
+  "marks:lock": ["schoolAdmin"],
   "reportcard:read": ["schoolAdmin", "teacher", "student", "guardian"],
+  "reportcard:edit": ["schoolAdmin", "teacher"],
+  "reportcard:publish": ["schoolAdmin"],
+  "reportcard:settings": ["schoolAdmin"],
+  "reportcard:template": [], // superAdmin only (implicit)
+  "teacherAssignment:write": ["schoolAdmin"],
   "attendance:write": ["schoolAdmin", "teacher"],
   "routine:write": ["schoolAdmin"],
   // money

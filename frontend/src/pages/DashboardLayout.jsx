@@ -150,15 +150,15 @@ function DashboardLayout() {
           path: "/dashboard/exam-duties",
           icon: ShieldCheck,
         },
-        ...(isClassTeacher
-          ? [
-              {
-                name: "Marks Entry",
-                path: "/dashboard/marks",
-                icon: BookOpen,
-              },
-            ]
-          : []),
+        {
+          // Every teacher can enter marks — but only for the class/section/
+          // subject triples assigned to them (the backend auto-filters the
+          // dropdowns). Class-teacher status is NOT required here; it only
+          // gates Attendance and full Report Card access.
+          name: "Marks Entry",
+          path: "/dashboard/marks",
+          icon: BookOpen,
+        },
         {
           name: "Report Card",
           path: "/dashboard/report-card",

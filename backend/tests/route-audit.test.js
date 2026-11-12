@@ -12,11 +12,21 @@ const PUBLIC_ALLOWLIST = new Set([
   "POST /api/admissions/apply/:schoolId", "POST /api/auth/superadmin", "POST /api/auth/register", "POST /api/auth/login",
   "POST /api/auth/refresh", "POST /api/auth/logout", "GET /api/auth/verify-email", "POST /api/auth/verify-email",
   "POST /api/auth/resend-verification", "POST /api/auth/forgot-password", "POST /api/auth/reset-password",
-  "GET /api/contact/ping", "POST /api/contact", "GET /api/landing-pages/:slug",
+  "GET /api/contact/ping", "POST /api/contact",
+  // Public landing-page read + visit counter. landingPages.js is mounted BOTH
+  // at "/api/landing-pages" (admin CRUD) and at "/api" (public read/visit), and
+  // the auditor resolves the LAST mount, so these routes are scanned as
+  // "/api/landingpages/:slug" — not "/api/landing-pages/:slug".
+  "GET /api/landingpages/:slug", "POST /api/landingpages/:slug/visit",
   "GET /api/slider", "GET /api/gallery", // public homepage images (active only)
   "POST /api/payments/sslcommerz/success", "POST /api/payments/sslcommerz/fail", "POST /api/payments/sslcommerz/cancel",
   "POST /api/payments/sslcommerz/ipn", "GET /api/payments/bkash/callback", "POST /api/payments/bkash/callback",
   "GET /api/schools/by-subdomain/:subdomain",
+  // Public QR verification for report cards (the token in the QR is the
+  // credential; the service re-checks the publish state before returning
+  // anything). Deliberately unauthenticated so a third party scanning the QR
+  // on a printed report card can confirm it.
+  "GET /api/report-cards/verify/:token",
   // optionalAuthMiddleware (public notice board; shows more when logged in)
   "GET /api/notices", "GET /api/notices/:id",
 ]);

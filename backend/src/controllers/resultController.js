@@ -1,9 +1,11 @@
 import mongoose from "mongoose";
 import Exam from "../models/Exam.js";
-import Mark from "../models/Mark.js";
+import ExamMark from "../models/ExamMark.js";
 import Student from "../models/Student.js";
+import Guardian from "../models/Guardian.js";
 import { tenantIdFor } from "../utils/tenant.js";
 import { saveMarks, MarkError, makeAuthorizer } from "../services/markService.js";
+import { getPublishState } from "../services/reportCardService.js";
 import { audit } from "../utils/audit.js";
 import { safeRegex } from "../utils/safeRegex.js";
 
@@ -53,7 +55,7 @@ const resolveStudentId = async (schoolId, studentIdentifier) => {
 const statusOf = (failed) => (failed.some((f) => f.status === 403) ? 403 : failed.some((f) => f.status === 404) ? 404 : 400);
 
 // T08: the marks endpoints below delegate to services/markService.js — the SAME authorisation + validation as
-// /api/marks (previously these routes had no teacher authorisation and accepted negative/NaN/>100 scores).
+// /api/marks-entry/save (previously these routes had no teacher authorisation and accepted negative/NaN/>100 scores).
 export const upsertMark = async (req, res) => {
   try {
     const { examId, schoolId: _ignored, ...row } = req.body || {};
@@ -159,8 +161,8 @@ export const listMarks = async (req, res) => {
       filter.studentId = { $in: studentIds };
     }
 
-    const total = await Mark.countDocuments(filter);
-    const marks = await Mark.find(filter)
+    const total = await ExamMark.countDocuments(filter);
+    const marks = await ExamMark.find(filter)
       .populate("studentId", "studentName studentId className section")
       .populate("examId", "name term className section")
       .sort({ updatedAt: -1 })
@@ -186,7 +188,7 @@ export const deleteMark = async (req, res) => {
     if (!isValidId(req.params.id)) return res.status(400).json({ message: "Invalid mark id" });
     const filter = { _id: req.params.id };
     if (req.user.role !== "superAdmin") filter.schoolId = req.user.schoolId;
-    const mark = await Mark.findOne(filter);
+    const mark = await ExamMark.findOne(filter);
     if (!mark) return res.status(404).json({ message: "Mark not found" });
 
     // Same rule as entering marks: a teacher may only delete marks for her own class/subject, and never on a published exam.
@@ -197,7 +199,7 @@ export const deleteMark = async (req, res) => {
       const canEnter = await makeAuthorizer(req, exam).catch(() => null);
       if (!canEnter || !canEnter(mark.subject)) return res.status(403).json({ message: "You are not authorized to delete this mark" });
     }
-    await Mark.deleteOne({ _id: mark._id, schoolId: mark.schoolId });
+    await ExamMark.deleteOne({ _id: mark._id, schoolId: mark.schoolId });
     await audit(req, "marks.deleted", { schoolId: mark.schoolId, entityType: "Mark", entityId: mark._id, summary: `Mark deleted (${mark.subject})`, before: { examId: mark.examId, studentId: mark.studentId, subject: mark.subject, total: mark.total, grade: mark.grade } });
     res.json({ message: "Mark deleted" });
   } catch (error) {
@@ -207,6 +209,10 @@ export const deleteMark = async (req, res) => {
 };
 
 // ✅ 4) Get Report Card (Student/Admin/Teacher/SuperAdmin/Guardian)
+// NOTE: /api/report-cards/data is the canonical, feature-complete report card endpoint
+// (branding, remarks, fee-lock, QR). This legacy endpoint stays for backwards
+// compatibility but now shares the SAME rules: tenant isolation, ownership checks
+// and the publish gate, so unpublished results can never leak to students/guardians.
 export const getReportCard = async (req, res) => {
   try {
     const { examId, studentId, schoolId: qSchoolId } = req.query;
@@ -216,15 +222,16 @@ export const getReportCard = async (req, res) => {
     }
     if (!isValidId(examId)) return res.status(400).json({ message: "Invalid examId" });
 
-    const targetSchoolId = qSchoolId || req.user.schoolId;
-    if (req.user.role === "superAdmin") {
-      if (!targetSchoolId) {
-        return res.status(400).json({ message: "Please pass schoolId in query string when loading report card as super admin." });
-      }
-    } else {
-      if (!targetSchoolId) {
-        return res.status(403).json({ message: "schoolId missing in token. Please log in again." });
-      }
+    // SuperAdmin must explicitly pick a school; every other role is pinned to its
+    // own school. Returns a clean payload so the UI renders a "Select School"
+    // dropdown instead of a raw developer warning.
+    const targetSchoolId = tenantIdFor(req, qSchoolId);
+    if (!targetSchoolId) {
+      return res.status(400).json({
+        success: false,
+        code: "SCHOOL_REQUIRED",
+        message: req.user.role === "superAdmin" ? "Select a school to view its report cards." : "Your account is not linked to a school.",
+      });
     }
 
     const exam = await Exam.findOne({ _id: examId, schoolId: targetSchoolId });
@@ -239,21 +246,44 @@ export const getReportCard = async (req, res) => {
     const student = await Student.findOne({ _id: resolvedStudentId, schoolId: targetSchoolId });
     if (!student) return res.status(404).json({ message: "Student not found for this school" });
 
-    const marks = await Mark.find({ schoolId: targetSchoolId, examId, studentId: resolvedStudentId }).sort({ subject: 1 });
+    // Ownership: a student may only read their own card; a guardian only their children's.
+    if (req.user.role === "student" && String(req.user.userId) !== String(student._id)) {
+      return res.status(403).json({ message: "You can only view your own report card." });
+    }
+    if (req.user.role === "guardian") {
+      const guardian = await Guardian.findById(req.user.userId).select("children").lean();
+      const owns = (guardian?.children || []).some((c) => String(c) === String(student._id));
+      if (!owns) return res.status(403).json({ message: "You can only view your own children's report cards." });
+    }
+
+    // Publish gate: students & guardians cannot see results until the school publishes them.
+    if (req.user.role === "student" || req.user.role === "guardian") {
+      const { published } = await getPublishState(targetSchoolId, examId, student.className, student.section);
+      if (!published) {
+        return res.status(403).json({ success: false, code: "NOT_PUBLISHED", message: "Results for this exam have not been published yet." });
+      }
+    }
+
+    const marks = await ExamMark.find({ schoolId: targetSchoolId, examId, studentId: resolvedStudentId })
+      .select("subject written mcq practical total fullMarks passMarks grade gpa isAbsent status")
+      .sort({ subject: 1 });
 
     if (!marks.length) {
       return res.status(404).json({ message: "No marks found for this student in this exam" });
     }
 
-    const totalSubjects = marks.length;
-    const totalMarks = marks.reduce((sum, m) => sum + (m.total || 0), 0);
-    const fullTotal = marks.reduce((sum, m) => sum + (m.fullMarks || 100), 0); // papers can have their own full marks
-    const hasFailedSubject = marks.some((m) => m.grade === "F");
+    const graded = marks.filter((m) => !m.isAbsent);
+    const totalSubjects = graded.length;
+    const totalMarks = graded.reduce((sum, m) => sum + (m.total || 0), 0);
+    const fullTotal = graded.reduce((sum, m) => sum + (m.fullMarks || 100), 0); // papers can have their own full marks
+    const hasFailedSubject = graded.some((m) => m.grade === "F");
     // Bangladeshi convention: failing even one subject fails the whole exam
     // and the reported GPA becomes 0.00, regardless of the other subjects.
-    const gpaAvg = hasFailedSubject
+    const gpaAvg = hasFailedSubject || !totalSubjects
       ? 0
-      : Number((marks.reduce((sum, m) => sum + (m.gpa || 0), 0) / totalSubjects).toFixed(2));
+      : Number((graded.reduce((sum, m) => sum + (m.gpa || 0), 0) / totalSubjects).toFixed(2));
+
+    const { published } = await getPublishState(targetSchoolId, examId, student.className, student.section);
 
     res.json({
       message: "Report card fetched",
@@ -266,6 +296,7 @@ export const getReportCard = async (req, res) => {
         section: student.section,
         classRoll: student.classRoll,
       },
+      published,
       summary: {
         totalSubjects,
         totalMarks,
@@ -274,7 +305,18 @@ export const getReportCard = async (req, res) => {
         gpa: gpaAvg,
         result: hasFailedSubject ? "Fail" : "Pass",
       },
-      marks,
+      marks: marks.map((m) => ({
+        subject: m.subject,
+        written: m.written,
+        mcq: m.mcq,
+        practical: m.practical,
+        fullMarks: m.fullMarks,
+        passMarks: m.passMarks,
+        total: m.isAbsent ? null : m.total,
+        grade: m.isAbsent ? "AB" : m.grade,
+        gpa: m.isAbsent ? 0 : m.gpa,
+        isAbsent: Boolean(m.isAbsent),
+      })),
     });
   } catch (error) {
     console.error("[resultController.js]", error);
@@ -291,21 +333,19 @@ export const getExamStats = async (req, res) => {
       return res.status(400).json({ message: "Valid examId required" });
     }
 
-    const targetSchoolId = qSchoolId || req.user.schoolId;
-    if (req.user.role === "superAdmin") {
-      if (!targetSchoolId) {
-        return res.status(400).json({ message: "Please pass schoolId in query when loading stats as super admin." });
-      }
-    } else {
-      if (!targetSchoolId) {
-        return res.status(403).json({ message: "schoolId missing in token" });
-      }
+    const targetSchoolId = tenantIdFor(req, qSchoolId);
+    if (!targetSchoolId) {
+      return res.status(400).json({
+        success: false,
+        code: "SCHOOL_REQUIRED",
+        message: req.user.role === "superAdmin" ? "Select a school to view its analytics." : "Your account is not linked to a school.",
+      });
     }
 
     const exam = await Exam.findOne({ _id: examId, schoolId: targetSchoolId });
     if (!exam) return res.status(404).json({ message: "Exam not found for this school" });
 
-    const marks = await Mark.find({ schoolId: targetSchoolId, examId }).select("studentId subject grade total");
+    const marks = await ExamMark.find({ schoolId: targetSchoolId, examId }).select("studentId subject grade total");
     if (!marks.length) {
       return res.json({
         message: "Exam stats fetched",

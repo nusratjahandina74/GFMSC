@@ -4,7 +4,7 @@ import ClassTeacher from "../models/ClassTeacher.js";
 import ClassSubject from "../models/ClassSubject.js";
 import { tenantIdFor } from "../utils/tenant.js";
 import mongoose from "mongoose";
-import Mark from "../models/Mark.js";
+import ExamMark from "../models/ExamMark.js";
 import { withTxn } from "../utils/txn.js";
 import { audit } from "../utils/audit.js";
 import { safeRegex } from "../utils/safeRegex.js";
@@ -177,7 +177,7 @@ export const updateExam = async (req, res) => {
 
     const { name, term, className, section, examType } = req.body || {};
     const classChanging = (className !== undefined && className !== exam.className) || (section !== undefined && (section || "") !== (exam.section || ""));
-    if (classChanging && (await Mark.exists({ examId: exam._id, schoolId: exam.schoolId }))) {
+    if (classChanging && (await ExamMark.exists({ examId: exam._id, schoolId: exam.schoolId }))) {
       return res.status(409).json({ message: "Marks already exist for this exam, so its class/section can no longer be changed." });
     }
     const parsed = normalizeExamInput(req.body || {}, { existing: exam, defaults: await getSchoolExamDefaults(exam.schoolId) });
@@ -218,7 +218,7 @@ export const deleteExam = async (req, res) => {
     if (!exam) return res.status(404).json({ message: "Exam not found" });
     const removedMarks = await withTxn(async (session) => {
       const o = session ? { session } : {};
-      const r = await Mark.deleteMany({ examId: exam._id, schoolId: exam.schoolId }, o);
+      const r = await ExamMark.deleteMany({ examId: exam._id, schoolId: exam.schoolId }, o);
       await ExamDuty.deleteMany({ examId: exam._id, schoolId: exam.schoolId }, o);
       await Exam.deleteOne({ _id: exam._id, schoolId: exam.schoolId }, o);
       return r.deletedCount || 0;

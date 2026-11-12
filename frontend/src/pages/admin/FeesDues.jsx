@@ -1,381 +1,425 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Loader2, Wallet, TrendingUp, AlertCircle, ShieldCheck, Layers, History,
+  FileText, KeyRound, Building2, School as SchoolIcon, RefreshCw, Printer,
+} from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import { Input } from "../../components/ui/input";
+import { Button } from "../../components/ui/button";
 import { Label } from "../../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
-import { Loader2, DollarSign, Plus, FileText, CheckCircle } from "lucide-react";
-import api from "../../api/client";
-import { CLASS_LIST, SECTION_LIST } from "../../lib/constants";
+import { FeeMsg, KpiCard } from "../../components/fees/FeeCommon";
+import { money } from "../../components/fees/feeUtils";
+import FeeSetupTab from "../../components/fees/FeeSetupTab";
+import RosterTab from "../../components/fees/RosterTab";
+import CollectPaymentModal from "../../components/fees/CollectPaymentModal";
+import TransactionsTab from "../../components/fees/TransactionsTab";
+import SupportViewTab from "../../components/fees/SupportViewTab";
+import GatewayConfigTab from "../../components/fees/GatewayConfigTab";
+import SaasBillingTab from "../../components/fees/SaasBillingTab";
+import FeePrintModal from "../../components/fees/FeePrintModal";
+import {
+  getFeesContext, getDashboard, getPayment, getLedger, getSupportLedger, listManualPayments,
+} from "../../api/feesDues";
+import { getReportSettings } from "../../api/reportCards";
+import { getMySchool } from "../../api/schools";
+import { getRole } from "../../api/auth";
 
-import { getDuesSummary } from "../../api/invoices";
-
+// ---------------------------------------------------------------------------
+// Fees & Dues — role-aware accounting console.
+//
+//   * School Admin  — a tabbed counter: money configuration (Tab 1), the class
+//                     roster with collect-payment + yearly ledger (Tab 2), and
+//                     the back-office controls: manual TrxID approvals, receipt
+//                     void, immutable audit log and bulk reminders (Tab 3).
+//                     A KPI strip on top reads GET /fees-dues/dashboard.
+//   * Super Admin   — a strictly read-only support window into any one school
+//                     (invoices / receipts / audit) plus the per-school payment
+//                     gateway credentials and the platform's SaaS billing.
+//
+// Every figure on screen comes from the backend serializers; nothing is
+// computed locally. Tenant scoping is server-side — a School Admin is pinned
+// to her own school and only a Super Admin may pass ?schoolId=.
+// ---------------------------------------------------------------------------
 export default function AdminFeesDues() {
-  const [activeTab, setActiveTab] = useState("dues");
-  const [className, setClassName] = useState("");
-  const [section, setSection] = useState("");
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM
-  const [feeAmount, setFeeAmount] = useState("");
-  const [feeTitle, setFeeTitle] = useState("Monthly Tuition Fee");
-  
-  const [students, setStudents] = useState([]);
-  const [invoices, setInvoices] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState("");
+  const role = getRole();
+  const isSuper = role === "superAdmin";
 
-  const loadData = async () => {
-    setLoading(true);
-    setMsg("");
-    try {
-      if (activeTab === "dues") {
-        if (!className) {
-          setStudents([]);
-          setLoading(false);
-          return;
-        }
-        const res = await getDuesSummary({ className, section });
-        setStudents(res.data?.students || []);
-      } else if (activeTab === "invoices") {
-        const res = await api.get("/invoices", { params: { month, limit: 100 } });
-        setInvoices(res.data?.invoices || []);
+  const [ctx, setCtx] = useState(null);
+  const [ctxLoading, setCtxLoading] = useState(true);
+  const [msg, setMsg] = useState(null);
+
+  // Super Admin school picker.
+  const [schoolId, setSchoolId] = useState("");
+  const [schoolList, setSchoolList] = useState([]);
+
+  // Branding for the printable receipt / ledger.
+  const [mySchool, setMySchool] = useState(null);
+  const [settings, setSettings] = useState(null);
+
+  const [tab, setTab] = useState(isSuper ? "support" : "setup");
+  const [dash, setDash] = useState(null);
+  const [pendingManual, setPendingManual] = useState(0);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [focusSection, setFocusSection] = useState("manual");
+
+  // Collect-payment + print overlays.
+  const [collectStudent, setCollectStudent] = useState(null);
+  const [collectOpen, setCollectOpen] = useState(false);
+  const [print, setPrint] = useState(null); // { mode: "receipt" | "ledger", receipt, ledger }
+  const [printBusy, setPrintBusy] = useState(false);
+
+  const onMsg = useCallback((m) => setMsg(m), []);
+
+  const tabs = useMemo(
+    () =>
+      isSuper
+        ? [
+            { id: "support", label: "Support View", icon: FileText },
+            { id: "gateway", label: "Gateway Config", icon: KeyRound },
+            { id: "saas", label: "SaaS Billing", icon: Building2 },
+          ]
+        : [
+            { id: "setup", label: "Fee Heads & Structures", icon: Layers },
+            { id: "roster", label: "Roster & Collect", icon: Wallet },
+            { id: "transactions", label: "Transactions & Audit", icon: History },
+          ],
+    [isSuper]
+  );
+
+  // ---- Role-aware context (runs on mount and whenever the Super Admin picks a school) ----
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setCtxLoading(true);
+      try {
+        const res = await getFeesContext(schoolId ? { schoolId } : {});
+        if (!alive) return;
+        setCtx(res.data || null);
+        if (res.data?.needSchool && res.data?.schools?.length) setSchoolList(res.data.schools);
+      } catch (e) {
+        if (alive) setMsg({ type: "error", text: e?.response?.data?.message || "Failed to load the fees workspace." });
+      } finally {
+        if (alive) setCtxLoading(false);
       }
-    } catch (err) {
-      setMsg(err?.response?.data?.message || "Failed to load data");
-    } finally {
-      setLoading(false);
+    })();
+    return () => { alive = false; };
+  }, [schoolId]);
+
+  // ---- KPI strip (School Admin only) + pending manual TrxID badge ----
+  const loadDashboard = useCallback(async () => {
+    try {
+      const res = await getDashboard();
+      setDash(res.data?.dashboard || null);
+    } catch {
+      setDash(null);
     }
-  };
+  }, []);
+
+  const loadPendingManual = useCallback(async () => {
+    try {
+      const res = await listManualPayments({ status: "PENDING_VERIFICATION", limit: 1 });
+      setPendingManual(res.data?.total || 0);
+    } catch {
+      setPendingManual(0);
+    }
+  }, []);
 
   useEffect(() => {
-    loadData();
-  }, [activeTab, className, section, month]);
+    if (isSuper) return;
+    if (!ctx || ctx.needSchool) return;
+    loadDashboard();
+    loadPendingManual();
+  }, [isSuper, ctx, reloadToken, loadDashboard, loadPendingManual]);
 
-  const handleSetFee = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setMsg("");
+  // ---- Branding: the school itself (name / address / phone) ----
+  useEffect(() => {
+    if (isSuper) return;
+    let alive = true;
+    getMySchool()
+      .then((res) => { if (alive) setMySchool(res?.school || null); })
+      .catch(() => { if (alive) setMySchool(null); });
+    return () => { alive = false; };
+  }, [isSuper]);
+
+  // ---- Branding: logo / principal signature (from the report-card settings) ----
+  useEffect(() => {
+    const sid = isSuper ? schoolId : ctx?.schoolId;
+    if (!sid) { setSettings(null); return undefined; }
+    let alive = true;
+    getReportSettings(isSuper ? { schoolId: sid } : {})
+      .then((res) => { if (alive) setSettings(res.data?.settings || null); })
+      .catch(() => { if (alive) setSettings(null); });
+    return () => { alive = false; };
+  }, [isSuper, schoolId, ctx?.schoolId]);
+
+  const selectedSchool = useMemo(() => {
+    if (isSuper) return schoolList.find((s) => String(s._id) === String(schoolId)) || null;
+    return mySchool;
+  }, [isSuper, schoolList, schoolId, mySchool]);
+
+  const brandSchool = useMemo(
+    () => ({
+      name: selectedSchool?.name || "",
+      address: selectedSchool?.address || "",
+      phone: selectedSchool?.phone || "",
+      logoUrl: settings?.logoUrl || "",
+      signatureUrl: settings?.principalSignatureUrl || "",
+      signatureTitle: settings?.principalTitle || "Principal",
+    }),
+    [selectedSchool, settings]
+  );
+
+  const refreshAll = useCallback(() => {
+    setReloadToken((t) => t + 1);
+    if (!isSuper) { loadDashboard(); loadPendingManual(); }
+  }, [isSuper, loadDashboard, loadPendingManual]);
+
+  // ---- Collect payment ----
+  const openCollect = (student) => {
+    setCollectStudent(student);
+    setCollectOpen(true);
+  };
+
+  const handlePaid = (receipt) => {
+    setCollectOpen(false);
+    setCollectStudent(null);
+    refreshAll();
+    if (receipt) setPrint({ mode: "receipt", receipt, ledger: null });
+  };
+
+  // ---- Print a receipt by id (from the receipts table) ----
+  const openReceiptById = async (paymentId) => {
+    if (!paymentId) return;
+    setPrintBusy(true);
     try {
-      if (!className) {
-        setMsg("Please select a class first.");
-        setLoading(false);
-        return;
-      }
-      const amountNum = Number(feeAmount);
-      if (!Number.isFinite(amountNum) || amountNum < 0) {
-        setMsg("Please enter a valid, non-negative fee amount.");
-        setLoading(false);
-        return;
-      }
-      await api.post("/fees/set", {
-        className,
-        month,
-        amount: amountNum,
-        title: feeTitle,
-      });
-      setMsg(`✅ Monthly fee of ৳${amountNum.toLocaleString("en-BD")} set for ${className} (${month})!`);
-    } catch (err) {
-      setMsg(err?.response?.data?.message || "Failed to set fee");
+      const res = await getPayment(paymentId);
+      const receipt = res.data?.receipt;
+      if (receipt) setPrint({ mode: "receipt", receipt, ledger: null });
+      else onMsg({ type: "error", text: "Receipt not found." });
+    } catch (e) {
+      onMsg({ type: "error", text: e?.response?.data?.message || "Failed to load the receipt." });
     } finally {
-      setLoading(false);
+      setPrintBusy(false);
     }
   };
 
-  const handleBulkGenerateInvoices = async () => {
-    if (!className) {
-      setMsg("Please select a class first.");
-      return;
-    }
-    setLoading(true);
-    setMsg("");
+  // ---- Print a yearly ledger for a roster row (School Admin) ----
+  const openLedger = async (student) => {
+    const identifier = student?.studentId || student?._id;
+    if (!identifier) return;
+    setPrintBusy(true);
     try {
-      const dueDate = new Date();
-      dueDate.setDate(dueDate.getDate() + 15);
-      const res = await api.post("/invoices/bulk", {
-        className,
-        section,
-        month,
-        dueDate: dueDate.toISOString().split("T")[0],
-      });
-      setMsg(`✅ Generated ${res.data?.count || 0} invoices for ${className}!`);
-      if (activeTab === "invoices") loadData();
-    } catch (err) {
-      setMsg(err?.response?.data?.message || "Failed to generate invoices");
+      const res = await getLedger(identifier, { className: student.className, section: student.section });
+      const ledger = res.data?.ledger;
+      if (ledger) setPrint({ mode: "ledger", receipt: null, ledger });
+      else onMsg({ type: "error", text: "Ledger not found for this student." });
+    } catch (e) {
+      onMsg({ type: "error", text: e?.response?.data?.message || "Failed to load the student ledger." });
     } finally {
-      setLoading(false);
+      setPrintBusy(false);
     }
   };
 
-  const handleMarkPaid = async (invoiceId) => {
+  // ---- Print a yearly ledger from the Super Admin support view ----
+  const openSupportLedger = async (identifier) => {
+    if (!identifier || !schoolId) return;
+    setPrintBusy(true);
     try {
-      await api.patch(`/invoices/${invoiceId}/status`, { status: "paid" });
-      setMsg("✅ Invoice marked as paid!");
-      loadData();
-    } catch (err) {
-      setMsg(err?.response?.data?.message || "Failed to update invoice");
+      const res = await getSupportLedger(identifier, { schoolId });
+      const ledger = res.data?.ledger;
+      if (ledger) setPrint({ mode: "ledger", receipt: null, ledger });
+      else onMsg({ type: "error", text: "Ledger not found for this student." });
+    } catch (e) {
+      onMsg({ type: "error", text: e?.response?.data?.message || "Failed to load the student ledger." });
+    } finally {
+      setPrintBusy(false);
     }
   };
+
+  const goToApprovals = () => {
+    setFocusSection("manual");
+    setTab("transactions");
+  };
+
+  const requiresSchool = isSuper && (tab === "support" || tab === "gateway");
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Fees &amp; Dues Management</h1>
-        <p className="text-muted-foreground mt-1">Set monthly fees, generate invoices, and track student dues</p>
-      </div>
-
-      {msg && (
-        <div
-          className={`p-4 rounded-lg border ${
-            msg.includes("✅")
-              ? "bg-green-50 text-green-800 border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800"
-              : "bg-red-50 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800"
-          }`}
-        >
-          {msg}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight">Fees &amp; Dues Management</h1>
+          <p className="mt-1 text-muted-foreground">
+            {isSuper
+              ? "Inspect any school's invoices, receipts, audit trail, gateway credentials and SaaS billing."
+              : "Configure fee heads, generate invoices, collect payments and print receipts & ledgers."}
+          </p>
         </div>
-      )}
+        <Button variant="outline" size="sm" onClick={refreshAll} disabled={ctxLoading}>
+          <RefreshCw className={`h-4 w-4 ${ctxLoading ? "animate-spin" : ""}`} /> Refresh
+        </Button>
+      </div>
 
-      {/* Action cards: Set fee & Bulk generate */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <FeeMsg msg={msg} onClose={() => setMsg(null)} />
+
+      {/* ---- Super Admin: clean school selector ---- */}
+      {isSuper ? (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-emerald-600" />
-              Set Monthly Fee Structure
+              <SchoolIcon className="h-5 w-5" /> Select School
             </CardTitle>
-            <CardDescription>Configure the fee amount for a specific class &amp; month</CardDescription>
+            <CardDescription>
+              Pick a school to inspect its fee data in read-only mode. Gateway credentials can be configured per school.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSetFee} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Class</Label>
-                  <Select value={className} onValueChange={setClassName}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select class" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {CLASS_LIST.map((c) => (
-                        <SelectItem key={c} value={c}>
-                          {c}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Month (YYYY-MM)</Label>
-                  <Input type="month" value={month} onChange={(e) => setMonth(e.target.value)} required />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Title</Label>
-                  <Input value={feeTitle} onChange={(e) => setFeeTitle(e.target.value)} required />
-                </div>
-                <div className="space-y-2">
-                  <Label>Amount (৳)</Label>
-                  <Input type="number" value={feeAmount} onChange={(e) => setFeeAmount(e.target.value)} required min="0" step="0.01" placeholder="e.g. 1500" />
-                </div>
-              </div>
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-md transition-all"
-              >
-                {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-                Save Fee Structure
-              </button>
-            </form>
+          <CardContent className="max-w-md space-y-2">
+            <Label>School</Label>
+            <Select value={schoolId} onValueChange={setSchoolId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose a school..." />
+              </SelectTrigger>
+              <SelectContent>
+                {schoolList.map((s) => (
+                  <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
+      ) : null}
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5 text-blue-600" />
-              Bulk Generate Monthly Invoices
-            </CardTitle>
-            <CardDescription>Automatically generate invoices for all enrolled students in a class</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-sm text-blue-800 dark:text-blue-300">
-              Generating invoices will create a pending fee record for every student in <strong>{className}</strong> for <strong>{month}</strong>.
-            </div>
+      {/* ---- KPI strip (School Admin) ---- */}
+      {!isSuper && !ctxLoading && ctx && !ctx.needSchool ? (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            label="Today's Collection"
+            value={money(dash?.today?.collection || 0)}
+            sub={`${dash?.today?.receipts || 0} receipt(s) today`}
+            icon={Wallet}
+            tone="success"
+          />
+          <KpiCard
+            label="This Month's Collection"
+            value={money(dash?.month?.collection || 0)}
+            sub={`${dash?.month?.receipts || 0} receipt(s) this month`}
+            icon={TrendingUp}
+            tone="info"
+          />
+          <KpiCard
+            label="Total Pending Dues"
+            value={money(dash?.dues?.total || 0)}
+            sub={`${dash?.dues?.students || 0} student(s) · ${dash?.dues?.invoices || 0} invoice(s)`}
+            icon={AlertCircle}
+            tone="danger"
+          />
+          <button type="button" onClick={goToApprovals} className="w-full text-left" title="Review pending manual TrxID approvals">
+            <KpiCard
+              label="Pending Manual TrxID"
+              value={pendingManual}
+              sub="Awaiting verification — click to review"
+              icon={ShieldCheck}
+              tone={pendingManual > 0 ? "warning" : "default"}
+            />
+          </button>
+        </div>
+      ) : null}
+
+      {/* ---- Tabs ---- */}
+      <div className="flex flex-wrap gap-2 border-b pb-2">
+        {tabs.map((t) => {
+          const Icon = t.icon;
+          return (
             <button
-              onClick={handleBulkGenerateInvoices}
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 rounded-lg flex items-center justify-center gap-2 shadow-md transition-all"
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+                tab === t.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent"
+              }`}
             >
-              {loading && <Loader2 className="h-4 w-4 animate-spin" />}
-              Generate Invoices Now
+              <Icon className="h-4 w-4" /> {t.label}
             </button>
-          </CardContent>
-        </Card>
+          );
+        })}
       </div>
 
-      {/* Tabs */}
-      <div className="flex gap-2 border-b pb-2">
-        <button
-          onClick={() => setActiveTab("dues")}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
-            activeTab === "dues" ? "bg-emerald-600 text-white" : "text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
-          }`}
-        >
-          Class Student List &amp; Dues
-        </button>
-        <button
-          onClick={() => setActiveTab("invoices")}
-          className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all ${
-            activeTab === "invoices" ? "bg-emerald-600 text-white" : "text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
-          }`}
-        >
-          Invoices &amp; Payments
-        </button>
-      </div>
-
-      {activeTab === "dues" ? (
+      {/* ---- Body ---- */}
+      {ctxLoading && !ctx ? (
+        <div className="flex items-center justify-center gap-2 p-16 text-muted-foreground">
+          <Loader2 className="h-6 w-6 animate-spin" /> Loading the fees workspace...
+        </div>
+      ) : isSuper && requiresSchool && !schoolId ? (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle>Students Roster{className ? ` - ${className}` : ""}</CardTitle>
-              <CardDescription>Manage and view student fee statuses</CardDescription>
-            </div>
-            <div className="flex gap-2">
-              <Select value={section || "all"} onValueChange={(v) => setSection(v === "all" ? "" : v)}>
-                <SelectTrigger className="w-32">
-                  <SelectValue placeholder="Section" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Sections</SelectItem>
-                  {SECTION_LIST.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      {s}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="p-8 text-center text-muted-foreground">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" /> Loading student roster...
-              </div>
-            ) : !className ? (
-              <div className="p-8 text-center text-muted-foreground border-t border-dashed">
-                Select a class above to view its student roster.
-              </div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Roll</TableHead>
-                    <TableHead>Student ID</TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Class</TableHead>
-                    <TableHead>Section</TableHead>
-                    <TableHead>Father's Phone</TableHead>
-                    <TableHead>Total Due</TableHead>
-                    <TableHead>Due Breakdown (Month · Type)</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {students.map((st) => (
-                    <TableRow key={st._id} className={st.totalDue > 0 ? "bg-red-50/40 dark:bg-red-900/10" : ""}>
-                      <TableCell className="font-medium">{st.classRoll}</TableCell>
-                      <TableCell className="font-mono font-medium">{st.studentId}</TableCell>
-                      <TableCell className="font-medium">{st.studentName}</TableCell>
-                      <TableCell>{st.className}</TableCell>
-                      <TableCell>{st.section}</TableCell>
-                      <TableCell>{st.fathersPhone || "-"}</TableCell>
-                      <TableCell className={`font-bold ${st.totalDue > 0 ? "text-red-600" : "text-green-600"}`}>
-                        ৳{(st.totalDue || 0).toLocaleString("en-BD")}
-                      </TableCell>
-                      <TableCell>
-                        {st.dues?.length > 0 ? (
-                          <div className="flex flex-wrap gap-1">
-                            {st.dues.map((d, i) => (
-                              <span
-                                key={i}
-                                className="text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-0.5 rounded-full"
-                                title={`Due: ${new Date(d.dueDate).toLocaleDateString()}`}
-                              >
-                                {d.month} · {d.type} · ৳{d.amount}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <span className="text-green-600 text-xs">No dues</span>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
+          <CardContent className="p-12 text-center text-muted-foreground">
+            Select a school above to view its fee data.
           </CardContent>
         </Card>
       ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Issued Invoices</CardTitle>
-            <CardDescription>Recent invoices for {month}</CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            {loading ? (
-              <div className="p-8 text-center text-muted-foreground">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" /> Loading invoices...
-              </div>
-            ) : invoices.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">No invoices found for this month.</div>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Student</TableHead>
-                    <TableHead>Month</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {invoices.map((inv) => (
-                    <TableRow key={inv._id}>
-                      <TableCell className="font-medium">{inv.studentId?.name || inv.studentId?.studentName || "Student"}</TableCell>
-                      <TableCell>{inv.month}</TableCell>
-                      <TableCell className="capitalize">{inv.type}</TableCell>
-                      <TableCell className="font-semibold">৳{inv.amount}</TableCell>
-                      <TableCell>
-                        {inv.status === "paid" ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                            <CheckCircle className="h-3 w-3" /> Paid
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
-                            Pending
-                          </span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {inv.status !== "paid" && (
-                          <button
-                            onClick={() => handleMarkPaid(inv._id)}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded shadow-sm transition-all"
-                          >
-                            Mark Paid
-                          </button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+        <>
+          {/* ---------------------- School Admin ---------------------- */}
+          {!isSuper && tab === "setup" ? <FeeSetupTab ctx={ctx} onMsg={onMsg} /> : null}
+
+          {!isSuper && tab === "roster" ? (
+            <RosterTab ctx={ctx} onCollect={openCollect} onLedger={openLedger} reloadToken={reloadToken} />
+          ) : null}
+
+          {!isSuper && tab === "transactions" ? (
+            <TransactionsTab
+              ctx={ctx}
+              onMsg={onMsg}
+              focusSection={focusSection}
+              reloadToken={reloadToken}
+              onPrintReceipt={openReceiptById}
+            />
+          ) : null}
+
+          {/* ---------------------- Super Admin ---------------------- */}
+          {isSuper && tab === "support" ? (
+            <SupportViewTab
+              schoolId={schoolId}
+              ctx={ctx}
+              onMsg={onMsg}
+              onPrintLedger={openSupportLedger}
+              reloadToken={reloadToken}
+            />
+          ) : null}
+
+          {isSuper && tab === "gateway" ? (
+            <GatewayConfigTab schoolId={schoolId} readOnly={false} onMsg={onMsg} />
+          ) : null}
+
+          {isSuper && tab === "saas" ? <SaasBillingTab onMsg={onMsg} /> : null}
+        </>
       )}
+
+      {/* ---- Collect payment ---- */}
+      {!isSuper ? (
+        <CollectPaymentModal
+          open={collectOpen}
+          onClose={() => { setCollectOpen(false); setCollectStudent(null); }}
+          student={collectStudent}
+          heads={ctx?.heads || []}
+          onPaid={handlePaid}
+        />
+      ) : null}
+
+      {/* ---- Printable receipt / ledger (A5 / POS / A4) ---- */}
+      <FeePrintModal
+        open={Boolean(print)}
+        onClose={() => setPrint(null)}
+        mode={print?.mode || "receipt"}
+        receipt={print?.receipt || null}
+        ledger={print?.ledger || null}
+        school={brandSchool}
+      />
+
+      {printBusy && !print ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50">
+          <div className="flex items-center gap-2 rounded-lg bg-background px-5 py-3 text-sm shadow-xl">
+            <Printer className="h-4 w-4" /> Preparing document...
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

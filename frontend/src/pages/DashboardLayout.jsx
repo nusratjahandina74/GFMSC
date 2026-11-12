@@ -89,6 +89,7 @@ function DashboardLayout() {
         name: "Dashboard",
         path: dashboardPath,
         icon: LayoutDashboard,
+        exact: true,
       },
     ];
 
@@ -106,8 +107,8 @@ function DashboardLayout() {
           icon: FileCheck,
         },
         {
-          name: "Payments",
-          path: "/dashboard/payments",
+          name: "Fees & Dues",
+          path: "/dashboard/student/fees",
           icon: CreditCard,
         },
         {
@@ -137,6 +138,13 @@ function DashboardLayout() {
                 name: "Student Attendance",
                 path: "/dashboard/attendance",
                 icon: Users,
+              },
+              {
+                // Class Teacher only — a PAID/DUE flag per student, never
+                // an amount. Regular (subject) teachers never see this item.
+                name: "Student Fee Status",
+                path: "/dashboard/teacher/fee-status",
+                icon: CreditCard,
               },
             ]
           : []),
@@ -237,6 +245,11 @@ function DashboardLayout() {
       return [
         ...baseItems,
         {
+          name: "Fees & Dues",
+          path: "/dashboard/guardian/fees",
+          icon: CreditCard,
+        },
+        {
           name: "Report Card",
           path: "/dashboard/report-card",
           icon: FileCheck,
@@ -322,9 +335,10 @@ function DashboardLayout() {
             <ul className="space-y-1">
               {getNavItems().map((item) => {
                 const Icon = item.icon;
-                const isActive =
-                  location.pathname === item.path ||
-                  location.pathname.startsWith(item.path + "/");
+                const isActive = item.exact
+                  ? location.pathname === item.path
+                  : location.pathname === item.path ||
+                    location.pathname.startsWith(item.path + "/");
                 return (
                   <li key={item.path}>
                     <Link

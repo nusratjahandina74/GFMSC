@@ -36,6 +36,10 @@ import MarksEntry from "./pages/MarksEntry";
 import ReportCard from "./pages/ReportCard";
 import VerifyResult from "./pages/VerifyResult";
 import Payments from "./pages/student/Payments";
+import StudentFees from "./pages/student/Fees";
+import GuardianFees from "./pages/guardian/Fees";
+import TeacherFeeStatus from "./pages/teacher/FeeStatus";
+import FeesPaymentResult from "./pages/fees/FeesPaymentResult";
 import Attendance from "./pages/teacher/Attendance";
 import Routine from "./pages/Routine";
 import MyLeaves from "./pages/MyLeaves";
@@ -186,6 +190,43 @@ export default function App() {
           />
           <Route path="/payments/sandbox-complete" element={<PaymentSandboxComplete />} />
           <Route path="/payment/result" element={<PaymentResult />} />
+          {/* PUBLIC (no login): where the bKash / SSLCommerz checkout returns the
+              browser for the Fees & Dues module. Contract (backend redirect):
+              /fees-dues/payment-result?payment=success|failed|cancelled&message=… */}
+          <Route path="/fees-dues/payment-result" element={<FeesPaymentResult />} />
+          {/* Spec-path aliases: /guardian/fees, /student/fees and the teacher
+              class-teacher status view are role-guarded and land on the
+              sidebar-wrapped /dashboard/* routes. */}
+          <Route
+            path="/guardian/fees"
+            element={
+              <RequireAuth>
+                <RequireRole allowedRoles={["guardian"]}>
+                  <Navigate to="/dashboard/guardian/fees" replace />
+                </RequireRole>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/student/fees"
+            element={
+              <RequireAuth>
+                <RequireRole allowedRoles={["student"]}>
+                  <Navigate to="/dashboard/student/fees" replace />
+                </RequireRole>
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/teacher/fee-status"
+            element={
+              <RequireAuth>
+                <RequireRole allowedRoles={["teacher"]}>
+                  <Navigate to="/dashboard/teacher/fee-status" replace />
+                </RequireRole>
+              </RequireAuth>
+            }
+          />
 
           <Route
             path="/admin"
@@ -536,6 +577,30 @@ export default function App() {
               element={
                 <RequireRole allowedRoles={["guardian"]}>
                   <GuardianDashboard />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="guardian/fees"
+              element={
+                <RequireRole allowedRoles={["guardian"]}>
+                  <GuardianFees />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="student/fees"
+              element={
+                <RequireRole allowedRoles={["student"]}>
+                  <StudentFees />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="teacher/fee-status"
+              element={
+                <RequireRole allowedRoles={["teacher"]}>
+                  <TeacherFeeStatus />
                 </RequireRole>
               }
             />

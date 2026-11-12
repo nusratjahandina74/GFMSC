@@ -219,3 +219,97 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     background: #ffffff !important;
   }
 }
+
+/* =====================================================================
+ * 🧾 FEE MONEY-RECEIPT (A5 / POS) + YEARLY LEDGER PRINT STYLES
+ * ---------------------------------------------------------------------
+ * The global block above forces landscape for the routine table; a receipt
+ * is a small portrait document, so it uses a NAMED page (`fee-receipt`).
+ * The ledger uses `fee-ledger` (A4 portrait, one page).
+ *
+ * Only active while a fees overlay is open (`body.fee-print-mode`), so no
+ * other page is affected. Controls are tagged `.fee-no-print`; the modal
+ * shell `.fee-overlay` becomes static so only the sheet prints.
+ * ===================================================================== */
+@page fee-receipt {
+  size: A5 portrait;
+  margin: 8mm;
+}
+@page fee-ledger {
+  size: A4 portrait;
+  margin: 10mm;
+}
+@page fee-pos {
+  size: 80mm 210mm;
+  margin: 3mm;
+}
+
+.fee-receipt-sheet {
+  page: fee-receipt;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.fee-pos-sheet {
+  page: fee-pos;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.fee-ledger-sheet {
+  page: fee-ledger;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+@media print {
+  /* While a fees overlay is open it is portaled to <body>, so hiding the whole
+   * app shell (#root — sidebar, header, tables, everything) guarantees ONLY the
+   * receipt / ledger sheet reaches the paper. */
+  body.fee-print-mode #root {
+    display: none !important;
+  }
+  body.fee-print-mode .fee-no-print {
+    display: none !important;
+  }
+  /* Take the fixed modal out of the viewport so the sheet starts at page 1. */
+  body.fee-print-mode .fee-overlay {
+    position: static !important;
+    inset: auto !important;
+    display: block !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+  body.fee-print-mode .fee-modal-card {
+    width: 100% !important;
+    max-width: none !important;
+    max-height: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+  }
+  body.fee-print-mode .fee-doc-body {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: #ffffff !important;
+    overflow: visible !important;
+  }
+  body.fee-print-mode .fee-receipt-sheet,
+  body.fee-print-mode .fee-pos-sheet,
+  body.fee-print-mode .fee-ledger-sheet {
+    width: 100% !important;
+    margin: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+  }
+  body.fee-print-mode {
+    background: #ffffff !important;
+  }
+  /* Keep the printed receipt/ledger text crisp and dark. */
+  body.fee-print-mode .fee-receipt-sheet,
+  body.fee-print-mode .fee-pos-sheet,
+  body.fee-print-mode .fee-ledger-sheet {
+    color: #000000 !important;
+  }
+}

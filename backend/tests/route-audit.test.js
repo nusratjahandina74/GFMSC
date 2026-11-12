@@ -21,6 +21,12 @@ const PUBLIC_ALLOWLIST = new Set([
   "GET /api/slider", "GET /api/gallery", // public homepage images (active only)
   "POST /api/payments/sslcommerz/success", "POST /api/payments/sslcommerz/fail", "POST /api/payments/sslcommerz/cancel",
   "POST /api/payments/sslcommerz/ipn", "GET /api/payments/bkash/callback", "POST /api/payments/bkash/callback",
+  // Fees & Dues per-school gateway callbacks (bKash / SSLCommerz). Public like
+  // the legacy adapter above; each re-verifies server-to-server before the money
+  // is recognised, so an unauthenticated hit can never move a balance.
+  "GET /api/fees-dues/gateway/bkash/callback", "POST /api/fees-dues/gateway/bkash/callback",
+  "POST /api/fees-dues/gateway/sslcommerz/success", "POST /api/fees-dues/gateway/sslcommerz/fail",
+  "POST /api/fees-dues/gateway/sslcommerz/cancel", "POST /api/fees-dues/gateway/sslcommerz/ipn",
   "GET /api/schools/by-subdomain/:subdomain",
   // Public QR verification for report cards (the token in the QR is the
   // credential; the service re-checks the publish state before returning

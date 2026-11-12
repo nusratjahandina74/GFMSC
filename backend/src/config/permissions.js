@@ -34,6 +34,22 @@ export const PERMISSIONS = Object.freeze({
   "invoice:read:own": ["student"],
   "payment:initiate": ["schoolAdmin", "student"],
   "payment:read": ["schoolAdmin", "student"],
+  // Fees & Dues module (multi-head accounting).
+  "fees:read": ["schoolAdmin"],              // invoices, payments, ledger, dashboard (read)
+  "fees:void": ["schoolAdmin"],              // void / cancel a receipt or an unpaid invoice
+  "fees:verify": ["schoolAdmin"],            // approve / reject manual bKash/Nagad TrxID submissions
+  "fees:remind": ["schoolAdmin"],            // bulk SMS / in-app due reminders
+  "feehead:manage": ["schoolAdmin"],         // dynamic fee heads (categories)
+  "feestructure:manage": ["schoolAdmin"],    // per class/section prices for a head
+  "waiver:manage": ["schoolAdmin"],          // scholarship / waiver (discount) rules
+  "paymentconfig:manage": ["schoolAdmin"],   // per-school gateway credentials + late fine + manual banking
+  "fees:support:read": [],                   // superAdmin only: read-only support view over any school
+  "saas:manage": [],                         // superAdmin only: SaaS plan + platform invoices
+  // self-service (guardian pays, student reads, class teacher sees a status only)
+  "fees:guardian:read": ["guardian"],
+  "fees:guardian:pay": ["guardian"],
+  "fees:student:read": ["student"],
+  "fees:class:status": ["teacher"],
   // library / admissions / comms
   "library:manage": ["schoolAdmin", "staff"],
   "admission:review": ["schoolAdmin", "staff"],

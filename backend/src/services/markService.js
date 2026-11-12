@@ -67,7 +67,8 @@ export const makeAuthorizer = async (req, exam, sectionOverride) => {
     .select("subject section")
     .lean();
   const assignedSubjects = new Set(
-    assignments.filter((a) => String(a.section || "") === section).map((a) => a.subject)
+    // an assignment saved as "All sections" (section "") covers every section of the class
+    assignments.filter((a) => !a.section || String(a.section) === section).map((a) => a.subject)
   );
   return (subject) =>
     Boolean(isClassTeacher) || assignedSubjects.has(subject) || (teacher.subject && teacher.subject === subject);

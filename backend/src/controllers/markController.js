@@ -75,10 +75,23 @@ export const getMarksContext = async (req, res) => {
 
       // key = className|section -> Set(subject)
       const map = new Map();
+      // An assignment saved as "All sections" (section "") is expanded into the class's real
+      // sections (A/B/C...) so the section dropdown and the student grid work for the teacher.
+      const wildClasses = [...new Set(assignments.filter((a) => !a.section).map((a) => a.className))];
+      const sectionsOfClass = new Map();
+      for (const c of wildClasses) {
+        const secs = (await Student.distinct("section", { schoolId, className: c }))
+          .filter((x) => x !== undefined && x !== null)
+          .map(String);
+        sectionsOfClass.set(c, secs.length ? [...new Set(secs)] : [""]);
+      }
       for (const a of assignments) {
-        const key = `${a.className}|${a.section || ""}`;
-        if (!map.has(key)) map.set(key, { className: a.className, section: a.section || "", subjects: new Set() });
-        map.get(key).subjects.add(a.subject);
+        const secs = a.section ? [a.section] : sectionsOfClass.get(a.className) || [""];
+        for (const sec of secs) {
+          const key = `${a.className}|${sec}`;
+          if (!map.has(key)) map.set(key, { className: a.className, section: sec, subjects: new Set() });
+          map.get(key).subjects.add(a.subject);
+        }
       }
       // A Class Teacher can enter every subject of her class (from ClassSubject).
       for (const ct of ctRows) {

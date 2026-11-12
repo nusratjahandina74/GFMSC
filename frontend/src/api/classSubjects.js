@@ -1,9 +1,10 @@
 import apiClient from './client';
 
 // GET /api/class-subjects/:className -> { subjects: [...] }
-export const getSubjectsForClass = async (className) => {
+export const getSubjectsForClass = async (className, params = {}) => {
   try {
-    const response = await apiClient.get(`/class-subjects/${encodeURIComponent(className)}`);
+    // `params` carries { schoolId } for superAdmin so the subjects of the SELECTED school load.
+    const response = await apiClient.get(`/class-subjects/${encodeURIComponent(className)}`, { params });
     return response.data.subjects || [];
   } catch (error) {
     console.error('Error fetching subjects for class:', error);

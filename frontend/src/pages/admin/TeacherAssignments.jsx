@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
-import { BookOpen, Loader2, Plus, Save, Trash2, Users } from "lucide-react";
+import { BookOpen, Info, Loader2, Pencil, Save, Trash2, Users } from "lucide-react";
 import api from "../../api/client";
 import { getUser } from "../../api/auth";
 import { listSchools } from "../../api/schools";
@@ -61,7 +61,9 @@ export default function TeacherAssignments() {
   const [deletingId, setDeletingId] = useState("");
   const [msg, setMsg] = useState(null);
 
-  const [filter, setFilter] = useState({ className: "", section: ALL_SECTIONS });
+  const [filter, setFilter] = useState({ className: "", section: ALL_SECTIONS, teacherId: "" });
+  const [existing, setExisting] = useState([]); // subjects already saved for form teacher+class+section
+  const [loadingExisting, setLoadingExisting] = useState(false);
   const [form, setForm] = useState({ teacherId: "", className: "", section: ALL_SECTIONS, subjects: [] });
 
   const scopeParams = useMemo(
@@ -77,6 +79,13 @@ export default function TeacherAssignments() {
       .catch(() => {});
   }, [isSuperAdmin]);
 
+  // A different school has different teachers/classes: drop every pick.
+  useEffect(() => {
+    setForm({ teacherId: "", className: "", section: ALL_SECTIONS, subjects: [] });
+    setFilter({ className: "", section: ALL_SECTIONS, teacherId: "" });
+    setExisting([]);
+  }, [schoolId]);
+
   // ---- Load teachers + the current assignment slice ----------------------
   const loadAssignments = useCallback(async () => {
     if (isSuperAdmin && !schoolId) {
@@ -90,6 +99,7 @@ export default function TeacherAssignments() {
       const params = { ...scopeParams };
       if (filter.className) params.className = filter.className;
       if (filter.section && filter.section !== ALL_SECTIONS) params.section = filter.section;
+      if (filter.teacherId) params.teacherId = filter.teacherId;
 
       const [tRes, aRes] = await Promise.all([
         api.get("/teachers", { params: { all: true, activeOnly: true, ...scopeParams } }),
@@ -118,7 +128,7 @@ export default function TeacherAssignments() {
     let cancelled = false;
     (async () => {
       try {
-        const subjects = await getSubjectsForClass(className);
+        const subjects = await getSubjectsForClass(className, scopeParams);
         if (cancelled) return;
         const names = (subjects || []).map(subjectName).filter(Boolean);
         setOfferedSubjects(names);
@@ -129,7 +139,39 @@ export default function TeacherAssignments() {
     return () => {
       cancelled = true;
     };
-  }, [form.className]);
+  }, [form.className, scopeParams]);
+
+  // ---- Pre-tick what this teacher already teaches for the picked class/section ----
+  // (Saving REPLACES the list, so without this an admin could wipe subjects by accident.)
+  useEffect(() => {
+    const { teacherId, className, section } = form;
+    if (!teacherId || !className || (isSuperAdmin && !schoolId)) {
+      setExisting([]);
+      return undefined;
+    }
+    let cancelled = false;
+    setLoadingExisting(true);
+    listTeacherAssignments({
+      teacherId,
+      className,
+      section: section === ALL_SECTIONS ? "" : section,
+      ...scopeParams,
+    })
+      .then((res) => {
+        if (cancelled) return;
+        const names = (res.data?.assignments || []).map((a) => a.subject);
+        setExisting(names);
+        setForm((p) =>
+          p.teacherId === teacherId && p.className === className && p.section === section ? { ...p, subjects: names } : p
+        );
+      })
+      .catch(() => !cancelled && setExisting([]))
+      .finally(() => !cancelled && setLoadingExisting(false));
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.teacherId, form.className, form.section, schoolId, isSuperAdmin, scopeParams]);
 
   const toggleSubject = (subject) =>
     setForm((prev) => ({
@@ -143,7 +185,10 @@ export default function TeacherAssignments() {
     setMsg(null);
     if (!form.teacherId) return setMsg({ type: "error", text: "Please select a teacher." });
     if (!form.className) return setMsg({ type: "error", text: "Please select a class." });
-    if (!form.subjects.length) return setMsg({ type: "error", text: "Select at least one subject." });
+    if (!form.subjects.length) {
+      if (!existing.length) return setMsg({ type: "error", text: "Select at least one subject." });
+      if (!window.confirm("No subject is ticked. This will REMOVE all subjects of this teacher for the selected class/section. Continue?")) return;
+    }
     setSaving(true);
     try {
       const { data } = await bulkAssignTeacher({
@@ -154,8 +199,9 @@ export default function TeacherAssignments() {
         ...scopeParams,
       });
       setMsg({ type: "success", text: data?.message || "Subjects assigned." });
-      setForm((prev) => ({ ...prev, subjects: [] }));
+      setExisting([...form.subjects]);
       await loadAssignments();
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
     } catch (err) {
       setMsg({ type: "error", text: err?.response?.data?.message || "Could not save the assignment." });
     } finally {
@@ -178,7 +224,14 @@ export default function TeacherAssignments() {
     }
   };
 
+  const editRow = (a) => {
+    const tid = typeof a.teacherId === "object" ? a.teacherId?._id : a.teacherId;
+    setForm({ teacherId: tid || "", className: a.className, section: a.section || ALL_SECTIONS, subjects: [] });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
   const needsSchool = isSuperAdmin && !schoolId;
+  const selectedTeacher = teachers.find((t) => t._id === form.teacherId);
 
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
@@ -187,6 +240,14 @@ export default function TeacherAssignments() {
         <p className="text-muted-foreground">
           Map teachers to the class/section/subject they teach — this drives their Marks Entry dropdowns.
         </p>
+      </div>
+
+      <div className="flex items-start gap-2 rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
+        <Info className="h-4 w-4 mt-0.5 shrink-0" />
+        <div className="space-y-0.5">
+          <p><b>Kivabe kaj kore:</b> (1) Admin → Class Subjects e class er subject set thakte hobe. (2) Ekhane teacher + class + section pick kore subject tick kore Save korun. (3) Oi teacher Marks Entry te shudhu ei class/section/subject dekhbe.</p>
+          <p>"All sections" mane oi class er shob section (A, B, C...) e kaj korbe. Class Teacher hole oi class er shob subject auto pabe.</p>
+        </div>
       </div>
 
       {msg && (
@@ -293,7 +354,25 @@ export default function TeacherAssignments() {
           </div>
 
           <div className="space-y-2">
-            <Label>Subjects *</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label>
+                Subjects * {form.className && offeredSubjects.length > 0 && (
+                  <span className="text-xs font-normal text-muted-foreground">
+                    ({form.subjects.length}/{offeredSubjects.length} selected{loadingExisting ? ", loading saved..." : ""})
+                  </span>
+                )}
+              </Label>
+              {offeredSubjects.length > 0 && (
+                <div className="flex gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => setForm((p) => ({ ...p, subjects: [...offeredSubjects] }))}>
+                    Select all
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setForm((p) => ({ ...p, subjects: [] }))}>
+                    Clear
+                  </Button>
+                </div>
+              )}
+            </div>
             {!form.className ? (
               <p className="text-sm text-muted-foreground">Select a class to load its subjects.</p>
             ) : offeredSubjects.length === 0 ? (
@@ -318,8 +397,17 @@ export default function TeacherAssignments() {
             )}
           </div>
 
-          <div className="flex justify-end">
-            <Button onClick={save} disabled={saving || needsSchool}>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t pt-4">
+            <p className="text-xs text-muted-foreground">
+              {selectedTeacher && form.className
+                ? `${selectedTeacher.name} → ${form.className} / ${form.section === ALL_SECTIONS ? "All sections" : `Section ${form.section}`}: ${form.subjects.length} subject(s)`
+                : "Teacher ar class select korun."}
+            </p>
+            <Button
+              onClick={save}
+              disabled={saving || needsSchool || !form.teacherId || !form.className}
+              className="min-w-[160px] bg-blue-600 text-white hover:bg-blue-700"
+            >
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
               Save Subjects
             </Button>
@@ -333,6 +421,21 @@ export default function TeacherAssignments() {
           <CardTitle className="flex items-center gap-2"><Users className="h-5 w-5" /> Current Assignments</CardTitle>
           <CardDescription>Filter to narrow the list.</CardDescription>
           <div className="flex flex-wrap gap-3 pt-3">
+            <Select
+              value={filter.teacherId || "__all"}
+              onValueChange={(v) => setFilter((p) => ({ ...p, teacherId: v === "__all" ? "" : v }))}
+            >
+              <SelectTrigger className="md:w-56">
+                <SelectValue placeholder="All teachers" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__all">All teachers</SelectItem>
+                {teachers.map((t) => (
+                  <SelectItem key={t._id} value={t._id}>{t.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
             <Select
               value={filter.className || "__all"}
               onValueChange={(v) => setFilter((p) => ({ ...p, className: v === "__all" ? "" : v }))}
@@ -407,7 +510,14 @@ export default function TeacherAssignments() {
                           {a.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right whitespace-nowrap">
+                        <button
+                          onClick={() => editRow(a)}
+                          title="Edit this teacher's subjects for this class/section"
+                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 p-2 rounded hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-all"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
                         <button
                           onClick={() => remove(a._id)}
                           disabled={deletingId === a._id}
@@ -430,7 +540,7 @@ export default function TeacherAssignments() {
       </Card>
 
       <p className="text-xs text-muted-foreground flex items-center gap-1">
-        <Plus className="h-3 w-3" />
+        <Info className="h-3 w-3" />
         A teacher who is not assigned here will not see the class, section or subject in Marks Entry.
       </p>
     </div>

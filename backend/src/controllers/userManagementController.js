@@ -5,6 +5,7 @@ import Guardian from "../models/Guardian.js";
 import Teacher from "../models/Teacher.js";
 import Staff from "../models/Staff.js";
 import { audit } from "../utils/audit.js";
+import { safeRegex } from "../utils/safeRegex.js";
 
 // SchoolAdmin -> Create Teacher User
 export const createTeacherUser = async (req, res) => {
@@ -100,85 +101,102 @@ export const createSchoolAdmin = async (req, res) => {
 
 // Super Admin: Get all users (Universal Filter Override)
 // Super Admin: Get all users (Absolute Database Pipeline Override)
+// SuperAdmin: every account on the platform (User + Student + Guardian collections) in ONE list.
+// Query: role (superAdmin|schoolAdmin|teacher|staff|student|guardian|all), q (search name / email / ID / phone),
+// schoolId, page, limit.  Filtering, searching and counting are done by the database, so the role filter, the
+// search box and the page counts always agree with each other.
+const USER_COLLECTION_ROLES = ["superAdmin", "schoolAdmin", "teacher", "staff"];
+const MAX_WINDOW = 5000; // never load more than this many rows per collection for one page
+
 export const getAllUsers = async (req, res) => {
   try {
-    const { role } = req.query;
-    let combined = [];
+    const role = typeof req.query.role === "string" && req.query.role !== "all" ? req.query.role : "";
+    const validRoles = [...USER_COLLECTION_ROLES, "student", "guardian"];
+    if (role && !validRoles.includes(role)) return res.status(400).json({ message: "Unknown role filter." });
 
-    // 1) Pull core credential users (Super Admins, School Admins, Staff, Teachers)
-    if (!role || (role !== "student" && role !== "guardian" && role !== "all")) {
-      const users = await User.find({})
-        .select("-password -verificationToken -verificationTokenExpires -resetPasswordToken -resetPasswordExpires")
-        .populate("schoolId", "name email")
-        .lean();
-      
-      combined = combined.concat(users);
-    }
-
-    // 2) Pull all student records directly from the database without filters
-    if (!role || role === "student" || role === "all") {
-      const students = await Student.find({})
-        .populate("schoolId", "name email")
-        .lean();
-
-      combined = combined.concat(
-        students.map((s) => ({
-          _id: s._id,
-          name: s.studentName,
-          email: s.studentId, // Displays their unique Student ID as primary identifier
-          role: "student",
-          schoolId: s.schoolId,
-          isSuspended: !!s.isSuspended,
-          createdAt: s.createdAt,
-          className: s.className,
-          section: s.section,
-        }))
-      );
-    }
-
-    // 3) Pull all guardian records directly from the database without filters
-    if (!role || role === "guardian" || role === "all") {
-      const guardians = await Guardian.find({})
-        .populate("schoolId", "name email")
-        .lean();
-
-      combined = combined.concat(
-        guardians.map((g) => ({
-          _id: g._id,
-          name: g.name,
-          email: g.email,
-          role: "guardian",
-          schoolId: g.schoolId || null,
-          isSuspended: !!g.isSuspended,
-          createdAt: g.createdAt,
-        }))
-      );
-    }
-
-    // Global sorting logic by newest records first
-    combined.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-
-    // Handle standard pagination safely
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 20));
-    const total = combined.length;
-    const start = (page - 1) * limit;
-    const pageItems = combined.slice(start, start + limit);
+    if (page * limit > MAX_WINDOW) return res.status(400).json({ message: "That page is too deep — use the search box or a filter to narrow the list." });
 
-    res.json({ 
-      users: pageItems, 
-      total, 
-      page, 
-      limit, 
-      totalPages: Math.ceil(total / limit) || 1 
+    const schoolId = typeof req.query.schoolId === "string" && /^[a-f\d]{24}$/i.test(req.query.schoolId) ? req.query.schoolId : "";
+    const qRaw = typeof req.query.q === "string" ? req.query.q.trim() : "";
+    const rx = qRaw ? safeRegex(qRaw) : null;
+
+    const wantUsers = !role || USER_COLLECTION_ROLES.includes(role);
+    const wantStudents = !role || role === "student";
+    const wantGuardians = !role || role === "guardian";
+
+    const userFilter = {};
+    if (role) userFilter.role = role;
+    if (schoolId) userFilter.schoolId = schoolId;
+    if (rx) userFilter.$or = [{ name: rx }, { email: rx }, { phone: rx }];
+    // a platform superAdmin belongs to no school, so a school filter can never match one
+    const skipUsers = !wantUsers || (schoolId && role === "superAdmin");
+
+    const studentFilter = {};
+    if (schoolId) studentFilter.schoolId = schoolId;
+    if (rx) studentFilter.$or = [{ studentName: rx }, { studentId: rx }, { email: rx }, { fathersPhone: rx }, { mothersPhone: rx }];
+
+    const guardianFilter = {};
+    if (schoolId) guardianFilter.schoolId = schoolId;
+    if (rx) guardianFilter.$or = [{ name: rx }, { email: rx }, { phone: rx }];
+
+    const windowSize = page * limit;
+    const [uCount, sCount, gCount, users, students, guardians] = await Promise.all([
+      skipUsers ? 0 : User.countDocuments(userFilter),
+      wantStudents ? Student.countDocuments(studentFilter) : 0,
+      wantGuardians ? Guardian.countDocuments(guardianFilter) : 0,
+      skipUsers
+        ? []
+        : User.find(userFilter)
+            .select("-password -verificationToken -verificationTokenExpires -resetPasswordToken -resetPasswordExpires")
+            .populate("schoolId", "name email")
+            .sort({ createdAt: -1, _id: -1 })
+            .limit(windowSize)
+            .lean(),
+      wantStudents ? Student.find(studentFilter).populate("schoolId", "name email").sort({ createdAt: -1, _id: -1 }).limit(windowSize).lean() : [],
+      wantGuardians ? Guardian.find(guardianFilter).populate("schoolId", "name email").sort({ createdAt: -1, _id: -1 }).limit(windowSize).lean() : [],
+    ]);
+
+    const combined = [
+      ...users,
+      ...students.map((s) => ({
+        _id: s._id,
+        name: s.studentName,
+        email: s.studentId, // a student logs in with the unique Student ID, so that is shown as the identifier
+        role: "student",
+        schoolId: s.schoolId,
+        isSuspended: !!s.isSuspended,
+        createdAt: s.createdAt,
+        className: s.className,
+        section: s.section,
+      })),
+      ...guardians.map((g) => ({
+        _id: g._id,
+        name: g.name,
+        email: g.email,
+        role: "guardian",
+        schoolId: g.schoolId || null,
+        isSuspended: !!g.isSuspended,
+        createdAt: g.createdAt,
+      })),
+    ];
+    combined.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+
+    const total = uCount + sCount + gCount;
+    const start = (page - 1) * limit;
+    res.json({
+      users: combined.slice(start, start + limit),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit) || 1,
     });
   } catch (error) {
-    console.error("[userManagementController.js Aggregation Override Error]", error);
+    console.error("[userManagementController.js getAllUsers]", error);
     res.status(500).json({ message: "Something went wrong. Please try again." });
   }
 };
-
-
 
 // Shared helper: find an account by id across all three account collections,
 // since Students and Guardians aren't in the User collection.

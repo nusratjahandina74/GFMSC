@@ -143,7 +143,11 @@ export const feeDues = async (schoolId, studentId) => {
 // Publish gate — students & guardians may not view/download until this is true.
 // ---------------------------------------------------------------------------
 export const getPublishState = async (schoolId, examId, className, section = "") => {
-  const row = await ExamPublish.findOne({ schoolId, examId, className, section: section || "" }).lean();
+  // A publish row saved for the whole class (section "") also covers every section of that class; a row for
+  // the student's own section wins when both exist.
+  const sec = section || "";
+  const rows = await ExamPublish.find({ schoolId, examId, className, section: { $in: [sec, ""] } }).lean();
+  const row = rows.find((r) => (r.section || "") === sec) || rows[0];
   return { published: Boolean(row?.isPublished), publishedAt: row?.publishedAt || null, publishedByRole: row?.publishedByRole || "" };
 };
 

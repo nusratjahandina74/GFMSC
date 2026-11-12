@@ -718,6 +718,7 @@ export default function ReportCard() {
   const [ctxError, setCtxError] = useState(null);
 
   const [schoolId, setSchoolId] = useState("");
+  const [schoolOptions, setSchoolOptions] = useState([]); // superAdmin: keep the school list even after one is chosen
   const [examId, setExamId] = useState("");
   const [studentId, setStudentId] = useState("");
 
@@ -749,6 +750,7 @@ export default function ReportCard() {
       try {
         const { data } = await getReportContext({});
         setCtx(data);
+        if (data?.schools?.length) setSchoolOptions(data.schools);
       } catch (err) {
         setCtxError({ text: err?.response?.data?.message || "Could not load schools." });
       } finally {
@@ -765,6 +767,7 @@ export default function ReportCard() {
       if (studentId) params.studentId = studentId;
       const { data } = await getReportContext(params);
       setCtx(data);
+      if (data?.schools?.length) setSchoolOptions(data.schools);
     } catch (err) {
       const code = err?.response?.data?.code;
       setCtxError({ text: err?.response?.data?.message || "Could not load the report card context.", code });
@@ -1076,12 +1079,21 @@ export default function ReportCard() {
               <CardContent>
                 <div className="max-w-sm space-y-2">
                   <Label>School</Label>
-                  <Select value={schoolId} onValueChange={setSchoolId}>
+                  <Select
+                    value={schoolId}
+                    onValueChange={(v) => {
+                      // a new school has its own exams and students — drop the old picks
+                      setSchoolId(v);
+                      setExamId("");
+                      setStudentId("");
+                      setCard(null);
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Choose a school..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {(ctx?.schools || []).map((s) => (
+                      {(schoolOptions.length ? schoolOptions : ctx?.schools || []).map((s) => (
                         <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>
                       ))}
                     </SelectContent>

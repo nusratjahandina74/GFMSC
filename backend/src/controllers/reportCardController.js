@@ -176,6 +176,11 @@ export const getReportContext = async (req, res) => {
       templates: [],
     };
 
+    if (role === "superAdmin") {
+      const all = await School.find({ isActive: { $ne: false } }).select("name address phone").sort({ name: 1 }).lean();
+      base.schools = all.map((s) => ({ _id: s._id, name: s.name, address: s.address || "", phone: s.phone || "" }));
+    }
+
     let classFilters = null; // null = unrestricted (admin); array = restricted
     let sectionList = [];
 
@@ -271,17 +276,18 @@ export const getReportContext = async (req, res) => {
     if (role === "schoolAdmin" || role === "superAdmin") {
       const examId = req.query.examId;
       let cls = req.query.className ? String(req.query.className) : "";
-      let sec = req.query.section !== undefined ? String(req.query.section || "") : undefined;
+      let sec = req.query.section ? String(req.query.section) : undefined;
       if (examId && isValidId(examId)) {
         const ex = await Exam.findOne({ _id: examId, schoolId }).select("className section").lean();
         if (ex) {
           cls = ex.className;
-          sec = String(ex.section || "");
+          // an exam for the whole class (no section) lists every section's students
+          if (ex.section) sec = String(ex.section);
         }
       }
       if (cls) {
         const sf = { schoolId, className: cls };
-        if (sec !== undefined) sf.section = sec;
+        if (sec) sf.section = sec;
         const list = await Student.find(sf)
           .select("studentName studentId className section classRoll")
           .sort({ classRoll: 1 })
@@ -362,13 +368,23 @@ export const getBulkReportData = async (req, res) => {
     const className = req.query.className ? String(req.query.className) : exam.className;
     const section = req.query.section !== undefined ? String(req.query.section || "") : String(exam.section || "");
 
+    // an exam made for the whole class (section "") covers every section of that class...
+    let sectionFilter = section ? { section } : {};
     if (req.user.role === "teacher") {
-      const ok = await isClassTeacherOf(schoolId, req.user.userId, className, section);
-      if (!ok) throw new ReportCardError(403, "Only the Class Teacher of this class/section can load bulk report cards.", { code: "NOT_CLASS_TEACHER" });
+      if (section) {
+        const ok = await isClassTeacherOf(schoolId, req.user.userId, className, section);
+        if (!ok) throw new ReportCardError(403, "Only the Class Teacher of this class/section can load bulk report cards.", { code: "NOT_CLASS_TEACHER" });
+      } else {
+        // ...but a Class Teacher only ever gets the sections she is Class Teacher of
+        const me = await Teacher.findOne({ userId: req.user.userId, schoolId }).select("_id").lean();
+        const rows = me ? await ClassTeacher.find({ schoolId, className, teacherId: me._id }).select("section").lean() : [];
+        if (!rows.length) throw new ReportCardError(403, "Only the Class Teacher of this class/section can load bulk report cards.", { code: "NOT_CLASS_TEACHER" });
+        if (!rows.some((r) => !r.section)) sectionFilter = { section: { $in: rows.map((r) => r.section) } };
+      }
     }
 
-    const students = await Student.find({ schoolId, className, section })
-      .sort({ classRoll: 1 })
+    const students = await Student.find({ schoolId, className, ...sectionFilter })
+      .sort({ section: 1, classRoll: 1 })
       .limit(300);
     if (!students.length) return res.status(404).json({ message: "No students found for this class/section." });
 
@@ -722,8 +738,9 @@ export const downloadBulkReportCardsPdf = async (req, res) => {
     const className = req.query.className ? String(req.query.className) : exam.className;
     const section = req.query.section !== undefined ? String(req.query.section || "") : String(exam.section || "");
 
-    const students = await Student.find({ schoolId, className, section })
-      .sort({ classRoll: 1 })
+    // an exam made for the whole class (section "") covers every section of that class
+    const students = await Student.find({ schoolId, className, ...(section ? { section } : {}) })
+      .sort({ section: 1, classRoll: 1 })
       .limit(300);
     if (!students.length) return res.status(404).json({ message: "No students found for this class/section." });
 

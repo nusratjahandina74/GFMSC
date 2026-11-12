@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { Button } from "../../components/ui/button";
-import { Plus, Loader2, Building2, Pencil, Trash2, Lock, Unlock, Users2 } from "lucide-react";
+import { Plus, Loader2, Building2, Pencil, Trash2, Lock, Unlock, Users2, Search, X } from "lucide-react";
 import { listSchools, createSchool, updateSchool, deleteSchool } from "../../api/schools";
 import { listAllUsers, updateUserStatus, deleteUserAccount, updateAnyAccount } from "../../api/userManagement";
 import CredentialsModal from "../../components/CredentialsModal";
@@ -59,6 +59,10 @@ const SuperAdminPanel = () => {
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [roleFilter, setRoleFilter] = useState("all");
+  const [searchText, setSearchText] = useState(""); // what the user types in the search box
+  const [debouncedQ, setDebouncedQ] = useState(""); // what is actually sent (after a short pause)
+  const [schoolFilter, setSchoolFilter] = useState("all");
+  const usersReq = useRef(0); // only the newest request may update the list
   const [usersMsg, setUsersMsg] = useState("");
   const [usersPage, setUsersPage] = useState(1);
   const [usersTotalPages, setUsersTotalPages] = useState(1);
@@ -161,41 +165,43 @@ const SuperAdminPanel = () => {
 //     setUsersLoading(false);
 //   }
 // };
-  const loadUsers = async (selectedRole = "all", pageNum = 1) => {
+  const loadUsers = async (selectedRole = roleFilter, pageNum = 1, q = debouncedQ, school = schoolFilter) => {
+    const reqId = ++usersReq.current;
     setUsersLoading(true);
     setUsersMsg("");
     try {
-      // ১. গ্লোবাল প্যারামিটার তৈরি করা হচ্ছে
-      const params = {
-        page: pageNum,
-        limit: 20
-      };
+      const params = { page: pageNum, limit: 20 };
+      if (selectedRole && selectedRole !== "all") params.role = selectedRole;
+      if (q) params.q = q;
+      if (school && school !== "all") params.schoolId = school;
 
-      // ২. ফ্রন্টঅ্যান্ড থেকে যদি সুনির্দিষ্ট কোনো রোল সিলেক্ট করা হয়
-      if (selectedRole && selectedRole !== "all") {
-        params.role = selectedRole;
-      }
-
-      // ৩. আপনার প্রজেক্টের অফিশিয়াল এপিআই মেথড 'listAllUsers' কল করা হলো
-      // এটি স্বয়ংক্রিয়ভাবে ব্যাকঅ্যান্ডের গেটওয়ে এবং টোকেন ঠিক রেখে ৩৪টি ডাটাই তুলে আনবে।
       const res = await listAllUsers(params);
+      if (reqId !== usersReq.current) return; // a newer search already replaced this one
 
-      // ৪. ডাটাবেজ রেসপন্স অনুযায়ী ফ্রন্টঅ্যান্ড স্টেট সেভ করা হলো
-      setUsers(res?.data?.users || res?.users || []);
-      setUsersTotal(res?.data?.total || res?.total || 0);
-      setUsersPage(res?.data?.page || res?.page || pageNum);
-      setUsersTotalPages(res?.data?.totalPages || res?.totalPages || 1);
+      setUsers(res?.users || []);
+      setUsersTotal(res?.total || 0);
+      setUsersPage(res?.page || pageNum);
+      setUsersTotalPages(res?.totalPages || 1);
     } catch (err) {
+      if (reqId !== usersReq.current) return;
       setUsersMsg(err?.response?.data?.message || "Failed to load system accounts.");
       setUsers([]);
     } finally {
-      setUsersLoading(false);
+      if (reqId === usersReq.current) setUsersLoading(false);
     }
   };
 
+  // wait for a short pause in typing before searching
   useEffect(() => {
-    if (tab === "accounts") loadUsers(roleFilter, 1);
-  }, [tab, roleFilter]);
+    const t = setTimeout(() => setDebouncedQ(searchText.trim()), 350);
+    return () => clearTimeout(t);
+  }, [searchText]);
+
+  // role / search / school changes always restart from page 1
+  useEffect(() => {
+    if (tab === "accounts") loadUsers(roleFilter, 1, debouncedQ, schoolFilter);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, roleFilter, debouncedQ, schoolFilter]);
 
   const toggleHold = async (user) => {
     setUsersMsg("");
@@ -557,12 +563,40 @@ const SuperAdminPanel = () => {
                   Every account on the platform — School Admin, Teacher, Staff, Student and Guardian — hold an account to instantly block its login.
                 </CardDescription>
               </div>
+              <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={searchText}
+                  onChange={(e) => setSearchText(e.target.value)}
+                  placeholder="Search name, email, ID or phone..."
+                  className="pl-8 pr-8 w-[260px]"
+                  autoComplete="off"
+                />
+                {searchText && (
+                  <button type="button" onClick={() => setSearchText("")} className="absolute right-2 top-2.5 text-muted-foreground hover:text-foreground" title="Clear search">
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              <Select value={schoolFilter} onValueChange={setSchoolFilter}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="All schools" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Schools</SelectItem>
+                  {schools.map((sch) => (
+                    <SelectItem key={sch._id} value={sch._id}>{sch.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={roleFilter} onValueChange={setRoleFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[160px]">
                   <SelectValue placeholder="Filter by role" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Roles</SelectItem>
+                  <SelectItem value="superAdmin">Super Admin</SelectItem>
                   <SelectItem value="schoolAdmin">School Admin</SelectItem>
                   <SelectItem value="teacher">Teacher</SelectItem>
                   <SelectItem value="staff">Staff</SelectItem>
@@ -570,6 +604,7 @@ const SuperAdminPanel = () => {
                   <SelectItem value="guardian">Guardian</SelectItem>
                 </SelectContent>
               </Select>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -586,7 +621,7 @@ const SuperAdminPanel = () => {
             ) : users.length === 0 ? (
               <div className="p-8 text-center text-gray-500 dark:text-gray-400">
                 <Users2 className="h-10 w-10 mx-auto mb-3 opacity-40" />
-                No accounts found for this filter.
+                {debouncedQ ? `No account matches “${debouncedQ}”.` : "No accounts found for this filter."}
               </div>
             ) : (
               <Table>

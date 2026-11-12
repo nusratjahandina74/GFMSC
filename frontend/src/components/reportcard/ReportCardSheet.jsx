@@ -46,6 +46,32 @@ function QrImage({ value, size = 92 }) {
 
 const fmt = (n, d = 2) => Number(n || 0).toFixed(d);
 
+// Click-to-upload wrapper used on the on-screen preview (admins only).
+// The hover overlay carries `rc-no-print`, so it never appears on paper / PDF.
+function EditableBox({ onClick, busy, hasImage, label, children }) {
+  if (!onClick) return children;
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      title={hasImage ? `Change ${label}` : `Upload ${label}`}
+      onClick={onClick}
+      onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && onClick()}
+      className="relative group cursor-pointer shrink-0"
+    >
+      {children}
+      <div
+        className={cn(
+          "rc-no-print absolute inset-0 items-center justify-center bg-black/55 text-white text-[10px] font-semibold text-center leading-tight rounded",
+          busy ? "flex" : "hidden group-hover:flex"
+        )}
+      >
+        {busy ? "Uploading..." : hasImage ? `Change ${label}` : `Upload ${label}`}
+      </div>
+    </div>
+  );
+}
+
 // The grading scale legend, e.g. "A+ ≥80 (5.00) · A ≥70 (4.00) …".
 function GradingLegend({ scale }) {
   const rows = Array.isArray(scale) ? scale : [];
@@ -140,7 +166,9 @@ function InfoRow({ label, value, mono }) {
   );
 }
 
-export default function ReportCardSheet({ card, className }) {
+// `editable` (optional) = { onLogo, onPhoto, busy: "logo" | "photo" | "" } turns the
+// LOGO / PHOTO boxes into click-to-upload buttons (preview only).
+export default function ReportCardSheet({ card, className, editable }) {
   if (!card) return null;
   const code = String(card.template?.code || card.settings?.reportCardTemplate || "CLASSIC").toUpperCase();
   const accent = card.template?.accentColor || card.school?.headerColor || FALLBACK;
@@ -149,15 +177,25 @@ export default function ReportCardSheet({ card, className }) {
   const showBorder = card.template?.showBorder !== false;
   const isMinimal = code === "MINIMAL";
 
-  const logoBox = card.school?.logoUrl ? (
+  const logoImg = card.school?.logoUrl ? (
     <img src={card.school.logoUrl} alt="logo" className="h-16 w-16 object-contain" />
   ) : (
     <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center text-[10px] text-gray-500">LOGO</div>
   );
-  const photoBox = card.student?.photoUrl ? (
+  const photoImg = card.student?.photoUrl ? (
     <img src={card.student.photoUrl} alt="student" className="h-20 w-16 object-cover border" />
   ) : (
     <div className="h-20 w-16 border flex items-center justify-center text-[10px] text-gray-400">PHOTO</div>
+  );
+  const logoBox = (
+    <EditableBox onClick={editable?.onLogo} busy={editable?.busy === "logo"} hasImage={!!card.school?.logoUrl} label="Logo">
+      {logoImg}
+    </EditableBox>
+  );
+  const photoBox = (
+    <EditableBox onClick={editable?.onPhoto} busy={editable?.busy === "photo"} hasImage={!!card.student?.photoUrl} label="Photo">
+      {photoImg}
+    </EditableBox>
   );
 
   const headBg = isMinimal ? "#f3f4f6" : accent;

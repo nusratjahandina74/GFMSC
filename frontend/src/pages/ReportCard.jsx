@@ -71,6 +71,7 @@ import {
   downloadBulkReportCardsPdf,
 } from "../api/reportCards";
 import { uploadImage } from "../api/uploads";
+import { updateIdCardStudentInfo } from "../api/idCards";
 import ReportCardSheet from "../components/reportcard/ReportCardSheet";
 
 // ---------------------------------------------------------------------------
@@ -728,6 +729,9 @@ export default function ReportCard() {
   const [publishBusy, setPublishBusy] = useState(false);
   const [confirmPublish, setConfirmPublish] = useState(null); // { make: bool }
   const [pdfBusy, setPdfBusy] = useState("");
+  const [imgBusy, setImgBusy] = useState(""); // "logo" | "photo" while an image uploads
+  const logoInputRef = useRef(null);
+  const photoInputRef = useRef(null);
   const [remarksDraft, setRemarksDraft] = useState("");
   const [remarksSaving, setRemarksSaving] = useState(false);
 
@@ -855,6 +859,33 @@ export default function ReportCard() {
       setCardLoading(false);
     }
   }, [examId, studentId, ctx, isStudent, schoolId]);
+
+  // Click the LOGO / PHOTO box (or the buttons above the card) to upload.
+  // logo  -> saved in the school's report-card settings (all cards of the school)
+  // photo -> saved on this student's record (also used on the ID card)
+  const onPickImage = async (file, kind) => {
+    if (!file) return;
+    if (kind === "photo" && !card?.student?._id) return;
+    setImgBusy(kind);
+    setMsg(null);
+    try {
+      const { url } = await uploadImage(file, kind === "logo" ? "report-cards" : "student-photos");
+      if (!url) throw new Error("Upload failed.");
+      if (kind === "logo") {
+        const payload = { logoUrl: url };
+        if (schoolId) payload.schoolId = schoolId;
+        await updateReportSettings(payload);
+      } else {
+        await updateIdCardStudentInfo(card.student._id, { photoUrl: url });
+      }
+      await loadCard();
+      setMsg({ type: "success", text: kind === "logo" ? "School logo updated on all report cards." : "Student photo updated." });
+    } catch (err) {
+      setMsg({ type: "error", text: err?.response?.data?.message || err?.message || "Upload failed." });
+    } finally {
+      setImgBusy("");
+    }
+  };
 
   useEffect(() => {
     loadCard();
@@ -1297,10 +1328,36 @@ export default function ReportCard() {
               {isStudentSide && <Highlights card={card} />}
               {isStudentSide && <SubjectChart card={card} />}
               {isStudent && <GpaTrendChart trend={trend} />}
+              {isAdmin && (
+                <div className="flex flex-wrap items-center gap-2 rc-no-print">
+                  <input ref={logoInputRef} type="file" accept="image/*" hidden onChange={(e) => { onPickImage(e.target.files?.[0], "logo"); e.target.value = ""; }} />
+                  <input ref={photoInputRef} type="file" accept="image/*" hidden onChange={(e) => { onPickImage(e.target.files?.[0], "photo"); e.target.value = ""; }} />
+                  <Button type="button" variant="outline" size="sm" disabled={!!imgBusy} onClick={() => logoInputRef.current?.click()}>
+                    {imgBusy === "logo" ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+                    {card.school?.logoUrl ? "Change School Logo" : "Upload School Logo"}
+                  </Button>
+                  <Button type="button" variant="outline" size="sm" disabled={!!imgBusy} onClick={() => photoInputRef.current?.click()}>
+                    {imgBusy === "photo" ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Upload className="h-4 w-4 mr-1" />}
+                    {card.student?.photoUrl ? "Change Student Photo" : "Upload Student Photo"}
+                  </Button>
+                  <span className="text-xs text-muted-foreground">Or just click the LOGO / PHOTO box on the card.</span>
+                </div>
+              )}
               <div
                 className={`rc-print-root overflow-x-auto print:overflow-visible${bulkPrinting ? " rc-suppress-print" : ""}`}
               >
-                <ReportCardSheet card={card} />
+                <ReportCardSheet
+                  card={card}
+                  editable={
+                    isAdmin
+                      ? {
+                          busy: imgBusy,
+                          onLogo: () => !imgBusy && logoInputRef.current?.click(),
+                          onPhoto: () => !imgBusy && photoInputRef.current?.click(),
+                        }
+                      : undefined
+                  }
+                />
               </div>
             </>
           ) : (

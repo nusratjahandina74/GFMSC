@@ -241,14 +241,14 @@ export default function TeacherAssignments() {
           Map teachers to the class/section/subject they teach — this drives their Marks Entry dropdowns.
         </p>
       </div>
-
+{/* 
       <div className="flex items-start gap-2 rounded-lg border bg-muted/40 p-3 text-xs text-muted-foreground">
         <Info className="h-4 w-4 mt-0.5 shrink-0" />
         <div className="space-y-0.5">
           <p><b>Kivabe kaj kore:</b> (1) Admin → Class Subjects e class er subject set thakte hobe. (2) Ekhane teacher + class + section pick kore subject tick kore Save korun. (3) Oi teacher Marks Entry te shudhu ei class/section/subject dekhbe.</p>
           <p>"All sections" mane oi class er shob section (A, B, C...) e kaj korbe. Class Teacher hole oi class er shob subject auto pabe.</p>
         </div>
-      </div>
+      </div> */}
 
       {msg && (
         <div

@@ -104,7 +104,7 @@ export default function AdminTeachers() {
     setMsg("");
     try {
       if (editingId) {
-        const { password, ...updateData } = formData;
+        const { password: _password, ...updateData } = formData;
         await updateTeacher(editingId, updateData);
         setMsg("✅ Teacher updated successfully");
       } else {

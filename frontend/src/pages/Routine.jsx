@@ -20,7 +20,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Clock, MapPin, Plus, Edit, Trash2, Loader2, Printer, Check, X, Save, Table2, ShieldCheck, CalendarOff } from "lucide-react";
 import { getClassRoutine, getMyRoutine, createRoutine, updateRoutine, deleteRoutine, getAllSchools } from "../api/routines";
 import { getRoutineMatrix } from "../api/routineMatrix";
-import { getShiftTemplates, createShiftTemplate, updateShiftTemplate, deleteShiftTemplate } from "../api/shiftTemplates";
+import { getShiftTemplates, createShiftTemplate, updateShiftTemplate } from "../api/shiftTemplates";
 import { getTeachers } from "../api/teachers";
 import { getClassSubjects } from "../api/classSubjects";
 import { CLASS_LIST, SECTION_LIST } from "../lib/constants";
@@ -1048,7 +1048,6 @@ function ShiftSetupPanel({ currentSchoolId }) {
   const [periods, setPeriods] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [msg, setMsg] = useState("");
 
   // 🌟 ১. পরিবর্তন: স্কুল আইডি দিয়ে ফিল্টার করার জন্য এপিআই কলে অবজেক্ট পাস করা হলো

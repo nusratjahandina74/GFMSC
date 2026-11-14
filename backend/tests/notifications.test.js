@@ -88,8 +88,9 @@ test("stuck 'sending' rows (crash mid-send) are recovered; concurrent workers ca
 });
 
 test("absence SMS from attendance goes through the outbox, to the verified guardians only", async () => {
-  const { request, app, makeUser, login, auth } = await import("./helpers/setup.js");
-  await makeUser("schoolAdmin", S._id, "nt@x.test"); const tok = (await login("nt@x.test")).token;
+  const { request, app, makeClassTeacher, auth } = await import("./helpers/setup.js");
+  // Only the assigned class teacher can take attendance (school admins are read-only there).
+  const tok = (await makeClassTeacher(S._id, "nt@x.test", [["Class 8", "A"]])).token;
   const st = await makeStudent(S._id, { classRoll: 1, className: "Class 8", section: "A", fathersPhone: "01711111111", mothersPhone: "01811111111" });
   const r = await request(app).post("/api/attendance").set(auth(tok)).send({ date: "2026-04-01", className: "Class 8", section: "A", records: [{ studentId: String(st._id), status: "absent" }] });
   assert.equal(r.status, 200, JSON.stringify(r.body));

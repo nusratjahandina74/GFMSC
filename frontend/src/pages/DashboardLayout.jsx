@@ -15,13 +15,17 @@ import {
   Calendar,
   CalendarDays,
   ShieldCheck,
+  Library as LibraryIcon,
   Loader2,
+  UserPlus,
+  ClipboardList,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import ThemeToggle from "../components/ThemeToggle";
 import { useContext, useEffect, useState } from "react";
 import { AuthContext } from "../App";
 import { getClassTeachers } from "../api/classTeachers";
+import { getCommitteeAccess } from "../api/admissions";
 
 function DashboardLayout() {
   const { user, setUser } = useContext(AuthContext);
@@ -34,6 +38,8 @@ function DashboardLayout() {
   // Card in their sidebar — a "subject teacher" with no class assignment
   // has no student roster to take attendance for or enter marks against.
   const [isClassTeacher, setIsClassTeacher] = useState(false);
+  // The Admission Marks menu is hidden by default: only teachers the school admin put on the admission committee see it.
+  const [isAdmissionCommittee, setIsAdmissionCommittee] = useState(false);
 
   useEffect(() => {
     const init = async () => {
@@ -64,6 +70,15 @@ function DashboardLayout() {
     return () => {
       cancelled = true;
     };
+  }, [role, user]);
+
+  useEffect(() => {
+    if (role !== "teacher" || !user) return;
+    let cancelled = false;
+    getCommitteeAccess()
+      .then((r) => { if (!cancelled) setIsAdmissionCommittee(!!r.isMember); })
+      .catch(() => { /* no access -> menu stays hidden */ });
+    return () => { cancelled = true; };
   }, [role, user]);
 
   const handleLogout = () => {
@@ -110,6 +125,11 @@ function DashboardLayout() {
           name: "Fees & Dues",
           path: "/dashboard/student/fees",
           icon: CreditCard,
+        },
+        {
+          name: "Library",
+          path: "/dashboard/library",
+          icon: LibraryIcon,
         },
         {
           name: "Notices",
@@ -167,10 +187,18 @@ function DashboardLayout() {
           path: "/dashboard/marks",
           icon: BookOpen,
         },
+        ...(isAdmissionCommittee
+          ? [{ name: "Admission Marks", path: "/dashboard/admission-marks", icon: ClipboardList }]
+          : []),
         {
           name: "Report Card",
           path: "/dashboard/report-card",
           icon: FileCheck,
+        },
+        {
+          name: "Library",
+          path: "/dashboard/library",
+          icon: LibraryIcon,
         },
         {
           name: "My Leaves",
@@ -248,6 +276,16 @@ function DashboardLayout() {
           name: "Fees & Dues",
           path: "/dashboard/guardian/fees",
           icon: CreditCard,
+        },
+        {
+          name: "Admissions",
+          path: "/dashboard/guardian/admissions",
+          icon: UserPlus,
+        },
+        {
+          name: "Library",
+          path: "/dashboard/guardian/library",
+          icon: LibraryIcon,
         },
         {
           name: "Report Card",

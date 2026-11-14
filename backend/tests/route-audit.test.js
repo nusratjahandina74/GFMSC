@@ -9,7 +9,8 @@ import { rolesFor } from "../src/config/permissions.js";
 // router.use) or be on the reviewed PUBLIC allow-list below. A new unprotected endpoint FAILS this test until
 // someone consciously adds it here. Then every protected route is hit WITHOUT a token and must answer 401.
 const PUBLIC_ALLOWLIST = new Set([
-  "POST /api/admissions/apply/:schoolId", "POST /api/auth/superadmin", "POST /api/auth/register", "POST /api/auth/login",
+  "POST /api/admissions/apply/:schoolId", "GET /api/admissions/public/:schoolId/circular", "POST /api/admissions/public/:schoolId/track", "POST /api/admissions/public/:schoolId/upload",
+  "POST /api/auth/superadmin", "POST /api/auth/register", "POST /api/auth/login",
   "POST /api/auth/refresh", "POST /api/auth/logout", "GET /api/auth/verify-email", "POST /api/auth/verify-email",
   "POST /api/auth/resend-verification", "POST /api/auth/forgot-password", "POST /api/auth/reset-password",
   "GET /api/contact/ping", "POST /api/contact",

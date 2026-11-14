@@ -59,7 +59,7 @@ export default function AdminDashboard() {
       try {
         const res = await api.get("/dashboard/school-admin/analytics");
         if (isMounted) setAnalytics(res?.data);
-      } catch (e) {
+      } catch {
         // Analytics block fallback execution
       } finally {
         if (isMounted) setAnalyticsLoading(false);

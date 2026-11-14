@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Button } from "../components/ui/button";
@@ -16,7 +16,7 @@ export default function PaymentSandboxComplete() {
   const navigate = useNavigate();
   const trxId = params.get("txn");
   const orderId = trxId;
-  const amount = null; // amount is decided by the server from the invoice, never by the URL
+  // The amount is decided by the server from the invoice, never by the URL.
 
   const [status, setStatus] = useState("idle"); // idle | processing | done | error
   const [msg, setMsg] = useState("");

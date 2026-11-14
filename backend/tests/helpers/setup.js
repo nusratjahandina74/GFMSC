@@ -69,3 +69,14 @@ export const engineIsAtomic = async () => {
   await C.drop().catch(() => {});
   return ok;
 };
+
+// A logged-in teacher who is the assigned CLASS TEACHER of the given [className, section] pairs.
+// (Attendance may only be taken by the class teacher; school admins are read-only there.)
+export const makeClassTeacher = async (schoolId, email, classes = [["Class 8", "A"]]) => {
+  const user = await makeUser("teacher", schoolId, email);
+  const { default: Teacher } = await import("../../src/models/Teacher.js");
+  const { default: ClassTeacher } = await import("../../src/models/ClassTeacher.js");
+  const teacher = await Teacher.create({ name: "CT " + email, email, phone: "01711111111", schoolId, userId: user._id });
+  for (const [className, section] of classes) await ClassTeacher.create({ schoolId, teacherId: teacher._id, className, section });
+  return { user, teacher, token: (await login(email)).token };
+};

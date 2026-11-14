@@ -223,8 +223,10 @@ export const saveMarks = async (req, examId, rows, opts = {}) => {
         )
       )
     );
+    // NOTE: ExamMark has no className field (the exam already pins the class), so filtering on it here
+    // matched nothing and every successful save was reported as "Mark could not be saved".
     saved = await ExamMark.find({
-      schoolId, examId: exam._id, className,
+      schoolId, examId: exam._id,
       $or: clean.map((c) => ({ studentId: c.studentId, subject: c.subject })),
     });
   }

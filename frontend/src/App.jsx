@@ -45,6 +45,8 @@ import Routine from "./pages/Routine";
 import MyLeaves from "./pages/MyLeaves";
 import Unauthorized from "./pages/Unauthorized";
 import LibraryPage from "./pages/admin/Library";
+import MyLibrary from "./pages/student/Library";
+import GuardianLibrary from "./pages/guardian/Library";
 import StaffAttendanceOverview from "./pages/admin/StaffAttendanceOverview";
 import StudentAttendanceOverview from "./pages/admin/StudentAttendanceOverview";
 import AdmissionsPage from "./pages/admin/Admissions";
@@ -54,6 +56,10 @@ import SliderManager from "./pages/admin/SliderManager";
 import TickerManager from "./pages/admin/TickerManager";
 import GalleryManager from "./pages/admin/GalleryManager";
 import PublicAdmissionApply from "./pages/PublicAdmissionApply";
+import PublicAdmissionTrack from "./pages/PublicAdmissionTrack";
+import GuardianAdmissions from "./pages/guardian/Admissions";
+import TeacherAdmissionMarks from "./pages/teacher/AdmissionMarks";
+import AdmissionAnalytics from "./pages/admin/AdmissionAnalytics";
 import SuperAdminPanel from "./pages/admin/SuperAdminPanel";
 import { getRole, isLoggedIn, getUser } from "./api/auth";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -128,7 +134,6 @@ export default function App() {
   useEffect(() => {
     try {
       const userData = getUser();
-      const roleData = getRole();
       setUser(userData);
     } catch (err) {
       console.error("[App] Error loading user from localStorage", err);
@@ -160,6 +165,7 @@ export default function App() {
           {/* Public pages */}
           <Route path="/notices" element={<NoticeList />} />
           <Route path="/admission/apply/:schoolId" element={<PublicAdmissionApply />} />
+          <Route path="/admission/track/:schoolId" element={<PublicAdmissionTrack />} />
           <Route path="/notices/:id" element={<NoticeDetails />} />
           <Route path="/blog" element={<BlogList />} />
           <Route path="/blog/:id" element={<BlogDetails />} />
@@ -360,7 +366,7 @@ export default function App() {
             <Route
               path="library"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <LibraryPage />
                 </RequireRole>
               }
@@ -368,8 +374,16 @@ export default function App() {
             <Route
               path="admissions"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdmissionsPage />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="admission-analytics"
+              element={
+                <RequireRole allowedRoles={["superAdmin"]}>
+                  <AdmissionAnalytics />
                 </RequireRole>
               }
             />
@@ -589,6 +603,22 @@ export default function App() {
               }
             />
             <Route
+              path="guardian/admissions"
+              element={
+                <RequireRole allowedRoles={["guardian"]}>
+                  <GuardianAdmissions />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="admission-marks"
+              element={
+                <RequireRole allowedRoles={["teacher"]}>
+                  <TeacherAdmissionMarks />
+                </RequireRole>
+              }
+            />
+            <Route
               path="student/fees"
               element={
                 <RequireRole allowedRoles={["student"]}>
@@ -601,6 +631,23 @@ export default function App() {
               element={
                 <RequireRole allowedRoles={["teacher"]}>
                   <TeacherFeeStatus />
+                </RequireRole>
+              }
+            />
+            {/* Library: student + teacher share one self-service page; guardian gets a read-only one. */}
+            <Route
+              path="library"
+              element={
+                <RequireRole allowedRoles={["student", "teacher"]}>
+                  <MyLibrary />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="guardian/library"
+              element={
+                <RequireRole allowedRoles={["guardian"]}>
+                  <GuardianLibrary />
                 </RequireRole>
               }
             />

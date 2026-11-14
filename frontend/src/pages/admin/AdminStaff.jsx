@@ -82,7 +82,7 @@ export default function AdminStaff() {
     setMsg("");
     try {
       if (editingId) {
-        const { password, ...updateData } = formData;
+        const { password: _password, ...updateData } = formData;
         await updateStaff(editingId, updateData);
         setMsg("✅ Staff member updated successfully");
       } else {

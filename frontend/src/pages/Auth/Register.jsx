@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { Eye, EyeOff, MailCheck } from 'lucide-react';
 import API from '../../services/api';
 
 export default function Register() {
-  const navigate = useNavigate();
   const [fullName, setFullName] = useState('');
   const [schoolName, setSchoolName] = useState('');
   const [email, setEmail] = useState('');

@@ -26,8 +26,9 @@ import {
   GalleryHorizontal,
   Images,
   Megaphone,
+  BarChart3,
 } from "lucide-react";
-import { getRole, logout, getUser } from "../../api/auth";
+import { getRole, logout } from "../../api/auth";
 import { useContext } from "react";
 import { AuthContext } from "../../App";
 import { useTheme } from "../../contexts/ThemeContext";
@@ -154,10 +155,11 @@ export default function AdminSidebar() {
       roles: ["schoolAdmin", "superAdmin"],
     },
     {
+      // Super Admin does not run a school's library (issue/return, catalog), so the menu is hidden for them.
       name: "Library",
       path: "/admin/library",
       icon: Library,
-      roles: ["schoolAdmin", "superAdmin"],
+      roles: ["schoolAdmin"],
     },
     {
       name: "Teacher & Staff Attendance",
@@ -166,10 +168,17 @@ export default function AdminSidebar() {
       roles: ["schoolAdmin", "superAdmin"],
     },
     {
+      // School admin only: running admissions is a school job. The super admin gets the read-only analytics below.
       name: "Admissions",
       path: "/admin/admissions",
       icon: UserPlus,
-      roles: ["schoolAdmin", "superAdmin"],
+      roles: ["schoolAdmin"],
+    },
+    {
+      name: "Admission Analytics",
+      path: "/admin/admission-analytics",
+      icon: BarChart3,
+      roles: ["superAdmin"],
     },
     {
       name: "ID Cards",

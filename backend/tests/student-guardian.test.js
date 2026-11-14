@@ -1,6 +1,6 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { request, app, connect, disconnect, makeSchool, makeUser, makeStudent, login, auth, PW } from "./helpers/setup.js";
+import { request, app, connect, disconnect, makeSchool, makeUser, makeStudent, makeClassTeacher, login, auth, PW } from "./helpers/setup.js";
 
 let A, B, tokA, stuA, stuB, teacherUser;
 before(async () => {
@@ -71,18 +71,21 @@ test("guardian cannot be linked to a student of ANOTHER school", async () => {
 });
 
 test("C10: attendance rejects students from another school / wrong class, accepts valid ones", async () => {
-  const bad = await request(app).post("/api/attendance").set(auth(tokA)).send({
+  // Only the assigned class teacher may take attendance (admins are read-only), so act as one.
+  const ct = await makeClassTeacher(A._id, "sg-ct@x.test", [["Class 8", "A"], ["Class 3", "A"]]);
+  const tokT = ct.token;
+  const bad = await request(app).post("/api/attendance").set(auth(tokT)).send({
     date: "2026-03-01", className: "Class 8", section: "A", records: [{ studentId: String(stuA._id), status: "present" }, { studentId: String(stuB._id), status: "absent" }] });
   assert.equal(bad.status, 400);
   const { default: Attendance } = await import("../src/models/Attendance.js");
   assert.equal(await Attendance.countDocuments({ date: "2026-03-01" }), 0, "nothing may be stored when a record is foreign");
-  const wrongClass = await request(app).post("/api/attendance").set(auth(tokA)).send({
+  const wrongClass = await request(app).post("/api/attendance").set(auth(tokT)).send({
     date: "2026-03-01", className: "Class 3", section: "A", records: [{ studentId: String(stuA._id), status: "present" }] });
   assert.equal(wrongClass.status, 400);
-  const dup = await request(app).post("/api/attendance").set(auth(tokA)).send({
+  const dup = await request(app).post("/api/attendance").set(auth(tokT)).send({
     date: "2026-03-01", className: "Class 8", section: "A", records: [{ studentId: String(stuA._id) }, { studentId: String(stuA._id) }] });
   assert.equal(dup.status, 400);
-  const ok = await request(app).post("/api/attendance").set(auth(tokA)).send({
+  const ok = await request(app).post("/api/attendance").set(auth(tokT)).send({
     date: "2026-03-01", className: "Class 8", section: "A", records: [{ studentId: String(stuA._id), status: "present" }] });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
 });

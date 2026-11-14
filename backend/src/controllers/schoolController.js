@@ -292,7 +292,10 @@ export const deleteSchoolBySuperAdmin = async (req, res) => {
 
     // H12: remove EVERYTHING the school owns, not just its admin. Every model that has a `schoolId`
     // path is discovered automatically, so modules added later are covered without touching this code.
-    const owned = Object.values(mongoose.models).filter((M) => M.modelName !== "School" && M.modelName !== "AuditLog" && M.schema.path("schoolId")) // audit trail survives school deletion;
+    // Audit trails survive school deletion on purpose; they are also append-only, so deleteMany on them throws
+    // (that used to make deleting any school with a fee/payment history fail with a 500).
+    const KEEP = new Set(["School", "AuditLog", "FeeAuditLog"]);
+    const owned = Object.values(mongoose.models).filter((M) => !KEEP.has(M.modelName) && M.schema.path("schoolId"));
     const memberIds = (await User.find({ schoolId: school._id }).select("_id").lean()).map((u) => u._id);
 
     const counts = await withTxn(async (session) => {

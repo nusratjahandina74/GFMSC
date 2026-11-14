@@ -42,7 +42,7 @@ test("H17/H18/H24: landing pages — schoolAdmin can manage ONLY own school's pa
   assert.equal(upd.status, 200);
   assert.equal(String(upd.body.schoolId), String(A._id)); assert.equal(upd.body.evil, undefined);
   // public read works w/o auth and doesn't expose schoolId
-  const pub = await request(app).get("/api/landing-pages/alpha-school");
+  const pub = await request(app).get("/api/landingpages/alpha-school");
   assert.equal(pub.status, 200); assert.equal(pub.body.schoolId, undefined);
   // invalid slug / duplicate slug
   assert.equal((await request(app).post("/api/landing-pages").set(auth(tokB)).send({ slug: "Bad Slug!" })).status, 400);

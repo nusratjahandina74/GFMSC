@@ -242,7 +242,7 @@ export default function AdminNotices() {
                     </div>
                     <p className="text-muted-foreground mt-1 whitespace-pre-wrap">{notice.body}</p>
                     <p className="text-xs text-muted-foreground mt-2">
-                      {new Date(notice.createdAt || notice.publishedAt || Date.now()).toLocaleString()}
+                      {notice.createdAt || notice.publishedAt ? new Date(notice.createdAt || notice.publishedAt).toLocaleString() : "—"}
                     </p>
                   </div>
                   <div className="flex gap-2">

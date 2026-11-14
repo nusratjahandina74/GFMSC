@@ -83,7 +83,7 @@ test("T08 bulk: good rows saved, bad rows reported per row; teacher bypass close
 // ---- T03.5: forged schoolId on the other write endpoints ----
 test("T03.5 forged schoolId on exam / notice / shift-template / class-subject / fees-set is ignored (lands in caller's school)", async () => {
   const forged = String(B._id);
-  const ex = await request(app).post("/api/exams").set(auth(tokA)).send({ name: "Unit", term: "2026", className: "Class 9", section: "A", schoolId: forged });
+  const ex = await request(app).post("/api/exams").set(auth(tokA)).send({ name: "Unit", term: "2026", className: "Class 9", section: "A", startDate: "2026-12-01", schoolId: forged });
   assert.equal(ex.status, 201, JSON.stringify(ex.body));
   assert.equal(String(ex.body.exam?.schoolId ?? ex.body.schoolId), String(A._id));
 

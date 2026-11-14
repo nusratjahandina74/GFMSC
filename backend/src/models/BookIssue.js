@@ -26,6 +26,18 @@ const bookIssueSchema = new mongoose.Schema(
     finePerDay: { type: Number, default: 5 },
     fineAmount: { type: Number, default: 0 },
     fineWaived: { type: Boolean, default: false },
+    // Late / lost fine collection tracking (Fees & Dues can pick this up later).
+    finePaid: { type: Boolean, default: false },
+    finePaidAt: { type: Date, default: null },
+    // Set when the fine was pushed into Fees & Dues as an invoice (paid there, not by "Mark paid").
+    feeInvoiceId: { type: mongoose.Schema.Types.ObjectId, ref: "FeeInvoice", default: null },
+
+    // "Mark as Lost" bookkeeping
+    lostDate: { type: Date, default: null },
+
+    // Overdue reminder bookkeeping (stops the admin spamming parents by accident).
+    reminderCount: { type: Number, default: 0 },
+    lastReminderAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

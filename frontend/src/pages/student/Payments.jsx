@@ -153,8 +153,8 @@ export default function Payments() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      invoices.map((invoice) => (
-                        <TableRow key={invoice?._id || Math.random()}>
+                      invoices.map((invoice, idx) => (
+                        <TableRow key={invoice?._id || `invoice-${idx}`}>
                           <TableCell className="font-medium">{invoice?.month || "-"}</TableCell>
                           <TableCell className="capitalize">{invoice?.type || "Unknown"}</TableCell>
                           <TableCell>{invoice?.description || "-"}</TableCell>

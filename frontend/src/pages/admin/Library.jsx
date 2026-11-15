@@ -41,6 +41,9 @@ export default function LibraryPage() {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
   const [search, setSearch] = useState("");
+  // Guards the Issue / Return / Lost buttons so a double click can't fire the
+  // same action twice while its request is still in flight.
+  const [actionBusy, setActionBusy] = useState("");
 
   // ---- book add/edit ----
   const [bookOpen, setBookOpen] = useState(false);
@@ -88,10 +91,13 @@ export default function LibraryPage() {
     }
   }, []);
 
+  // Live catalog search: re-query the backend (debounced) as the librarian
+  // types, so the book list filters immediately instead of only on Enter.
+  // Also runs once on mount with an empty query.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadAll();
-  }, [loadAll]);
+    const t = setTimeout(() => loadAll(search), 300);
+    return () => clearTimeout(t);
+  }, [search, loadAll]);
 
   // student search inside the issue dialog (server-side: name or student ID)
   useEffect(() => {
@@ -238,6 +244,8 @@ export default function LibraryPage() {
       setMsg("Select a book and a borrower first");
       return;
     }
+    if (actionBusy) return;
+    setActionBusy("issue");
     try {
       const payload = { bookId: issueForm.bookId, borrowerType: issueForm.borrowerType };
       if (issueForm.borrowerType === "student") payload.studentId = issueForm.borrowerId;
@@ -250,12 +258,16 @@ export default function LibraryPage() {
       await loadAll(search);
     } catch (err) {
       setMsg(errMsg(err));
+    } finally {
+      setActionBusy("");
     }
   };
 
   // ------------------------------------------------------------------ return / lost / fine / reminders
   const handleReturn = async () => {
     if (!returning) return;
+    if (actionBusy) return;
+    setActionBusy("return");
     try {
       const res = await returnBook(returning._id, { waiveFine: waive });
       setMsg(
@@ -268,6 +280,8 @@ export default function LibraryPage() {
       await loadAll(search);
     } catch (err) {
       setMsg(errMsg(err));
+    } finally {
+      setActionBusy("");
     }
   };
 
@@ -413,7 +427,6 @@ export default function LibraryPage() {
                   className="pl-8 w-56"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && loadAll(search)}
                 />
               </div>
 
@@ -659,7 +672,9 @@ export default function LibraryPage() {
                     </Label>
                     <Input type="date" value={issueForm.dueDate} onChange={(e) => setIssueForm({ ...issueForm, dueDate: e.target.value })} />
                   </div>
-                  <Button type="submit" className="w-full">Issue</Button>
+                  <Button type="submit" className="w-full" disabled={actionBusy === "issue"}>
+                    {actionBusy === "issue" ? "Issuing…" : "Issue"}
+                  </Button>
                 </form>
               </DialogContent>
             </Dialog>
@@ -940,7 +955,9 @@ export default function LibraryPage() {
               ) : (
                 <p className="text-green-700">Returned on time — no fine.</p>
               )}
-              <Button className="w-full" onClick={handleReturn}>Confirm return</Button>
+              <Button className="w-full" onClick={handleReturn} disabled={actionBusy === "return"}>
+                {actionBusy === "return" ? "Returning…" : "Confirm return"}
+              </Button>
             </div>
           )}
         </DialogContent>

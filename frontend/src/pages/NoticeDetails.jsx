@@ -1,6 +1,7 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getNotice } from "../api/notices";
+import { roleHomePath } from "../api/auth";
 import "../styles/notice.css";
 
 export default function NoticeDetails() {
@@ -8,6 +9,9 @@ export default function NoticeDetails() {
   const [notice, setNotice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // "Back to Home" must never dump a signed-in user on the public landing
+  // page (that looks like a logout) — send them to their own dashboard.
+  const homePath = roleHomePath();
 
   useEffect(() => {
     const fetchNotice = async () => {
@@ -31,7 +35,7 @@ export default function NoticeDetails() {
     return (
       <div className="noticeWrap">
         <div className="noticeCard">
-          <Link to="/notices" className="noticeBack">← Back to Notices</Link>
+          <Link to="/notices" className="noticeBack">← Back to Notices</Link>{" "}<Link to={homePath} className="noticeBack">← Back to Home</Link>
           <h2 className="noticeTitle">Loading...</h2>
         </div>
       </div>
@@ -42,7 +46,7 @@ export default function NoticeDetails() {
     return (
       <div className="noticeWrap">
         <div className="noticeCard">
-          <Link to="/notices" className="noticeBack">← Back to Notices</Link>
+          <Link to="/notices" className="noticeBack">← Back to Notices</Link>{" "}<Link to={homePath} className="noticeBack">← Back to Home</Link>
           <h2 className="noticeTitle">Notice not found</h2>
           {error && <div className="noticeBody">{error}</div>}
         </div>
@@ -53,7 +57,7 @@ export default function NoticeDetails() {
   return (
     <div className="noticeWrap">
       <div className="noticeCard">
-        <Link to="/notices" className="noticeBack">← Back to Notices</Link>
+        <Link to="/notices" className="noticeBack">← Back to Notices</Link>{" "}<Link to={homePath} className="noticeBack">← Back to Home</Link>
         <h2 className="noticeTitle">{notice.title}</h2>
         <div className="noticeMeta">{new Date(notice.publishDate || notice.createdAt).toLocaleString()}</div>
         <div className="noticeBody" style={{ whiteSpace: "pre-wrap" }}>{notice.body}</div>

@@ -61,6 +61,9 @@ import GuardianAdmissions from "./pages/guardian/Admissions";
 import TeacherAdmissionMarks from "./pages/teacher/AdmissionMarks";
 import AdmissionAnalytics from "./pages/admin/AdmissionAnalytics";
 import SuperAdminPanel from "./pages/admin/SuperAdminPanel";
+import SubscriptionPlans from "./pages/admin/SubscriptionPlans";
+import GlobalBilling from "./pages/admin/GlobalBilling";
+import AuditLogs from "./pages/admin/AuditLogs";
 import { getRole, isLoggedIn, getUser } from "./api/auth";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Register from "./pages/Auth/Register";
@@ -254,7 +257,7 @@ export default function App() {
             <Route
               path="notices"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminNotices />
                 </RequireRole>
               }
@@ -262,7 +265,7 @@ export default function App() {
             <Route
               path="teachers"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminTeachers />
                 </RequireRole>
               }
@@ -270,7 +273,7 @@ export default function App() {
             <Route
               path="students"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminStudents />
                 </RequireRole>
               }
@@ -278,7 +281,7 @@ export default function App() {
             <Route
               path="staff"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminStaff />
                 </RequireRole>
               }
@@ -286,7 +289,7 @@ export default function App() {
             <Route
               path="guardians"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminGuardians />
                 </RequireRole>
               }
@@ -294,7 +297,7 @@ export default function App() {
             <Route
               path="class-subjects"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminClassSubjects />
                 </RequireRole>
               }
@@ -302,7 +305,7 @@ export default function App() {
             <Route
               path="class-teachers"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminClassTeachers />
                 </RequireRole>
               }
@@ -310,7 +313,7 @@ export default function App() {
             <Route
               path="teacher-assignments"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <TeacherAssignments />
                 </RequireRole>
               }
@@ -318,7 +321,7 @@ export default function App() {
             <Route
               path="routine"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminRoutine />
                 </RequireRole>
               }
@@ -326,7 +329,7 @@ export default function App() {
             <Route
               path="attendance"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminAttendance />
                 </RequireRole>
               }
@@ -334,7 +337,7 @@ export default function App() {
             <Route
               path="exams"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminExams />
                 </RequireRole>
               }
@@ -342,7 +345,7 @@ export default function App() {
             <Route
               path="exam-duties"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <ExamDuties />
                 </RequireRole>
               }
@@ -350,7 +353,7 @@ export default function App() {
             <Route
               path="leaves"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminLeaves />
                 </RequireRole>
               }
@@ -358,7 +361,7 @@ export default function App() {
             <Route
               path="fees-dues"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminFeesDues />
                 </RequireRole>
               }
@@ -390,7 +393,7 @@ export default function App() {
             <Route
               path="landing-page"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["superAdmin"]}>
                   <LandingEditor />
                 </RequireRole>
               }
@@ -398,7 +401,7 @@ export default function App() {
             <Route
               path="ticker"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["superAdmin"]}>
                   <TickerManager />
                 </RequireRole>
               }
@@ -406,7 +409,7 @@ export default function App() {
             <Route
               path="slider-images"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["superAdmin"]}>
                   <SliderManager />
                 </RequireRole>
               }
@@ -414,7 +417,7 @@ export default function App() {
             <Route
               path="gallery-images"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["superAdmin"]}>
                   <GalleryManager />
                 </RequireRole>
               }
@@ -422,7 +425,7 @@ export default function App() {
             <Route
               path="id-cards"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin", "staff"]}>
+                <RequireRole allowedRoles={["schoolAdmin", "staff"]}>
                   <IdCardsPage />
                 </RequireRole>
               }
@@ -436,9 +439,33 @@ export default function App() {
               }
             />
             <Route
+              path="subscription-plans"
+              element={
+                <RequireRole allowedRoles={["superAdmin"]}>
+                  <SubscriptionPlans />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="global-billing"
+              element={
+                <RequireRole allowedRoles={["superAdmin"]}>
+                  <GlobalBilling />
+                </RequireRole>
+              }
+            />
+            <Route
+              path="audit-logs"
+              element={
+                <RequireRole allowedRoles={["superAdmin"]}>
+                  <AuditLogs />
+                </RequireRole>
+              }
+            />
+            <Route
               path="marks-entry"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminMarksEntry />
                 </RequireRole>
               }
@@ -446,7 +473,7 @@ export default function App() {
             <Route
               path="report-cards"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminReportCards />
                 </RequireRole>
               }
@@ -454,7 +481,7 @@ export default function App() {
             <Route
               path="school-settings"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminSettings />
                 </RequireRole>
               }
@@ -470,7 +497,7 @@ export default function App() {
             <Route
               path="report-card"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <ReportCard />
                 </RequireRole>
               }
@@ -478,7 +505,7 @@ export default function App() {
             <Route
               path="staff-attendance"
               element={
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <StaffAttendanceOverview />
                 </RequireRole>
               }
@@ -490,7 +517,7 @@ export default function App() {
             path="/dashboard/teachers"
             element={
               <RequireAuth>
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminTeachers />
                 </RequireRole>
               </RequireAuth>
@@ -500,7 +527,7 @@ export default function App() {
             path="/dashboard/students"
             element={
               <RequireAuth>
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminStudents />
                 </RequireRole>
               </RequireAuth>
@@ -510,7 +537,7 @@ export default function App() {
             path="/dashboard/notices"
             element={
               <RequireAuth>
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminNotices />
                 </RequireRole>
               </RequireAuth>
@@ -520,7 +547,7 @@ export default function App() {
             path="/dashboard/settings"
             element={
               <RequireAuth>
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminSettings />
                 </RequireRole>
               </RequireAuth>
@@ -530,7 +557,7 @@ export default function App() {
             path="/dashboard/staff"
             element={
               <RequireAuth>
-                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
+                <RequireRole allowedRoles={["schoolAdmin"]}>
                   <AdminStaff />
                 </RequireRole>
               </RequireAuth>

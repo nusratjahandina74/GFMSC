@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../../componen
 import { Plus, Printer, Loader2, Copy, CheckCircle2 } from "lucide-react";
 import { getMyApplications, applyAsGuardian, getPublicCircular, uploadAdmissionDocument } from "../../api/admissions";
 import { getUser } from "../../api/auth";
+import { isValidPhone, PHONE_MESSAGE } from "../../lib/utils";
 
 const STAGES = [["PENDING", "Under Review"], ["SHORTLISTED", "Admit Card Issued"], ["EXAM_PASSED", "Exam / Viva Passed"], ["SELECTED", "Selected"], ["ADMITTED", "Admitted"]];
 const LABELS = { PENDING: "Under Review", SHORTLISTED: "Admit Card Issued", EXAM_PASSED: "Exam / Viva Passed", SELECTED: "Selected", WAITING_LIST: "Waiting List", ADMITTED: "Admitted", REJECTED: "Rejected" };
@@ -15,7 +16,7 @@ const DOCS = [["birthCertificate", "Birth certificate"], ["photo", "Passport-siz
 const selectCls = "w-full h-9 rounded-md border border-input bg-background px-3 text-sm";
 const errMsg = (err) => err?.response?.data?.message || err.message;
 
-const blank = { applicantName: "", appliedForClass: "", dateOfBirth: "", gender: "", birthRegNo: "", previousSchool: "", previousClass: "", feeMethod: "bKash", feeTrxId: "", feeSenderNumber: "" };
+const blank = { applicantName: "", appliedForClass: "", dateOfBirth: "", gender: "", birthRegNo: "", fathersName: "", fathersPhone: "", mothersName: "", mothersPhone: "", previousSchool: "", previousClass: "", feeMethod: "bKash", feeTrxId: "", feeSenderNumber: "" };
 
 export default function GuardianAdmissions() {
   const user = getUser();
@@ -62,6 +63,10 @@ export default function GuardianAdmissions() {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
+    if (!form.fathersName.trim() || !form.mothersName.trim()) return setError("Father's and mother's names are required.");
+    if (!isValidPhone(form.fathersPhone)) return setError(PHONE_MESSAGE);
+    if (form.mothersPhone.trim() && !isValidPhone(form.mothersPhone)) return setError(PHONE_MESSAGE);
+    if (form.feeSenderNumber.trim() && !isValidPhone(form.feeSenderNumber)) return setError(PHONE_MESSAGE);
     const missing = DOCS.find(([t]) => reqDoc(t) && !docs[t]);
     if (missing) return setError(`Please upload the ${missing[1].toLowerCase()}.`);
     setBusy(true);
@@ -75,6 +80,16 @@ export default function GuardianAdmissions() {
 
   const print = (a) => { setPrintApp(a); setTimeout(() => window.print(), 100); };
 
+  const openForm = () => {
+    setError("");
+    setForm({
+      ...blank,
+      fathersName: prefill.fathersName || "", fathersPhone: prefill.fathersPhone || "",
+      mothersName: prefill.mothersName || "", mothersPhone: prefill.mothersPhone || "",
+    });
+    setOpen(true);
+  };
+
   return (
     <div className="space-y-6 p-4 md:p-6 lg:p-8">
       <div className="flex items-start justify-between flex-wrap gap-3 print:hidden">
@@ -82,7 +97,18 @@ export default function GuardianAdmissions() {
           <h1 className="text-3xl font-bold tracking-tight">Admissions</h1>
           <p className="text-muted-foreground">Apply for another child and track your applications</p>
         </div>
-        <Button className="gap-2" disabled={!circular?.isOpen} onClick={() => { setError(""); setOpen(true); }}><Plus className="h-4 w-4" /> New Admission Application</Button>
+        <button
+          type="button"
+          onClick={openForm}
+          // Only lock the button once we KNOW admissions are closed; while the
+          // circular is still loading (circular === null) it must stay usable
+          // so it never renders as a faded, "missing" button.
+          disabled={Boolean(circular) && !circular.isOpen}
+          title={circular && !circular.isOpen ? circular.closedReason : "Start a new admission application"}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 visible opacity-100 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          <Plus className="h-4 w-4" /> Apply for New Admission
+        </button>
       </div>
 
       {circular && !circular.isOpen && <div className="p-3 rounded-lg bg-yellow-50 text-yellow-800 text-sm print:hidden">{circular.closedReason}</div>}
@@ -154,10 +180,14 @@ export default function GuardianAdmissions() {
           <DialogHeader><DialogTitle>New Admission Application</DialogTitle></DialogHeader>
           <form onSubmit={submit} className="space-y-4">
             {error && <div className="p-3 rounded-lg bg-red-50 text-red-800 text-sm">{error}</div>}
-            <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 text-sm space-y-0.5">
-              <div className="flex items-center gap-1 font-medium"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> Parent details are filled in for you</div>
-              <div className="text-muted-foreground">Father: {prefill.fathersName || "—"} · {prefill.fathersPhone || "—"}</div>
-              <div className="text-muted-foreground">Mother: {prefill.mothersName || "—"}{prefill.address ? ` · ${prefill.address}` : ""}</div>
+            <div className="rounded-lg bg-gray-50 dark:bg-gray-800 p-3 text-sm space-y-2">
+              <div className="flex items-center gap-1 font-medium"><CheckCircle2 className="h-4 w-4 text-emerald-600" /> Parent details (pre-filled from your profile — edit if needed)</div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5"><Label>Father's name *</Label><Input required value={form.fathersName} onChange={set("fathersName")} /></div>
+                <div className="space-y-1.5"><Label>Father's phone *</Label><Input type="tel" pattern="^\+?\d{10,15}$" title={PHONE_MESSAGE} required value={form.fathersPhone} onChange={set("fathersPhone")} /></div>
+                <div className="space-y-1.5"><Label>Mother's name *</Label><Input required value={form.mothersName} onChange={set("mothersName")} /></div>
+                <div className="space-y-1.5"><Label>Mother's phone</Label><Input type="tel" pattern="^\+?\d{10,15}$" title={PHONE_MESSAGE} value={form.mothersPhone} onChange={set("mothersPhone")} /></div>
+              </div>
             </div>
             <div className="space-y-1.5"><Label>New child's full name *</Label><Input required value={form.applicantName} onChange={set("applicantName")} /></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -194,7 +224,7 @@ export default function GuardianAdmissions() {
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div className="space-y-1.5"><Label>Method</Label><select className={selectCls} value={form.feeMethod} onChange={set("feeMethod")}><option>bKash</option><option>Nagad</option><option>Rocket</option><option>Other</option></select></div>
                   <div className="space-y-1.5"><Label>TrxID</Label><Input value={form.feeTrxId} onChange={set("feeTrxId")} /></div>
-                  <div className="space-y-1.5"><Label>Sender number</Label><Input inputMode="tel" value={form.feeSenderNumber} onChange={set("feeSenderNumber")} /></div>
+                  <div className="space-y-1.5"><Label>Sender number</Label><Input type="tel" pattern="^\+?\d{10,15}$" title={PHONE_MESSAGE} inputMode="tel" value={form.feeSenderNumber} onChange={set("feeSenderNumber")} /></div>
                 </div>
               </div>
             )}

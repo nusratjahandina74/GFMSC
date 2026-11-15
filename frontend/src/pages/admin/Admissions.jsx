@@ -16,6 +16,7 @@ import {
 import { getTeachers } from "../../api/teachers";
 import { getUser } from "../../api/auth";
 import { SECTION_LIST } from "../../lib/constants";
+import { isValidPhone, PHONE_MESSAGE } from "../../lib/utils";
 
 const STAGES = [
   ["ALL", "All"], ["PENDING", "Pending"], ["SHORTLISTED", "Admit Issued"], ["EXAM_PASSED", "Exam Passed"],
@@ -43,6 +44,7 @@ export default function AdmissionsPage() {
   const [busy, setBusy] = useState(false);
   const [dlg, setDlg] = useState(null); // { type, a }
   const [form, setForm] = useState({});
+  const [dlgError, setDlgError] = useState("");
   const [result, setResult] = useState(null); // enrol / walk-in credentials
   const [settingsOpen, setSettingsOpen] = useState(false);
   const user = getUser();
@@ -63,8 +65,8 @@ export default function AdmissionsPage() {
   const trackUrl = user?.schoolId ? `${base}/admission/track/${user.schoolId}` : "";
 
   const copy = async (text, key) => { await navigator.clipboard.writeText(text); setCopied(key); setTimeout(() => setCopied(""), 2000); };
-  const open = (type, a, init = {}) => { setForm(init); setDlg({ type, a }); };
-  const close = () => setDlg(null);
+  const open = (type, a, init = {}) => { setForm(init); setDlgError(""); setDlg({ type, a }); };
+  const close = () => { setDlg(null); setDlgError(""); };
 
   // Runs one API action, refreshes the list and shows a message.
   const run = async (fn, okMsg) => {
@@ -87,6 +89,10 @@ export default function AdmissionsPage() {
       if (res) setResult(res);
     }
     if (type === "walkin") {
+      if (!form.mothersName?.trim()) return setDlgError("Mother's name is required.");
+      if (!isValidPhone(form.fathersPhone)) return setDlgError(PHONE_MESSAGE);
+      if (form.mothersPhone?.trim() && !isValidPhone(form.mothersPhone)) return setDlgError(PHONE_MESSAGE);
+      setDlgError("");
       const res = await run(() => createWalkInAdmission(form), (r) => `✅ Walk-in admission done — ${r.student?.studentId}`);
       if (res) setResult(res);
     }
@@ -125,8 +131,20 @@ export default function AdmissionsPage() {
           <p className="text-muted-foreground">Review applications from your public page and take them from application to enrolment</p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button variant="outline" className="gap-2" onClick={() => setSettingsOpen(true)}><Settings className="h-4 w-4" /> Admission Settings</Button>
-          <Button className="gap-2" onClick={() => open("walkin", null, { ...emptyWalkIn })}><Plus className="h-4 w-4" /> New Walk-in Admission</Button>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-900 dark:text-gray-100 font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 transition-all"
+          >
+            <Settings className="h-4 w-4" /> Admission Settings
+          </button>
+          <button
+            type="button"
+            onClick={() => open("walkin", null, { ...emptyWalkIn })}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 visible opacity-100 z-50 transition-all"
+          >
+            <Plus className="h-4 w-4" /> New Walk-in Admission
+          </button>
         </div>
       </div>
 
@@ -249,6 +267,7 @@ export default function AdmissionsPage() {
           <DialogHeader><DialogTitle>New Walk-in Admission</DialogTitle></DialogHeader>
           <form onSubmit={submitDialog} className="space-y-4">
             <p className="text-xs text-muted-foreground">For families who come to school with a paper form. The student is enrolled immediately.</p>
+            {dlgError && <div className="p-3 rounded-lg bg-red-50 text-red-800 text-sm">{dlgError}</div>}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <F label="Applicant's full name *"><Input required value={form.applicantName || ""} onChange={wf("applicantName")} /></F>
               <F label="Class *"><select required className={selectCls} value={form.appliedForClass || ""} onChange={wf("appliedForClass")}><option value="">Select</option>{["Play", "Nursery", "KG", ...Array.from({ length: 10 }, (_, i) => `Class ${i + 1}`)].map((c) => <option key={c}>{c}</option>)}</select></F>
@@ -257,9 +276,9 @@ export default function AdmissionsPage() {
               <F label="Date of birth"><Input type="date" value={form.dateOfBirth || ""} onChange={wf("dateOfBirth")} /></F>
               <F label="Gender"><select className={selectCls} value={form.gender || ""} onChange={wf("gender")}><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></F>
               <F label="Father's name *"><Input required value={form.fathersName || ""} onChange={wf("fathersName")} /></F>
-              <F label="Father's phone *"><Input required inputMode="tel" value={form.fathersPhone || ""} onChange={wf("fathersPhone")} /></F>
-              <F label="Mother's name"><Input value={form.mothersName || ""} onChange={wf("mothersName")} /></F>
-              <F label="Mother's phone"><Input inputMode="tel" value={form.mothersPhone || ""} onChange={wf("mothersPhone")} /></F>
+              <F label="Father's phone *"><Input required type="tel" pattern="^\+?\d{10,15}$" title={PHONE_MESSAGE} inputMode="tel" value={form.fathersPhone || ""} onChange={wf("fathersPhone")} /></F>
+              <F label="Mother's name *"><Input required value={form.mothersName || ""} onChange={wf("mothersName")} /></F>
+              <F label="Mother's phone"><Input type="tel" pattern="^\+?\d{10,15}$" title={PHONE_MESSAGE} inputMode="tel" value={form.mothersPhone || ""} onChange={wf("mothersPhone")} /></F>
               <F label="Guardian email"><Input type="email" value={form.guardianEmail || ""} onChange={wf("guardianEmail")} /></F>
               <F label="Birth registration no."><Input value={form.birthRegNo || ""} onChange={wf("birthRegNo")} /></F>
               <F label="Previous school"><Input value={form.previousSchool || ""} onChange={wf("previousSchool")} /></F>
@@ -269,7 +288,13 @@ export default function AdmissionsPage() {
             <label className="flex items-center gap-2 text-sm"><Checkbox checked={!!form.overrideSeats} onCheckedChange={(v) => setForm((f) => ({ ...f, overrideSeats: v }))} /> Ignore the class seat limit</label>
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={close}>Cancel</Button>
-              <Button type="submit" disabled={busy} className="gap-2">{busy && <Loader2 className="h-4 w-4 animate-spin" />} Admit Student</Button>
+              <button
+                type="submit"
+                disabled={busy}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 visible opacity-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {busy && <Loader2 className="h-4 w-4 animate-spin" />} Admit Student
+              </button>
             </div>
           </form>
         </DialogContent>
@@ -390,7 +415,7 @@ function SettingsDialog({ onClose, onSaved }) {
             </div>
 
             <div className="space-y-2">
-              <Label>Mandatory form fields <span className="text-xs text-muted-foreground">(name, class, father's name & phone are always required)</span></Label>
+              <Label>Mandatory form fields <span className="text-xs text-muted-foreground">(name, class, father's name & phone and mother's name are always required)</span></Label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {data.optionalFields.map((f) => (
                   <label key={f} className="flex items-center gap-2 text-sm"><Checkbox checked={(s.requiredFields || []).includes(f)} onCheckedChange={(v) => toggleField(f, v)} /> {FIELD_LABELS[f] || f}</label>
@@ -425,7 +450,13 @@ function SettingsDialog({ onClose, onSaved }) {
 
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-              <Button type="submit" disabled={saving} className="gap-2">{saving && <Loader2 className="h-4 w-4 animate-spin" />} Save Settings</Button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 visible opacity-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving && <Loader2 className="h-4 w-4 animate-spin" />} Save Settings
+              </button>
             </div>
           </form>
         )}

@@ -33,6 +33,21 @@ export const logout = () => {
 // restores the token on the first API call). The hint is not a credential.
 export const isLoggedIn = () => !!getAccessToken() || !!getUser();
 export const getRole = () => localStorage.getItem("role");
+
+// Single source of truth for "where does this role live after login / from a
+// shared public page". Mirrors RoleHome in App.jsx so links such as the
+// "Back to Home" button on the public Notice pages return an authenticated
+// user to their own dashboard instead of the public landing page (which
+// looked like a logout). Falls back to "/" for anonymous visitors.
+export const roleHomePath = () => {
+  const role = getRole();
+  if (role === "schoolAdmin" || role === "superAdmin") return "/admin/dashboard";
+  if (role === "teacher") return "/dashboard/teacher";
+  if (role === "student") return "/dashboard/student";
+  if (role === "staff") return "/dashboard/staff-portal";
+  if (role === "guardian") return "/dashboard/guardian";
+  return "/";
+};
 export const getUser = () => {
   const raw = localStorage.getItem("user");
   if (!raw || raw === "undefined" || raw === "null") return null;

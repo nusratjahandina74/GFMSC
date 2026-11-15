@@ -114,10 +114,10 @@ export const getMarksContext = async (req, res) => {
 
     // Exams the user may actually open.
     const examFilter = { schoolId };
+    const allowedClasses = new Set(options.map((o) => o.className));
     if (role === "teacher") {
-      const classes = [...new Set(options.map((o) => o.className))];
-      if (!classes.length) return res.json({ role, readOnly, schoolId, teacherId, options: [], exams: [], defaults: { defaultFullMarks: defaults.defaultFullMarks, defaultPassPercent: defaults.defaultPassPercent } });
-      examFilter.className = { $in: classes };
+      if (!allowedClasses.size) return res.json({ role, readOnly, schoolId, teacherId, options: [], exams: [], defaults: { defaultFullMarks: defaults.defaultFullMarks, defaultPassPercent: defaults.defaultPassPercent } });
+      examFilter.className = { $in: [...allowedClasses] };
     }
     const examDocs = await Exam.find(examFilter)
       .select("name title examType term className section startDate endDate date isPublished marksDeadline")
@@ -125,10 +125,20 @@ export const getMarksContext = async (req, res) => {
       .limit(300)
       .lean();
 
-    // A teacher only sees exams whose class+section she has an option for.
-    const allowedKeys = new Set(options.map((o) => `${o.className}|${o.section}`));
+    // A teacher only sees exams of the classes she owns. A "whole class" exam
+    // (no section) applies to every section of that class, so any teacher of
+    // the class may open it; a section-specific exam additionally needs the
+    // teacher to own that exact section. (Previously a whole-class exam was
+    // hidden from a teacher who only owned one section of the class, which
+    // made the Exam Term dropdown look empty.)
+    const allowedKeys = new Set(options.map((o) => `${o.className}|${o.section || ""}`));
     const exams = examDocs
-      .filter((ex) => role !== "teacher" || allowedKeys.has(`${ex.className}|${ex.section || ""}`) || allowedKeys.has(`${ex.className}|`))
+      .filter((ex) => {
+        if (role !== "teacher") return true;
+        if (!allowedClasses.has(ex.className)) return false;
+        const examSection = ex.section || "";
+        return !examSection || allowedKeys.has(`${ex.className}|${examSection}`);
+      })
       .map((ex) => ({
         _id: ex._id,
         name: ex.name,

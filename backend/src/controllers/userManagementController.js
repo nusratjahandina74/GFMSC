@@ -6,6 +6,7 @@ import Teacher from "../models/Teacher.js";
 import Staff from "../models/Staff.js";
 import { audit } from "../utils/audit.js";
 import { safeRegex } from "../utils/safeRegex.js";
+import { isValidPhone, PHONE_MESSAGE } from "../utils/validation.js";
 
 // SchoolAdmin -> Create Teacher User
 export const createTeacherUser = async (req, res) => {
@@ -286,7 +287,11 @@ return res.status(400).json({ message: "This email is already used by another ac
 }
 account.email = email;
 }
-if (phone !== undefined && account.phone !== undefined) account.phone = phone;
+if (phone !== undefined && account.phone !== undefined) {
+const cleaned = typeof phone === "string" ? phone.trim() : "";
+if (cleaned && !isValidPhone(cleaned)) return res.status(400).json({ message: PHONE_MESSAGE });
+account.phone = cleaned;
+}
 if (name !== undefined) {
 if (kind === "student") account.studentName = name;
 else account.name = name;
@@ -391,6 +396,9 @@ const name = typeof rawName === "string" ? rawName.trim() : "";
 const phone = typeof rawPhone === "string" ? rawPhone.trim() : "";
 if (!name) {
 return res.status(400).json({ message: "Name is required." });
+}
+if (phone && !isValidPhone(phone)) {
+return res.status(400).json({ message: PHONE_MESSAGE });
 }
 let account;
 if (req.user.role === "student") {

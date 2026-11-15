@@ -19,18 +19,20 @@ import { enqueueSms, normalizeBdPhone } from "../services/notificationService.js
 import cloudinary, { isCloudinaryConfigured } from "../config/cloudinary.js";
 import { sniffImage } from "../utils/imageUpload.js";
 import { tenantIdFor } from "../utils/tenant.js";
+import { isValidPhone, PHONE_MESSAGE } from "../utils/validation.js";
 
 const FRONTEND_URL = process.env.FRONTEND_URL || "https://gfmsc.vercel.app";
 
 const str = (v, max = 200) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 const num = (v) => (v === "" || v === null || v === undefined || Number.isNaN(Number(v)) ? null : Number(v));
-const PHONE_RE = /^[0-9+\-\s]{6,20}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 export const CLASS_NAMES = ["Play", "Nursery", "KG", "Class 1", "Class 2", "Class 3", "Class 4", "Class 5", "Class 6", "Class 7", "Class 8", "Class 9", "Class 10"];
-// Fields a school can mark "mandatory" on the public form (the five basics are always mandatory).
-export const OPTIONAL_FIELDS = ["dateOfBirth", "gender", "birthRegNo", "mothersName", "mothersPhone", "address", "previousSchool", "previousClass", "guardianEmail"];
+// Fields a school can mark "mandatory" on the public form (the six basics —
+// applicant name, class, session, father's name + phone, mother's name — are
+// always mandatory and can no longer be toggled).
+export const OPTIONAL_FIELDS = ["dateOfBirth", "gender", "birthRegNo", "mothersPhone", "address", "previousSchool", "previousClass", "guardianEmail"];
 
 export const DOC_TYPES = ["birthCertificate", "photo", "previousMarksheet"];
 const CLOUDINARY_URL_RE = /^https:\/\/res\.cloudinary\.com\/[^\s]+$/;
@@ -117,14 +119,14 @@ const parseDocuments = (raw) => {
 };
 
 const validateForm = (data, requiredFields = []) => {
-  if (!data.applicantName || !data.appliedForClass || !data.sessionYear || !data.fathersName || !data.fathersPhone) {
-    return "applicantName, appliedForClass, sessionYear, fathersName and fathersPhone are required";
+  if (!data.applicantName || !data.appliedForClass || !data.sessionYear || !data.fathersName || !data.fathersPhone || !data.mothersName) {
+    return "applicantName, appliedForClass, sessionYear, fathersName, fathersPhone and mothersName are required";
   }
   if (!CLASS_NAMES.includes(data.appliedForClass)) return "Please choose a valid class.";
-  if (!PHONE_RE.test(data.fathersPhone) || (data.mothersPhone && !PHONE_RE.test(data.mothersPhone))) return "Please enter a valid phone number.";
+  if (!isValidPhone(data.fathersPhone) || (data.mothersPhone && !isValidPhone(data.mothersPhone))) return PHONE_MESSAGE;
   if (data.guardianEmail && !EMAIL_RE.test(data.guardianEmail)) return "Please enter a valid email address.";
   if (data.dateOfBirth && !DATE_RE.test(data.dateOfBirth)) return "Please enter a valid date of birth.";
-  const labels = { dateOfBirth: "Date of birth", gender: "Gender", birthRegNo: "Birth registration no.", mothersName: "Mother's name", mothersPhone: "Mother's phone", address: "Address", previousSchool: "Previous school", previousClass: "Previous class", guardianEmail: "Guardian email" };
+  const labels = { dateOfBirth: "Date of birth", gender: "Gender", birthRegNo: "Birth registration no.", mothersPhone: "Mother's phone", address: "Address", previousSchool: "Previous school", previousClass: "Previous class", guardianEmail: "Guardian email" };
   for (const f of requiredFields) if (OPTIONAL_FIELDS.includes(f) && !data[f]) return `${labels[f] || f} is required.`;
   return null;
 };

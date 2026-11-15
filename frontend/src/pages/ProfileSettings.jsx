@@ -6,6 +6,7 @@ import { Button } from "../components/ui/button";
 import { Loader2, User, Lock, Eye, EyeOff } from "lucide-react";
 import api from "../api/client";
 import { AuthContext } from "../App";
+import { isValidPhone, PHONE_MESSAGE } from "../lib/utils";
 
 export default function ProfileSettings() {
   const { user, setUser } = useContext(AuthContext) || {};
@@ -74,6 +75,12 @@ export default function ProfileSettings() {
 
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
+    const trimmedPhone = (profileData.phone || "").trim();
+    if (trimmedPhone && !isValidPhone(trimmedPhone)) {
+      setMsgType("error");
+      setMsg(PHONE_MESSAGE);
+      return;
+    }
     setSaving(true);
     setMsg("");
     try {
@@ -199,6 +206,8 @@ export default function ProfileSettings() {
                   <Input
                     name="phone"
                     type="tel"
+                    pattern="^\+?\d{10,15}$"
+                    title={PHONE_MESSAGE}
                     value={profileData.phone}
                     onChange={handleProfileChange}
                     placeholder="e.g. +8801XXXXXXXXX"

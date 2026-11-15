@@ -27,7 +27,7 @@ const admissionSchema = new mongoose.Schema(
 
     fathersName: { type: String, required: true, trim: true },
     fathersPhone: { type: String, required: true, trim: true },
-    mothersName: { type: String, default: "" },
+    mothersName: { type: String, required: true, trim: true },
     mothersPhone: { type: String, default: "" },
     guardianEmail: { type: String, trim: true, lowercase: true, default: "" },
     address: { type: String, default: "" },

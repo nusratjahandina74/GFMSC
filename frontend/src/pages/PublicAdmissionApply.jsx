@@ -7,6 +7,7 @@ import { Label } from "../components/ui/label";
 import { Badge } from "../components/ui/badge";
 import { CheckCircle2, Copy, Search, Loader2, ArrowLeft, ArrowRight } from "lucide-react";
 import { applyForAdmission, getPublicCircular, uploadAdmissionDocument } from "../api/admissions";
+import { isValidPhone, PHONE_MESSAGE } from "../lib/utils";
 
 const STEPS = ["Student", "Parents", "School & Documents", "Review & Fee"];
 const DOCS = [
@@ -74,8 +75,10 @@ export default function PublicAdmissionApply() {
     }
     if (s === 1) {
       if (!form.fathersName.trim() || !form.fathersPhone.trim()) return "Father's name and phone are required.";
-      if (req("mothersName") && !form.mothersName.trim()) return "Mother's name is required.";
+      if (!isValidPhone(form.fathersPhone)) return PHONE_MESSAGE;
+      if (!form.mothersName.trim()) return "Mother's name is required.";
       if (req("mothersPhone") && !form.mothersPhone.trim()) return "Mother's phone is required.";
+      if (form.mothersPhone.trim() && !isValidPhone(form.mothersPhone)) return PHONE_MESSAGE;
       if (req("guardianEmail") && !form.guardianEmail.trim()) return "Guardian email is required.";
       if (req("address") && !form.address.trim()) return "Address is required.";
     }
@@ -84,6 +87,9 @@ export default function PublicAdmissionApply() {
       if (req("previousClass") && !form.previousClass.trim()) return "Previous class is required.";
       const missing = DOCS.find(([t]) => reqDoc(t) && !docs[t]);
       if (missing) return `Please upload the ${missing[1].toLowerCase()}.`;
+    }
+    if (s === 3) {
+      if (form.feeSenderNumber.trim() && !isValidPhone(form.feeSenderNumber)) return PHONE_MESSAGE;
     }
     return "";
   };
@@ -230,9 +236,9 @@ export default function PublicAdmissionApply() {
                   <>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <Field label="Father's Name" required><Input value={form.fathersName} onChange={set("fathersName")} /></Field>
-                      <Field label="Father's Phone" required><Input value={form.fathersPhone} onChange={set("fathersPhone")} inputMode="tel" /></Field>
-                      <Field label="Mother's Name" required={req("mothersName")}><Input value={form.mothersName} onChange={set("mothersName")} /></Field>
-                      <Field label="Mother's Phone" required={req("mothersPhone")}><Input value={form.mothersPhone} onChange={set("mothersPhone")} inputMode="tel" /></Field>
+                      <Field label="Father's Phone" required><Input type="tel" pattern="^\+?\d{10,15}$" title={PHONE_MESSAGE} value={form.fathersPhone} onChange={set("fathersPhone")} inputMode="tel" /></Field>
+                      <Field label="Mother's Name" required><Input value={form.mothersName} onChange={set("mothersName")} /></Field>
+                      <Field label="Mother's Phone" required={req("mothersPhone")}><Input type="tel" pattern="^\+?\d{10,15}$" title={PHONE_MESSAGE} value={form.mothersPhone} onChange={set("mothersPhone")} inputMode="tel" /></Field>
                     </div>
                     <Field label="Guardian Email (login details are sent here)" required={req("guardianEmail")}><Input type="email" value={form.guardianEmail} onChange={set("guardianEmail")} /></Field>
                     <Field label="Address" required={req("address")}><Input value={form.address} onChange={set("address")} /></Field>

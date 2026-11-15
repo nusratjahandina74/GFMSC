@@ -528,9 +528,12 @@ export default function MarksEntry() {
   );
 
   // ---- auto-pick sensible defaults --------------------------------------
+  // Pick the first available class as soon as the context arrives so the
+  // Section / Subject / Exam dropdowns (and the grid) populate immediately
+  // instead of the page looking empty until the user opens the Class select.
   useEffect(() => {
     if (!ctx) return;
-    if (!className && classOptions.length === 1) setClassName(classOptions[0]);
+    if (!className && classOptions.length) setClassName(classOptions[0]);
   }, [ctx, className, classOptions]);
 
   useEffect(() => {

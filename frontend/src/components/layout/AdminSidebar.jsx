@@ -27,6 +27,10 @@ import {
   Images,
   Megaphone,
   BarChart3,
+  Building2,
+  CreditCard,
+  ReceiptText,
+  ScrollText,
 } from "lucide-react";
 import { getRole, logout } from "../../api/auth";
 import { useContext } from "react";
@@ -44,6 +48,15 @@ export default function AdminSidebar() {
     navigate("/login");
   };
 
+  // ---------------------------------------------------------------------------
+  // The sidebar is split by ROLE so the two admin types never see each other's
+  // modules. App.jsx enforces the same split again with RequireRole, so hiding
+  // an item here can never be bypassed by typing the URL directly.
+  //
+  //   schoolAdmin -> runs ONE school (people, academics, fees, admissions, …)
+  //   superAdmin  -> runs the PLATFORM (tenants, plans, platform billing,
+  //                  platform-wide analytics, global CMS, the audit trail)
+  // ---------------------------------------------------------------------------
   const allNavItems = [
     {
       name: "Dashboard Overview",
@@ -51,48 +64,15 @@ export default function AdminSidebar() {
       icon: LayoutDashboard,
       roles: ["schoolAdmin", "superAdmin"],
     },
-    {
-      name: "Notices",
-      path: "/admin/notices",
-      icon: FileText,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Students",
-      path: "/admin/students",
-      icon: GraduationCap,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Teachers",
-      path: "/admin/teachers",
-      icon: Users,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Staff",
-      path: "/admin/staff",
-      icon: Briefcase,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Guardians",
-      path: "/admin/guardians",
-      icon: Users,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Class Subjects",
-      path: "/admin/class-subjects",
-      icon: BookOpen,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Class Teachers",
-      path: "/admin/class-teachers",
-      icon: Users,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
+
+    // ---- School Admin only: single-school operations ----
+    { name: "Notices", path: "/admin/notices", icon: FileText, roles: ["schoolAdmin"] },
+    { name: "Students", path: "/admin/students", icon: GraduationCap, roles: ["schoolAdmin"] },
+    { name: "Teachers", path: "/admin/teachers", icon: Users, roles: ["schoolAdmin"] },
+    { name: "Staff", path: "/admin/staff", icon: Briefcase, roles: ["schoolAdmin"] },
+    { name: "Guardians", path: "/admin/guardians", icon: Users, roles: ["schoolAdmin"] },
+    { name: "Class Subjects", path: "/admin/class-subjects", icon: BookOpen, roles: ["schoolAdmin"] },
+    { name: "Class Teachers", path: "/admin/class-teachers", icon: Users, roles: ["schoolAdmin"] },
     {
       // Maps each teacher to the (Class, Section, Subject) triples they may
       // enter marks for — this drives the teacher's auto-filtered Marks Entry
@@ -100,128 +80,49 @@ export default function AdminSidebar() {
       name: "Teacher Assignments",
       path: "/admin/teacher-assignments",
       icon: BookOpen,
-      roles: ["schoolAdmin", "superAdmin"],
+      roles: ["schoolAdmin"],
     },
+    { name: "Routine", path: "/admin/routine", icon: Calendar, roles: ["schoolAdmin"] },
+    { name: "Student Attendance", path: "/admin/attendance", icon: CheckSquare, roles: ["schoolAdmin"] },
+    { name: "Exams", path: "/admin/exams", icon: ClipboardList, roles: ["schoolAdmin"] },
+    { name: "Exam Duties", path: "/admin/exam-duties", icon: ShieldCheck, roles: ["schoolAdmin"] },
+    { name: "Leaves", path: "/admin/leaves", icon: CalendarDays, roles: ["schoolAdmin"] },
+    { name: "Fees & Dues", path: "/admin/fees-dues", icon: DollarSign, roles: ["schoolAdmin"] },
     {
-      name: "Routine",
-      path: "/admin/routine",
-      icon: Calendar,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Student Attendance",
-      path: "/admin/attendance",
-      icon: CheckSquare,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Exams",
-      path: "/admin/exams",
-      icon: ClipboardList,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Exam Duties",
-      path: "/admin/exam-duties",
-      icon: ShieldCheck,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Leaves",
-      path: "/admin/leaves",
-      icon: CalendarDays,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Fees & Dues",
-      path: "/admin/fees-dues",
-      icon: DollarSign,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      // Marks Entry is a school-scoped, write-heavy module; Super Admin has
-      // no business entering marks, so it is hidden from their sidebar. A
-      // direct /admin/marks-entry URL still renders a read-only school
-      // selector for support/debugging (see MarksEntry.jsx).
+      // Marks Entry is a school-scoped, write-heavy module — schoolAdmin only.
       name: "Marks Entry",
       path: "/admin/marks-entry",
       icon: BookOpen,
       roles: ["schoolAdmin"],
     },
+    { name: "Report Cards", path: "/admin/report-cards", icon: Award, roles: ["schoolAdmin"] },
+    { name: "Library", path: "/admin/library", icon: Library, roles: ["schoolAdmin"] },
+    { name: "Teacher & Staff Attendance", path: "/admin/staff-attendance", icon: CalendarCheck, roles: ["schoolAdmin"] },
     {
-      name: "Report Cards",
-      path: "/admin/report-cards",
-      icon: Award,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      // Super Admin does not run a school's library (issue/return, catalog), so the menu is hidden for them.
-      name: "Library",
-      path: "/admin/library",
-      icon: Library,
-      roles: ["schoolAdmin"],
-    },
-    {
-      name: "Teacher & Staff Attendance",
-      path: "/admin/staff-attendance",
-      icon: CalendarCheck,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      // School admin only: running admissions is a school job. The super admin gets the read-only analytics below.
+      // Running admissions is a school job. The platform owner gets the
+      // read-only Admission Analytics module instead.
       name: "Admissions",
       path: "/admin/admissions",
       icon: UserPlus,
       roles: ["schoolAdmin"],
     },
-    {
-      name: "Admission Analytics",
-      path: "/admin/admission-analytics",
-      icon: BarChart3,
-      roles: ["superAdmin"],
-    },
-    {
-      name: "ID Cards",
-      path: "/admin/id-cards",
-      icon: IdCard,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Landing Page",
-      path: "/admin/landing-page",
-      icon: ImageIcon,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Notice Ticker",
-      path: "/admin/ticker",
-      icon: Megaphone,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Slider Images",
-      path: "/admin/slider-images",
-      icon: GalleryHorizontal,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "Gallery Images",
-      path: "/admin/gallery-images",
-      icon: Images,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
-    {
-      name: "School Settings",
-      path: "/admin/school-settings",
-      icon: SettingsIcon,
-      roles: ["schoolAdmin"], // এখানে superAdmin রিমুভ করা হয়েছে
-    },
-    {
-      name: "My Profile",
-      path: "/admin/profile",
-      icon: UserCog,
-      roles: ["schoolAdmin", "superAdmin"],
-    },
+    { name: "ID Cards", path: "/admin/id-cards", icon: IdCard, roles: ["schoolAdmin"] },
+    { name: "School Settings", path: "/admin/school-settings", icon: SettingsIcon, roles: ["schoolAdmin"] },
+
+    // ---- Super Admin only: platform (SaaS) operations ----
+    { name: "Admission Analytics", path: "/admin/admission-analytics", icon: BarChart3, roles: ["superAdmin"] },
+    { name: "Schools & Tenants", path: "/admin/super-admin", icon: Building2, roles: ["superAdmin"] },
+    { name: "Subscription Plans", path: "/admin/subscription-plans", icon: CreditCard, roles: ["superAdmin"] },
+    { name: "Global Billing", path: "/admin/global-billing", icon: ReceiptText, roles: ["superAdmin"] },
+    { name: "Audit Logs", path: "/admin/audit-logs", icon: ScrollText, roles: ["superAdmin"] },
+    // Global CMS controls the PUBLIC landing site — a platform-level asset.
+    { name: "Landing Page", path: "/admin/landing-page", icon: ImageIcon, roles: ["superAdmin"] },
+    { name: "Notice Ticker", path: "/admin/ticker", icon: Megaphone, roles: ["superAdmin"] },
+    { name: "Slider Images", path: "/admin/slider-images", icon: GalleryHorizontal, roles: ["superAdmin"] },
+    { name: "Gallery Images", path: "/admin/gallery-images", icon: Images, roles: ["superAdmin"] },
+
+    // ---- Shared ----
+    { name: "My Profile", path: "/admin/profile", icon: UserCog, roles: ["schoolAdmin", "superAdmin"] },
   ];
 
   const navItems = allNavItems.filter((item) => item.roles.includes(role));

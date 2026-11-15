@@ -9,6 +9,7 @@ import { getStudents, createStudent, updateStudent, deleteStudent } from "../../
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { CLASS_LIST, SECTION_LIST } from "../../lib/constants";
+import { isValidPhone, PHONE_MESSAGE } from "../../lib/utils";
 import { exportStudentsCSV } from "../../api/exports";
 import { getUser } from "../../api/auth";
 import { listSchools } from "../../api/schools";
@@ -92,6 +93,10 @@ export default function AdminStudents() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!isValidPhone(formData.fathersPhone) || !isValidPhone(formData.mothersPhone)) {
+      setMsg(PHONE_MESSAGE);
+      return;
+    }
     setLoadingForm(true);
     setMsg("");
     try {
@@ -307,6 +312,9 @@ export default function AdminStudents() {
                 <div className="space-y-2">
                   <Label>Father's Phone *</Label>
                   <Input
+                    type="tel"
+                    pattern="^\+?\d{10,15}$"
+                    title={PHONE_MESSAGE}
                     value={formData.fathersPhone}
                     onChange={(e) => setFormData({ ...formData, fathersPhone: e.target.value })}
                     required
@@ -315,6 +323,9 @@ export default function AdminStudents() {
                 <div className="space-y-2">
                   <Label>Mother's Phone *</Label>
                   <Input
+                    type="tel"
+                    pattern="^\+?\d{10,15}$"
+                    title={PHONE_MESSAGE}
                     value={formData.mothersPhone}
                     onChange={(e) => setFormData({ ...formData, mothersPhone: e.target.value })}
                     required

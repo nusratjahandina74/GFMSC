@@ -56,7 +56,7 @@ export default function MyLibrary() {
       if (category && b.category !== category) return false;
       if (onlyAvailable && b.availableCopies < 1) return false;
       if (!q) return true;
-      return [b.title, b.author, b.isbn].some((v) => String(v || "").toLowerCase().includes(q));
+      return [b.title, b.author, b.isbn, b.shelfLocation].some((v) => String(v || "").toLowerCase().includes(q));
     });
   }, [books, search, category, onlyAvailable]);
 
@@ -184,6 +184,9 @@ export default function MyLibrary() {
                     </TableRow>
                   );
                 })}
+                {loading && (
+                  <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">Loading…</TableCell></TableRow>
+                )}
                 {!loading && filtered.length === 0 && (
                   <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No books found.</TableCell></TableRow>
                 )}

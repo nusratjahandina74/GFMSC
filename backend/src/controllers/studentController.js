@@ -5,11 +5,20 @@ import { tenantIdFor } from "../utils/tenant.js";
 import { validatePassword, generateTempPassword } from "../utils/password.js";
 import { audit } from "../utils/audit.js";
 import { safeRegex } from "../utils/safeRegex.js";
+import { isValidPhone, PHONE_MESSAGE } from "../utils/validation.js";
 
 // Mass-assignment guard: ONLY these fields can ever be set from a request body.
 const STUDENT_FIELDS = ["studentName", "studentId", "email", "className", "section", "classRoll", "sessionYear",
   "fathersName", "fathersPhone", "mothersName", "mothersPhone", "monthlyFee", "bloodGroup", "birthRegNo"];
 const pickStudent = (body) => Object.fromEntries(STUDENT_FIELDS.filter((k) => body[k] !== undefined).map((k) => [k, body[k]]));
+
+// Both guardian phone numbers must be real phone numbers before anything is saved.
+const phoneProblem = (data) => {
+  const present = (k) => typeof data[k] === "string" && data[k].trim() !== "";
+  if (present("fathersPhone") && !isValidPhone(data.fathersPhone)) return PHONE_MESSAGE;
+  if (present("mothersPhone") && !isValidPhone(data.mothersPhone)) return PHONE_MESSAGE;
+  return null;
+};
 
 
 export const createStudent = async (req, res) => {
@@ -25,6 +34,8 @@ export const createStudent = async (req, res) => {
     }
     const studentData = { ...pickStudent(req.body), schoolId: targetSchoolId };
     if (typeof studentData.studentId === "string" && studentData.studentId.trim() === "") delete studentData.studentId;
+    const phoneErr = phoneProblem(studentData);
+    if (phoneErr) return res.status(400).json({ message: phoneErr });
     let temporaryPassword;
     const supplied = typeof req.body.password === "string" ? req.body.password.trim() : "";
     if (supplied) {
@@ -225,6 +236,8 @@ export const updateStudent = async (req, res) => {
     if (!student) return res.status(404).json({ message: "Student not found" });
 
     const { password, studentId, ...rest } = pickStudent({ ...req.body });
+    const phoneErr = phoneProblem(rest);
+    if (phoneErr) return res.status(400).json({ message: phoneErr });
     if (typeof req.body.password === "string" && req.body.password.trim() !== "") {
       const problem = validatePassword(req.body.password.trim());
       if (problem) return res.status(400).json({ message: problem });

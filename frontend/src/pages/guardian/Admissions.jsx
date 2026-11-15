@@ -230,7 +230,19 @@ export default function GuardianAdmissions() {
             )}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
-              <Button type="submit" disabled={busy || !!uploading} className="gap-2">{busy && <Loader2 className="h-4 w-4 animate-spin" />} Submit Application</Button>
+              <Button 
+  type="submit" 
+  disabled={busy || !!uploading} 
+  className="gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+>
+  {(busy || uploading) && <Loader2 className="h-4 w-4 animate-spin" />}
+  {uploading 
+    ? "Uploading file..." 
+    : busy 
+    ? "Submitting..." 
+    : "Submit Application"}
+</Button>
+
             </div>
           </form>
         </DialogContent>

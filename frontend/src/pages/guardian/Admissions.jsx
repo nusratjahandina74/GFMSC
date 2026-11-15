@@ -43,7 +43,7 @@ export default function GuardianAdmissions() {
 
   useEffect(() => {
     load(); // eslint-disable-line react-hooks/set-state-in-effect
-    if (user?.schoolId) getPublicCircular(user.schoolId).then(setCircular).catch(() => {});
+    if (user?.schoolId) getPublicCircular(user.schoolId).then(setCircular).catch(() => { });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -134,11 +134,11 @@ export default function GuardianAdmissions() {
                 <CardContent className="space-y-3 text-sm">
                   {a.status === "REJECTED" ? <p className="text-red-700">{a.rejectionReason || "Your application was not selected."}</p>
                     : a.status === "WAITING_LIST" ? <p className="text-yellow-800">You are on the waiting list. The school will contact you if a seat opens.</p>
-                    : (
-                      <ol className="space-y-1">
-                        {STAGES.map(([k, label], i) => <li key={k} className={i <= idx ? "text-emerald-700 font-medium" : "text-muted-foreground"}>{i <= idx ? "✓" : "○"} {label}</li>)}
-                      </ol>
-                    )}
+                      : (
+                        <ol className="space-y-1">
+                          {STAGES.map(([k, label], i) => <li key={k} className={i <= idx ? "text-emerald-700 font-medium" : "text-muted-foreground"}>{i <= idx ? "✓" : "○"} {label}</li>)}
+                        </ol>
+                      )}
                   {a.admitCard && (
                     <div className="rounded-lg border p-3 space-y-1">
                       <div className="font-medium">Admission test</div>
@@ -230,19 +230,10 @@ export default function GuardianAdmissions() {
             )}
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy}>Cancel</Button>
-              <Button 
-  type="submit" 
-  disabled={busy || !!uploading} 
-  className="gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
->
-  {(busy || uploading) && <Loader2 className="h-4 w-4 animate-spin" />}
-  {uploading 
-    ? "Uploading file..." 
-    : busy 
-    ? "Submitting..." 
-    : "Submit Application"}
-</Button>
-
+              <Button type="submit" disabled={busy || !!uploading} className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-5 py-2 rounded-lg gap-2 opacity-100 disabled:opacity-50">
+                {(busy || uploading) && <Loader2 className="h-4 w-4 animate-spin" />}
+                {uploading ? "Uploading..." : busy ? "Submitting..." : "Submit Application"}
+              </Button>
             </div>
           </form>
         </DialogContent>

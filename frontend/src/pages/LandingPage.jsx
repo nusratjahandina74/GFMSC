@@ -912,26 +912,21 @@ export default function LandingPage() {
               )}
 
               <div className="hActions">
-                {hero.buttonText &&
-                  hero.buttonLink && (
-                    <button
-                      className="btn btnPrimary"
-                      onClick={
-                        onHeroButtonClick
-                      }
-                    >
-                      {hero.buttonText}
-                    </button>
-                  )}
-
-                <button
-                  className="btn"
-                  onClick={() =>
-                    nav("/login")
-                  }
-                >
-                  Get Started
-                </button>
+                {hero.buttonText && hero.buttonLink ? (
+                  <button
+                    className="btn btnPrimary"
+                    onClick={onHeroButtonClick}
+                  >
+                    {hero.buttonText}
+                  </button>
+                ) : (
+                  <button
+                    className="btn btnPrimary"
+                    onClick={() => nav("/login")}
+                  >
+                    Get Started
+                  </button>
+                )}
 
                 <Link
                   className="btn"
@@ -1085,7 +1080,7 @@ export default function LandingPage() {
               <h4>Mission</h4>
 
               <p>
-                {about.description ||
+                {about.mission ||
                   "Our mission is to provide quality education and support."}
               </p>
             </div>
@@ -1096,20 +1091,21 @@ export default function LandingPage() {
               </h4>
 
               <p>
-                {about.description ||
+                {about.whyItMatters ||
                   "Education and proper support help students build a brighter future."}
               </p>
             </div>
 
             <div className="box">
               <h4>
-                Ready for growth
+                {about.growthTitle || "Ready for growth"}
               </h4>
 
               <p>
-                {school.name
-                  ? `${school.name} is committed to continuous growth and better opportunities for students.`
-                  : "We are committed to continuous growth and better opportunities for students."}
+                {about.growthText ||
+                  (school.name
+                    ? `${school.name} is committed to continuous growth and better opportunities for students.`
+                    : "We are committed to continuous growth and better opportunities for students.")}
               </p>
             </div>
           </div>

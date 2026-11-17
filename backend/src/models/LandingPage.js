@@ -134,6 +134,10 @@ const landingPageSchema = new mongoose.Schema(
       title: { type: String, default: "" },
       description: { type: String, default: "" },
       image: { type: String, default: "" },
+      mission: { type: String, default: "" },
+      whyItMatters: { type: String, default: "" },
+      growthTitle: { type: String, default: "" },
+      growthText: { type: String, default: "" },
     },
 
     features: [featureSchema],

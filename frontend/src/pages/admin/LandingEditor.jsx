@@ -329,6 +329,19 @@ export default function LandingEditor() {
                 <Textarea value={page.about?.description || ""} onChange={(e) => setField("about", "description", e.target.value)} />
               </div>
               <ImageField label="Image" value={page.about?.image} onChange={(u) => setField("about", "image", u)} onError={err} />
+              <div className="space-y-2">
+                <Label>Mission</Label>
+                <Textarea rows={3} placeholder="Our mission is to provide quality education and support." value={page.about?.mission || ""} onChange={(e) => setField("about", "mission", e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Why it matters</Label>
+                <Textarea rows={3} placeholder="Education and proper support help students build a brighter future." value={page.about?.whyItMatters || ""} onChange={(e) => setField("about", "whyItMatters", e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Third box (default heading: Ready for growth)</Label>
+                <Input placeholder="Heading (Ready for growth)" value={page.about?.growthTitle || ""} onChange={(e) => setField("about", "growthTitle", e.target.value)} />
+                <Textarea rows={3} placeholder="Text (leave empty to use the default sentence with the school name)" value={page.about?.growthText || ""} onChange={(e) => setField("about", "growthText", e.target.value)} />
+              </div>
             </CardContent>
           </Card>
 

@@ -1,15 +1,14 @@
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { listNotices } from "../api/notices";
-import { roleHomePath } from "../api/auth";
 import "../styles/notice.css";
 
 export default function NoticeList() {
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // Logged-in users go back to their own dashboard; visitors to the public home.
-  const homePath = roleHomePath();
+  // Public page: "Back to Home" always returns to the public landing page.
+  const homePath = "/";
 
   useEffect(() => {
     const fetchNotices = async () => {

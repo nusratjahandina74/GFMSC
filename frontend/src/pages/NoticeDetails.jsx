@@ -1,7 +1,6 @@
 import { Link, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { getNotice } from "../api/notices";
-import { roleHomePath } from "../api/auth";
 import "../styles/notice.css";
 
 export default function NoticeDetails() {
@@ -9,9 +8,8 @@ export default function NoticeDetails() {
   const [notice, setNotice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // "Back to Home" must never dump a signed-in user on the public landing
-  // page (that looks like a logout) — send them to their own dashboard.
-  const homePath = roleHomePath();
+  // Public page: "Back to Home" always returns to the public landing page.
+  const homePath = "/";
 
   useEffect(() => {
     const fetchNotice = async () => {

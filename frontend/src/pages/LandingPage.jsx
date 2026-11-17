@@ -150,9 +150,28 @@ function splitDate(value) {
 
 const isExternal = (url) => /^(https?:|mailto:|tel:)/i.test(url || "");
 
+// Paths that are really sections of this page, not separate routes (the router has no /about, /contact ...
+// so they would just bounce to the top of the home page). They are turned into "#section" links so
+// both "/contact" and "#contact" scroll to the Contact section. /blog and /notices are real pages and stay as they are.
+const SECTION_ALIASES = {
+  "/about": "about",
+  "/features": "features",
+  "/contact": "contact",
+  "/branches": "branches",
+  "/notice": "notice",
+  "/leadership": "leadership",
+  "/faq": "faq",
+};
+const resolveLink = (url) => {
+  const t = String(url ?? "").trim();
+  const key = t.toLowerCase().replace(/\/+$/, "");
+  return SECTION_ALIASES[key] ? `#${SECTION_ALIASES[key]}` : t;
+};
+
 // One link component for everything editable from the dashboard:
 // external url -> <a>, "#section" -> smooth scroll, "/path" -> router Link, empty -> plain text.
-function SmartLink({ to, className, children }) {
+function SmartLink({ to: rawTo, className, children }) {
+  const to = resolveLink(rawTo);
   if (!to) return <span className={className}>{children}</span>;
   if (to.startsWith("#")) {
     return (
@@ -586,7 +605,7 @@ export default function LandingPage() {
    * Hero button
    */
   const onHeroButtonClick = () => {
-    const link = (hero.buttonLink || "").trim() || "/login";
+    const link = resolveLink(hero.buttonLink) || "/login";
 
     if (link.startsWith("#")) {
       scrollTo(link.slice(1));
@@ -613,7 +632,7 @@ export default function LandingPage() {
    * - "/route"     -> in-app navigation
    */
   const onExploreClick = () => {
-    const link = (hero.exploreLink || "").trim();
+    const link = resolveLink(hero.exploreLink);
 
     if (!link) {
       scrollTo("branches");

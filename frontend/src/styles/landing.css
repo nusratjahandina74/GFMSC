@@ -335,3 +335,6 @@ html.dark .gfPgWrap .pgBtn.active{ background: var(--gf-green-dark); color:#fff;
 }
 .statValue{ font-variant-numeric: tabular-nums; font-size: clamp(28px, 3.4vw, 42px); font-weight:800; line-height:1.1; color:var(--text); letter-spacing:-.01em; }
 .statLabel{ margin-top:6px; font-size: clamp(13px, 1.3vw, 15px); font-weight:500; color:var(--muted); }
+
+/* ---------- About description: full container width ---------- */
+.aboutText{ max-width:none; width:100%; margin-bottom:22px; white-space:pre-line; }

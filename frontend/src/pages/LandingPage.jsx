@@ -1193,7 +1193,7 @@ export default function LandingPage() {
             {about.title || "About"}
           </h2>
 
-          <p className="sectionSub">
+          <p className="sectionSub aboutText">
             {about.description || ""}
           </p>
 
@@ -1330,9 +1330,10 @@ export default function LandingPage() {
           <h2 className="sectionTitle">
             Features
           </h2>
-           <h3>Why Choose GFMSC</h3>
+
           <p className="sectionSub">
-            Combining strict academic excellence, daily student nutrition, and smart multi-branch management.
+            A complete set of tools
+            for Bangladesh schools.
           </p>
 
           {features.length > 0 ? (

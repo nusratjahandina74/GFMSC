@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2, Star, Trash2 } from "lucide-react";
+import { Loader2, Save, Star, Trash2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
@@ -12,6 +12,8 @@ export default function ImageCollectionManager({ kind, title, description }) {
   const [images, setImages] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(null);
+  // Unsaved caption edits, keyed by image id: { [id]: { title, description } }
+  const [drafts, setDrafts] = useState({});
   const [msg, setMsg] = useState({ text: "", type: "success" });
 
   const say = (text, type = "success") => setMsg({ text, type });
@@ -58,19 +60,47 @@ export default function ImageCollectionManager({ kind, title, description }) {
     }
   };
 
-  const saveTitle = async (img, value) => {
-    const clean = value.trim();
-    if (clean === (img.title || "")) return;
+  const draftOf = (img) => ({
+    title: drafts[img._id]?.title ?? (img.title || ""),
+    description: drafts[img._id]?.description ?? (img.description || ""),
+  });
+  const isDirty = (img) => {
+    const d = draftOf(img);
+    return d.title.trim() !== (img.title || "") || d.description.trim() !== (img.description || "");
+  };
+  const setDraft = (img, patch) => setDrafts((d) => ({ ...d, [img._id]: { ...draftOf(img), ...patch } }));
+  const hasUnsaved = images.some(isDirty);
+
+  const saveCaption = async (img) => {
+    const d = draftOf(img);
     setBusyId(img._id);
     try {
-      const saved = await updateImage(kind, img._id, { title: clean });
-      setImages((list) => list.map((i) => (i._id === img._id ? { ...i, title: saved.title } : i)));
+      const saved = await updateImage(kind, img._id, { title: d.title.trim(), description: d.description.trim() });
+      setImages((list) =>
+        list.map((i) => (i._id === img._id ? { ...i, title: saved.title, description: saved.description } : i))
+      );
+      setDrafts((all) => {
+        const { [img._id]: _gone, ...rest } = all;
+        return rest;
+      });
+      say("Saved. Refresh the home page to see it.");
     } catch (err) {
-      say(errText(err, "Could not save the title."), "error");
+      say(errText(err, "Could not save the caption."), "error");
     } finally {
       setBusyId(null);
     }
   };
+
+  // Warn before leaving the page (reload / close tab) while a caption is still unsaved.
+  useEffect(() => {
+    if (!hasUnsaved) return undefined;
+    const warn = (e) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasUnsaved]);
 
   const makeCover = async (img) => {
     setBusyId(img._id);
@@ -144,7 +174,7 @@ export default function ImageCollectionManager({ kind, title, description }) {
                 <thead>
                   <tr className="border-b text-xs uppercase text-muted-foreground">
                     <th className="py-2 pr-3">Image</th>
-                    <th className="py-2 pr-3">Title / caption</th>
+                    <th className="py-2 pr-3">Title / caption &amp; description</th>
                     <th className="py-2 pr-3">Status</th>
                     <th className="py-2 pr-3">Cover</th>
                     <th className="py-2 pr-3">Uploaded</th>
@@ -161,14 +191,55 @@ export default function ImageCollectionManager({ kind, title, description }) {
                           <img src={img.imageUrl} alt={img.title || ""} className="h-14 w-24 rounded-md border object-cover" />
                         </td>
                         <td className="py-2 pr-3">
-                          <Input
-                            key={`${img._id}-${img.title || ""}`}
-                            defaultValue={img.title || ""}
-                            maxLength={120}
-                            placeholder="Add a caption"
-                            className="h-8 min-w-[10rem]"
-                            onBlur={(e) => saveTitle(img, e.target.value)}
-                          />
+                          <div className="space-y-1.5">
+                            <Input
+                              value={draftOf(img).title}
+                              maxLength={120}
+                              placeholder="Add a caption"
+                              className="h-8 min-w-[12rem]"
+                              onChange={(e) => setDraft(img, { title: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && isDirty(img) && !busy) saveCaption(img);
+                              }}
+                            />
+                            <Input
+                              value={draftOf(img).description}
+                              maxLength={500}
+                              placeholder="Description (optional)"
+                              className="h-8 min-w-[12rem]"
+                              onChange={(e) => setDraft(img, { description: e.target.value })}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter" && isDirty(img) && !busy) saveCaption(img);
+                              }}
+                            />
+                            {isDirty(img) && (
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  disabled={busy}
+                                  onClick={() => saveCaption(img)}
+                                  className="bg-green-600 text-white hover:bg-green-700"
+                                >
+                                  {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Save
+                                </Button>
+                                <button
+                                  type="button"
+                                  disabled={busy}
+                                  onClick={() =>
+                                    setDrafts((all) => {
+                                      const { [img._id]: _gone, ...rest } = all;
+                                      return rest;
+                                    })
+                                  }
+                                  className="text-xs text-muted-foreground underline"
+                                >
+                                  Cancel
+                                </button>
+                                <span className="text-xs text-amber-600">Unsaved</span>
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="py-2 pr-3">
                           <button

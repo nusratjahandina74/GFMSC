@@ -1330,10 +1330,9 @@ export default function LandingPage() {
           <h2 className="sectionTitle">
             Features
           </h2>
-
+           <h3>Why Choose GFMSC</h3>
           <p className="sectionSub">
-            A complete set of tools
-            for Bangladesh schools.
+            Combining strict academic excellence, daily student nutrition, and smart multi-branch management.
           </p>
 
           {features.length > 0 ? (

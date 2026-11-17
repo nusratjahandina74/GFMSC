@@ -333,5 +333,5 @@ html.dark .gfPgWrap .pgBtn.active{ background: var(--gf-green-dark); color:#fff;
   content:""; position:absolute; left:0; right:0; top:0; height:4px;
   background: linear-gradient(90deg, var(--primary), var(--primary2));
 }
-.statValue{ font-size: clamp(28px, 3.4vw, 42px); font-weight:800; line-height:1.1; color:var(--text); letter-spacing:-.01em; }
+.statValue{ font-variant-numeric: tabular-nums; font-size: clamp(28px, 3.4vw, 42px); font-weight:800; line-height:1.1; color:var(--text); letter-spacing:-.01em; }
 .statLabel{ margin-top:6px; font-size: clamp(13px, 1.3vw, 15px); font-weight:500; color:var(--muted); }

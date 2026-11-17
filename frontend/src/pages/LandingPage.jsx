@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import "../styles/landing.css";
 import { API_BASE_URL } from "../api/baseUrl.js";
@@ -32,6 +32,75 @@ const DEFAULT_PAGE = {
   blogs: [],
   faqs: [],
 };
+
+// Counts up from 0 to the number inside `value` (e.g. "4,000+", "04", "300+") the first time it scrolls into view.
+// Keeps the prefix/suffix, the thousands comma and leading zeros. Shows the final value right away if the
+// text has no number, or if the visitor prefers reduced motion.
+function CountUp({ value, duration = 2000 }) {
+  const text = String(value ?? "");
+  const m = text.match(/^(\D*)(\d[\d,]*)(.*)$/);
+  const ref = useRef(null);
+  const [shown, setShown] = useState(m ? 0 : null);
+
+  const prefix = m ? m[1] : "";
+  const digits = m ? m[2] : "";
+  const suffix = m ? m[3] : "";
+  const target = m ? parseInt(digits.replace(/,/g, ""), 10) : 0;
+  const hasComma = digits.includes(",");
+  const padTo = !hasComma && digits.length > 1 && digits.startsWith("0") ? digits.length : 0;
+
+  useEffect(() => {
+    if (!m) return;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reduce || !("IntersectionObserver" in window)) {
+      setShown(target);
+      return;
+    }
+
+    let raf = 0;
+    const el = ref.current;
+    const run = () => {
+      const start = performance.now();
+      const tick = (now) => {
+        const t = Math.min(1, (now - start) / duration);
+        const eased = 1 - Math.pow(1 - t, 3); // ease-out
+        setShown(Math.round(target * eased));
+        if (t < 1) raf = requestAnimationFrame(tick);
+      };
+      raf = requestAnimationFrame(tick);
+    };
+
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          io.disconnect();
+          run();
+        }
+      },
+      { threshold: 0.4 }
+    );
+    io.observe(el);
+
+    return () => {
+      io.disconnect();
+      cancelAnimationFrame(raf);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, duration]);
+
+  if (!m) return <span ref={ref}>{text}</span>;
+
+  const n = shown ?? 0;
+  const body = hasComma ? n.toLocaleString("en-US") : padTo ? String(n).padStart(padTo, "0") : String(n);
+
+  return (
+    <span ref={ref} aria-label={text}>
+      {prefix}
+      {body}
+      {suffix}
+    </span>
+  );
+}
 
 // Shown when the dashboard has not saved any stats / badges yet.
 const DEFAULT_STATS = [
@@ -1097,7 +1166,7 @@ export default function LandingPage() {
                   key={`${item.label}-${index}`}
                 >
                   <div className="statValue">
-                    {item.value}
+                    <CountUp value={item.value} />
                   </div>
                   {item.label && (
                     <div className="statLabel">

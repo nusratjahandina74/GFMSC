@@ -314,3 +314,24 @@ html.dark .leadMsg h3{ color: var(--gf-green); }
 .pgGap{ color:#64748b; padding:0 2px; }
 html.dark .gfPgWrap .pgBtn{ background:transparent; color:var(--text); border-color:var(--border); }
 html.dark .gfPgWrap .pgBtn.active{ background: var(--gf-green-dark); color:#fff; }
+
+
+/* ---------- Key impact stats (below hero) ---------- */
+.statsBar{ padding:6px 0 30px; }
+.statsGrid{ display:grid; gap:14px; grid-template-columns: repeat(2, minmax(0,1fr)); }
+@media(min-width:900px){ .statsGrid{ grid-template-columns: repeat(4, minmax(0,1fr)); gap:18px; } }
+.statCard{
+  position:relative; overflow:hidden;
+  padding:22px 18px 20px;
+  border:1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: var(--shadow);
+  text-align:center;
+}
+.statCard::before{
+  content:""; position:absolute; left:0; right:0; top:0; height:4px;
+  background: linear-gradient(90deg, var(--primary), var(--primary2));
+}
+.statValue{ font-size: clamp(28px, 3.4vw, 42px); font-weight:800; line-height:1.1; color:var(--text); letter-spacing:-.01em; }
+.statLabel{ margin-top:6px; font-size: clamp(13px, 1.3vw, 15px); font-weight:500; color:var(--muted); }

@@ -81,6 +81,14 @@ const infoBlockSchema = new mongoose.Schema(
   { _id: false }
 );
 
+const statSchema = new mongoose.Schema(
+  {
+    value: { type: String, required: true }, // e.g. "4,000+"
+    label: { type: String, default: "" }, // e.g. "Active Students"
+  },
+  { _id: false }
+);
+
 const landingPageSchema = new mongoose.Schema(
   {
     // H18: owner school. Optional only for legacy/platform pages created before this field existed.
@@ -128,6 +136,17 @@ const landingPageSchema = new mongoose.Schema(
       description: { type: String, default: "" },
       buttonText: { type: String, default: "" },
       buttonLink: { type: String, default: "" },
+      // second (outline) button, default scrolls to the Branches section
+      exploreText: { type: String, default: "" },
+      exploreLink: { type: String, default: "" },
+      // small tick badges under the buttons
+      badges: [{ type: String }],
+    },
+
+    // Key impact numbers bar (right below the hero)
+    stats: {
+      show: { type: Boolean, default: true },
+      items: [statSchema],
     },
 
     about: {

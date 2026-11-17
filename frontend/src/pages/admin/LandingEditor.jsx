@@ -58,6 +58,15 @@ function ImageField({ label, value, onChange, folder = "landing", onError }) {
 
 const PER_PAGE = 5;
 
+// Same values the public page shows when nothing is saved yet. They pre-fill the editor so you can just edit them.
+const DEFAULT_STATS = [
+  { value: "4,000+", label: "Active Students" },
+  { value: "300+", label: "Dedicated Teachers" },
+  { value: "100+", label: "Support Staff" },
+  { value: "04", label: "Branches Across Dhaka" },
+];
+const DEFAULT_BADGES = ["Supported by Austrian Doctors", "Daily Free Nutritious Meals", "4 Branches in Dhaka"];
+
 // The editor is split into pages so it is not one endless scroll.
 const SECTIONS = ["Basics", "Features & FAQ", "Gallery & Blog", "Chairman & Notice", "Branches", "Footer"];
 
@@ -110,6 +119,16 @@ function LinkList({ items, onChange, labelPh = "Label", urlPh = "Link (/page, ht
   );
 }
 
+// Fill empty hero badges / stats with the defaults so the editor never starts blank.
+function withDefaults(p) {
+  if (!p) return p;
+  return {
+    ...p,
+    hero: { ...(p.hero || {}), badges: p.hero?.badges?.length ? p.hero.badges : DEFAULT_BADGES },
+    stats: { show: p.stats?.show !== false, items: p.stats?.items?.length ? p.stats.items : DEFAULT_STATS },
+  };
+}
+
 export default function LandingEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -135,7 +154,7 @@ export default function LandingEditor() {
     try {
       const res = await api.get("/landing-pages");
       const pages = res.data?.pages || [];
-      setPage(pages[0] || null);
+      setPage(withDefaults(pages[0] || null));
     } catch (err) {
       say(err?.response?.data?.message || "Could not load landing page.", "error");
     } finally {
@@ -151,7 +170,7 @@ export default function LandingEditor() {
     setSaving(true);
     try {
       const res = await api.post("/landing-pages", { slug });
-      setPage(res.data);
+      setPage(withDefaults(res.data));
       say("Landing page created. Now add your images.");
     } catch (err) {
       say(err?.response?.data?.message || "Could not create page.", "error");
@@ -190,6 +209,11 @@ export default function LandingEditor() {
     try {
       const body = {
         school: page.school || {},
+        hero: page.hero || {},
+        stats: {
+          show: page.stats?.show !== false,
+          items: (page.stats?.items || []).filter((x) => x.value),
+        },
         about: page.about || {},
         slides: (page.slides || []).filter((s) => s.url),
         gallery: (page.gallery || []).filter((g) => g.url),
@@ -212,8 +236,8 @@ export default function LandingEditor() {
         },
       };
       const res = await api.put(`/landing-pages/${page._id}`, body);
-      setPage(res.data);
-      say("Saved. Refresh the home page to see the new images.");
+      setPage(withDefaults(res.data));
+      say("Saved. Refresh the home page to see your changes.");
     } catch (err) {
       say(err?.response?.data?.message || "Save failed.", "error");
     } finally {
@@ -292,6 +316,89 @@ export default function LandingEditor() {
             </CardHeader>
             <CardContent>
               <ImageField value={page.school?.logo} onChange={(u) => setField("school", "logo", u)} folder="logo" onError={err} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Hero section</CardTitle>
+              <CardDescription>The big welcome area at the very top of the home page (title, text, buttons and tick badges).</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label>Title</Label>
+                <Input placeholder="Welcome to GFMSC" value={page.hero?.title || ""} onChange={(e) => setField("hero", "title", e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Subtitle (first line under the title)</Label>
+                <Input placeholder="Quality Education for a Better Future" value={page.hero?.subtitle || ""} onChange={(e) => setField("hero", "subtitle", e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label>Description (second line)</Label>
+                <Textarea rows={3} placeholder="Our school provides quality education and student support." value={page.hero?.description || ""} onChange={(e) => setField("hero", "description", e.target.value)} />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Main button (e.g. Get Started)</Label>
+                <div className="flex gap-2">
+                  <Input placeholder="Button text (Get Started)" value={page.hero?.buttonText || ""} onChange={(e) => setField("hero", "buttonText", e.target.value)} />
+                  <Input placeholder="Link (/login, #about, https://...)" value={page.hero?.buttonLink || ""} onChange={(e) => setField("hero", "buttonLink", e.target.value)} />
+                </div>
+                <p className="text-xs text-muted-foreground">Leave both empty to show "Dashboard Login" (goes to /login).</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Second button (e.g. Explore Our 4 Branches)</Label>
+                <div className="flex gap-2">
+                  <Input placeholder="Button text (Explore Our 4 Branches)" value={page.hero?.exploreText || ""} onChange={(e) => setField("hero", "exploreText", e.target.value)} />
+                  <Input placeholder="Link (empty = scroll to Branches section)" value={page.hero?.exploreLink || ""} onChange={(e) => setField("hero", "exploreLink", e.target.value)} />
+                </div>
+                <p className="text-xs text-muted-foreground">Leave the link empty and the button scrolls down to the Branches section of the home page.</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Tick badges (small ✅ pills under the buttons)</Label>
+                {(page.hero?.badges || []).map((b, i) => (
+                  <div key={i} className="flex gap-2">
+                    <Input placeholder="Badge text" value={b || ""} onChange={(e) => setField("hero", "badges", (page.hero?.badges || []).map((x, idx) => (idx === i ? e.target.value : x)))} />
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setField("hero", "badges", (page.hero?.badges || []).filter((_, idx) => idx !== i))}>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                {(page.hero?.badges || []).length < 6 && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => setField("hero", "badges", [...(page.hero?.badges || []), ""])}>
+                    <Plus className="h-4 w-4" /> Add badge
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Key impact stats</CardTitle>
+              <CardDescription>The number cards shown right below the hero (up to 8). Example: 4,000+ / Active Students.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={page.stats?.show !== false} onChange={(e) => setField("stats", "show", e.target.checked)} />
+                Show this stats bar on the home page
+              </label>
+              {(page.stats?.items || []).map((st, i) => (
+                <div key={i} className="flex gap-2">
+                  <Input className="w-36" placeholder="4,000+" value={st.value || ""} onChange={(e) => setField("stats", "items", (page.stats?.items || []).map((x, idx) => (idx === i ? { ...x, value: e.target.value } : x)))} />
+                  <Input placeholder="Label (Active Students)" value={st.label || ""} onChange={(e) => setField("stats", "items", (page.stats?.items || []).map((x, idx) => (idx === i ? { ...x, label: e.target.value } : x)))} />
+                  <Button type="button" variant="ghost" size="sm" onClick={() => setField("stats", "items", (page.stats?.items || []).filter((_, idx) => idx !== i))}>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+              {(page.stats?.items || []).length < 8 && (
+                <Button type="button" variant="outline" size="sm" onClick={() => setField("stats", "items", [...(page.stats?.items || []), { value: "", label: "" }])}>
+                  <Plus className="h-4 w-4" /> Add stat
+                </Button>
+              )}
             </CardContent>
           </Card>
 

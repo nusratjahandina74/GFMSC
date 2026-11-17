@@ -9,13 +9,32 @@ const router = express.Router();
 router.param("id", objectIdParam);
 
 // H24: only these fields may ever be written from a request body (no raw ...req.body spread).
-const EDITABLE = ["isPublished", "school", "ticker", "slides", "hero", "about", "features", "gallery", "notices", "blogs", "faqs", "footerText", "noticeBoard", "branchesTitle", "branches", "leadership", "footer"];
+const EDITABLE = ["isPublished", "school", "ticker", "slides", "hero", "stats", "about", "features", "gallery", "notices", "blogs", "faqs", "footerText", "noticeBoard", "branchesTitle", "branches", "leadership", "footer"];
 const pickEditable = (body = {}) => Object.fromEntries(EDITABLE.filter((k) => body[k] !== undefined).map((k) => [k, body[k]]));
 // Scrolling notice ticker: trim, drop blanks, cap length and count.
 const normalizeTicker = (v) =>
   Array.isArray(v)
     ? v.map((t) => String(t ?? "").trim().slice(0, 200)).filter(Boolean).slice(0, 30)
     : [];
+// Hero badges: trim, drop blanks, cap length/count. Stats: keep only rows that have a value.
+const normalizeHero = (h) => {
+  if (!h || typeof h !== "object") return h;
+  const out = { ...h };
+  if (out.badges !== undefined) {
+    out.badges = Array.isArray(out.badges) ? out.badges.map((t) => String(t ?? "").trim().slice(0, 80)).filter(Boolean).slice(0, 6) : [];
+  }
+  return out;
+};
+const normalizeStats = (s) => {
+  if (!s || typeof s !== "object") return s;
+  return {
+    show: s.show !== false,
+    items: (Array.isArray(s.items) ? s.items : [])
+      .map((i) => ({ value: String(i?.value ?? "").trim().slice(0, 20), label: String(i?.label ?? "").trim().slice(0, 60) }))
+      .filter((i) => i.value)
+      .slice(0, 8),
+  };
+};
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const cleanSlug = (v) => String(v || "").trim().toLowerCase();
 // H17: the real roles. (The old code used role "admin", which does not exist, so NOBODY could manage pages.)
@@ -123,6 +142,8 @@ router.post("/", authMiddleware(ADMINS), async (req, res) => {
     }
     const data = pickEditable(req.body);
     if (data.ticker !== undefined) data.ticker = normalizeTicker(data.ticker);
+    if (data.hero !== undefined) data.hero = normalizeHero(data.hero);
+    if (data.stats !== undefined) data.stats = normalizeStats(data.stats);
     const page = await LandingPage.create({ ...data, slug, schoolId });
     res.status(201).json(page);
   } catch (error) {
@@ -139,6 +160,8 @@ router.put("/:id", authMiddleware(ADMINS), async (req, res) => {
     if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ message: "Invalid id" });
     const update = pickEditable(req.body);
     if (update.ticker !== undefined) update.ticker = normalizeTicker(update.ticker);
+    if (update.hero !== undefined) update.hero = normalizeHero(update.hero);
+    if (update.stats !== undefined) update.stats = normalizeStats(update.stats);
     if (req.body?.slug !== undefined) {
       const slug = cleanSlug(req.body.slug);
       if (!SLUG_RE.test(slug) || slug.length > 60) return res.status(400).json({ message: "Invalid slug." });

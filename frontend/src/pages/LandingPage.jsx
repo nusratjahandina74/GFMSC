@@ -33,6 +33,15 @@ const DEFAULT_PAGE = {
   faqs: [],
 };
 
+// Shown when the dashboard has not saved any stats / badges yet.
+const DEFAULT_STATS = [
+  { value: "4,000+", label: "Active Students" },
+  { value: "300+", label: "Dedicated Teachers" },
+  { value: "100+", label: "Support Staff" },
+  { value: "04", label: "Branches Across Dhaka" },
+];
+const DEFAULT_BADGES = ["Supported by Austrian Doctors", "Daily Free Nutritious Meals", "4 Branches in Dhaka"];
+
 function readCachedPage() {
   try {
     const raw = localStorage.getItem(CACHE_KEY);
@@ -436,6 +445,10 @@ export default function LandingPage() {
   const hero = page?.hero || {};
   const about = page?.about || {};
 
+  const heroBadges = Array.isArray(hero.badges) && hero.badges.some((b) => b?.trim()) ? hero.badges.filter((b) => b?.trim()) : DEFAULT_BADGES;
+  const statItems = Array.isArray(page?.stats?.items) && page.stats.items.some((x) => x?.value) ? page.stats.items.filter((x) => x?.value) : DEFAULT_STATS;
+  const showStats = page?.stats?.show !== false && statItems.length > 0;
+
   const noticeBoard = page?.noticeBoard || {};
   const branches = Array.isArray(page?.branches) ? page.branches.filter((b) => b?.name) : [];
   const leadership = page?.leadership || {};
@@ -504,22 +517,51 @@ export default function LandingPage() {
    * Hero button
    */
   const onHeroButtonClick = () => {
-    if (!hero.buttonLink) return;
+    const link = (hero.buttonLink || "").trim() || "/login";
+
+    if (link.startsWith("#")) {
+      scrollTo(link.slice(1));
+      return;
+    }
 
     if (
-      hero.buttonLink.startsWith("http://") ||
-      hero.buttonLink.startsWith("https://")
+      link.startsWith("http://") ||
+      link.startsWith("https://")
     ) {
-      window.open(
-        hero.buttonLink,
-        "_blank",
-        "noopener,noreferrer"
-      );
+      window.open(link, "_blank", "noopener,noreferrer");
 
       return;
     }
 
-    nav(hero.buttonLink);
+    nav(link);
+  };
+
+  /*
+   * Hero second button ("Explore Our Branches")
+   * - no link set  -> smooth scroll to the Branches section of this page
+   * - "#section"   -> smooth scroll to that section
+   * - http(s)://   -> new tab
+   * - "/route"     -> in-app navigation
+   */
+  const onExploreClick = () => {
+    const link = (hero.exploreLink || "").trim();
+
+    if (!link) {
+      scrollTo("branches");
+      return;
+    }
+
+    if (link.startsWith("#")) {
+      scrollTo(link.slice(1));
+      return;
+    }
+
+    if (link.startsWith("http://") || link.startsWith("https://")) {
+      window.open(link, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    nav(link);
   };
 
   /*
@@ -914,42 +956,33 @@ export default function LandingPage() {
               )}
 
               <div className="hActions">
-                {hero.buttonText && hero.buttonLink ? (
+                <button
+                  className="btn btnPrimary"
+                  onClick={onHeroButtonClick}
+                >
+                  {hero.buttonText || "Dashboard Login"}
+                </button>
+
+                {(branches.length > 0 || (hero.exploreLink || "").trim()) && (
                   <button
-                    className="btn btnPrimary"
-                    onClick={onHeroButtonClick}
+                    type="button"
+                    className="btn"
+                    onClick={onExploreClick}
                   >
-                    {hero.buttonText}
-                  </button>
-                ) : (
-                  <button
-                    className="btn btnPrimary"
-                    onClick={() => nav("/login")}
-                  >
-                    Dashboard Login
+                    {hero.exploreText ||
+                      (branches.length > 0
+                        ? `Explore Our ${branches.length} Branches`
+                        : "Explore Our Branches")}
                   </button>
                 )}
-
-                <Link
-                  className="btn"
-                  to="/branches"
-                >
-                  Explore Our 4 Branches
-                </Link>
               </div>
 
               <div className="miniBadges">
-                <span>
-                  ✅ Supported by Austrian Doctors
-                </span>
-
-                <span>
-                  ✅ Daily Free Nutritious Meals
-                </span>
-
-                <span>
-                  ✅ 4 Branches in Dhaka
-                </span>
+                {heroBadges.map((text, index) => (
+                  <span key={`${text}-${index}`}>
+                    ✅ {text}
+                  </span>
+                ))}
               </div>
             </div>
 
@@ -1046,6 +1079,37 @@ export default function LandingPage() {
           )}
         </div>
       </section>
+
+      {/* =========================
+          KEY IMPACT STATS
+      ========================== */}
+
+      {showStats && (
+        <section
+          className="statsBar"
+          aria-label="Key impact statistics"
+        >
+          <div className="container">
+            <div className="statsGrid">
+              {statItems.map((item, index) => (
+                <div
+                  className="statCard"
+                  key={`${item.label}-${index}`}
+                >
+                  <div className="statValue">
+                    {item.value}
+                  </div>
+                  {item.label && (
+                    <div className="statLabel">
+                      {item.label}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* =========================
           ABOUT

@@ -50,7 +50,7 @@ export const sendEmail = async ({ to, subject, html }) => {
 
 export const verificationEmailHtml = ({ name, verifyUrl }) => `
   <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto;">
-    <h2 style="color:#059669;">Welcome to GFMSC, ${name || "there"}!</h2>
+    <h2 style="color:#059669;">Welcome to GFMSC ${name || "there"}!</h2>
     <p>Please verify your email address to activate your account.</p>
     <p style="margin: 24px 0;">
       <a href="${verifyUrl}" style="background:#059669;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">

@@ -20,9 +20,9 @@ const DEFAULT_PAGE = {
   school: { name: "GFMSC" },
   ticker: [],
   hero: {
-    title: "Welcome to GFMSC",
+    title: "Quality Education & Daily Nutrition for Every Child",
     subtitle: "School Management System",
-    description: "Sign in to access your dashboard.",
+    description: "An educational initiative by Glory Bandhu Protim Samaj Kallayan Sangstha (GBSKS), proudly supported by Austrian Doctors. Providing strict academic excellence, free daily nutritious meals, and holistic care across 4 branches in Dhaka since 1992.",
     buttonText: "Login",
     buttonLink: "/login",
   },
@@ -926,29 +926,29 @@ export default function LandingPage() {
                     className="btn btnPrimary"
                     onClick={() => nav("/login")}
                   >
-                    Get Started
+                    Dashboard Login
                   </button>
                 )}
 
                 <Link
                   className="btn"
-                  to="/notices"
+                  to="/branches"
                 >
-                  View Notices
+                  Explore Our 4 Branches
                 </Link>
               </div>
 
               <div className="miniBadges">
                 <span>
-                  ✅ Mobile friendly
+                  ✅ Supported by Austrian Doctors
                 </span>
 
                 <span>
-                  ✅ Secure login
+                  ✅ Daily Free Nutritious Meals
                 </span>
 
                 <span>
-                  ✅ Fast reports
+                  ✅ 4 Branches in Dhaka
                 </span>
               </div>
             </div>

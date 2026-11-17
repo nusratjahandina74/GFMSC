@@ -253,8 +253,8 @@ export default function MultiImageUploader({ onUpload, maxFiles = 10, maxMB = 5 
                 disabled={busy}
                 className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm"
               >
-                <option value="active">Active (show on website)</option>
-                <option value="inactive">Inactive (hidden)</option>
+                <option value="active" className="bg-background text-foreground">Active (show on website)</option>
+                <option value="inactive" className="bg-background text-foreground">Inactive (hidden)</option>
               </select>
             </div>
           </div>

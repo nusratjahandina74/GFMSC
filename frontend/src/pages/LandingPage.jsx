@@ -332,6 +332,8 @@ export default function LandingPage() {
               .map((img) => ({
                 url: img.imageUrl,
                 alt: img.title || "",
+                title: img.title || "",
+                description: img.description || "",
                 isCover: Boolean(img.isCover),
               }))
           );
@@ -956,7 +958,8 @@ export default function LandingPage() {
             <div className="card slider">
               {slides.length > 0 ? (
                 <>
-                  <img
+                  <div className="slideWrap">
+                    <img
                     className="slideImg"
                     src={slides[slide]?.url}
                     alt={
@@ -968,6 +971,22 @@ export default function LandingPage() {
                         "none";
                     }}
                   />
+
+                    {(slides[slide]?.title || slides[slide]?.description) && (
+                      <div className="slideCaption">
+                        {slides[slide]?.title && (
+                          <div className="slideCapTitle">
+                            {slides[slide].title}
+                          </div>
+                        )}
+                        {slides[slide]?.description && (
+                          <div className="slideCapText">
+                            {slides[slide].description}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   {slides.length > 1 && (
                     <div className="slideDots">

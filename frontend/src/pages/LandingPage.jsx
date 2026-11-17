@@ -971,22 +971,22 @@ export default function LandingPage() {
                         "none";
                     }}
                   />
-
-                    {(slides[slide]?.title || slides[slide]?.description) && (
-                      <div className="slideCaption">
-                        {slides[slide]?.title && (
-                          <div className="slideCapTitle">
-                            {slides[slide].title}
-                          </div>
-                        )}
-                        {slides[slide]?.description && (
-                          <div className="slideCapText">
-                            {slides[slide].description}
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
+
+                  {slides.some((x) => x.title || x.description) && (
+                    <div className="slideCaption">
+                      {slides[slide]?.title && (
+                        <div className="slideCapTitle">
+                          {slides[slide].title}
+                        </div>
+                      )}
+                      {slides[slide]?.description && (
+                        <div className="slideCapText">
+                          {slides[slide].description}
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   {slides.length > 1 && (
                     <div className="slideDots">
@@ -1392,6 +1392,21 @@ export default function LandingPage() {
                           "none";
                       }}
                     />
+
+                    {(image.title || image.description) && (
+                      <div className="galCaption">
+                        {image.title && (
+                          <div className="galCapTitle">
+                            {image.title}
+                          </div>
+                        )}
+                        {image.description && (
+                          <div className="galCapText">
+                            {image.description}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               )}

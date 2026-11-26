@@ -67,7 +67,7 @@ export default function AdminSidebar() {
 
     // ---- School Admin only: single-school operations ----
     { name: "Notices", path: "/admin/notices", icon: FileText, roles: ["schoolAdmin"] },
-    { name: "Students", path: "/admin/students", icon: GraduationCap, roles: ["schoolAdmin"] },
+    { name: "Students", path: "/admin/students", icon: GraduationCap, roles: ["schoolAdmin", "superAdmin"] },
     { name: "Teachers", path: "/admin/teachers", icon: Users, roles: ["schoolAdmin"] },
     { name: "Staff", path: "/admin/staff", icon: Briefcase, roles: ["schoolAdmin"] },
     { name: "Guardians", path: "/admin/guardians", icon: Users, roles: ["schoolAdmin"] },

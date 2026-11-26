@@ -1,6 +1,7 @@
 import Student from "../models/Student.js";
 import ClassTeacher from "../models/ClassTeacher.js"; 
 import Teacher from "../models/Teacher.js";
+import School from "../models/School.js";
 import { tenantIdFor } from "../utils/tenant.js";
 import { validatePassword, generateTempPassword } from "../utils/password.js";
 import { audit } from "../utils/audit.js";
@@ -20,19 +21,50 @@ const phoneProblem = (data) => {
   return null;
 };
 
+// ---------------------------------------------------------------------------
+// Class-teacher data isolation.
+// A teacher may only touch students of the class+section(s) they are assigned to as CLASS TEACHER.
+// `classScope` returns that list ([] when the teacher has no assignment); `scopeFilter` turns it into a Mongo
+// filter (a section of "" means "no section" and also matches students stored without one).
+// ---------------------------------------------------------------------------
+const classScope = async (req) => {
+  const teacher = await Teacher.findOne({ userId: req.user.userId, schoolId: req.user.schoolId }).select("_id");
+  if (!teacher) return [];
+  const rows = await ClassTeacher.find({ teacherId: teacher._id, schoolId: req.user.schoolId }).select("className section").lean();
+  return rows.map((r) => ({ className: r.className, section: r.section || "" }));
+};
+const sectionMatch = (section) => (section ? section : { $in: ["", null] });
+const scopeFilter = (scope) => ({ $or: scope.map((a) => ({ className: a.className, section: sectionMatch(a.section) })) });
+const inScope = (scope, className, section) => scope.some((a) => a.className === className && a.section === (section || ""));
+const NO_CLASS_MSG = "You are not assigned as a Class Teacher of any class, so you cannot manage students.";
+
 
 export const createStudent = async (req, res) => {
   try {
-
-    if (req.user.role === "teacher" || req.user.role === "student") {
-      return res.status(403).json({ message: "Access denied. You do not have permission to create students." });
-    }
-
+    // Route-level permission already blocked schoolAdmin / student / guardian. Everything below is class scoping.
     const targetSchoolId = tenantIdFor(req, req.body.schoolId);
     if (!targetSchoolId) {
       return res.status(400).json({ message: "School ID is required to create a student." });
     }
     const studentData = { ...pickStudent(req.body), schoolId: targetSchoolId };
+
+    if (req.user.role === "teacher") {
+      const scope = await classScope(req);
+      if (!scope.length) return res.status(403).json({ message: NO_CLASS_MSG });
+      // Money is not a teacher's call.
+      delete studentData.monthlyFee;
+      // Lock the class: no class sent -> use the only assigned class; a class sent -> must be one of theirs.
+      if (!studentData.className && !studentData.section && scope.length === 1) {
+        studentData.className = scope[0].className;
+        studentData.section = scope[0].section || undefined;
+      } else if (!studentData.className) {
+        return res.status(400).json({ message: "Please choose one of your assigned classes." });
+      } else if (!inScope(scope, studentData.className, studentData.section)) {
+        return res.status(403).json({ message: "You can only add students to your own assigned class and section." });
+      }
+      if (!studentData.section) delete studentData.section;
+    }
+
     if (typeof studentData.studentId === "string" && studentData.studentId.trim() === "") delete studentData.studentId;
     const phoneErr = phoneProblem(studentData);
     if (phoneErr) return res.status(400).json({ message: phoneErr });
@@ -43,7 +75,7 @@ export const createStudent = async (req, res) => {
       if (problem) return res.status(400).json({ message: problem });
       studentData.password = supplied;
     } else {
-      // H22: no predictable default. Random one-time password, shown ONCE to the admin.
+      // H22: no predictable default. Random one-time password, shown ONCE to the creator.
       temporaryPassword = generateTempPassword();
       studentData.password = temporaryPassword;
       studentData.mustChangePassword = true;
@@ -76,6 +108,9 @@ export const getStudents = async (req, res) => {
 
     const filter = {};
 
+    // superAdmin: all schools by default, or one school when ?schoolId= is given.
+    if (req.user.role === "superAdmin" && qSchoolId && /^[a-f\d]{24}$/i.test(String(qSchoolId))) filter.schoolId = qSchoolId;
+
     if (req.user.role !== "superAdmin") {
       const scopedSchoolId = req.user.schoolId;
       if (!scopedSchoolId) {
@@ -86,45 +121,13 @@ export const getStudents = async (req, res) => {
       filter.schoolId = scopedSchoolId;
 
       if (req.user.role === "teacher") {
-        const teacherProfile = await Teacher.findOne({ userId: req.user.userId });
-        
-        if (!teacherProfile) {
-          return res.status(200).json({
-            total: 0,
-            page: pageNum,
-            limit: limitNum,
-            totalPages: 0,
-            students: [],
-          });
+        const scope = await classScope(req);
+        if (!scope.length) {
+          return res.status(200).json({ total: 0, page: pageNum, limit: limitNum, totalPages: 0, students: [] });
         }
-
-        // A teacher sees students for ALL class/sections they are
-        // assigned to as Class Teacher (regardless of isFirstPeriodTeacher flag).
-        // The old code only checked isFirstPeriodTeacher:true, which effectively
-        // made the students list empty for 90% of class teachers.
-        const assignments = await ClassTeacher.find({
-          teacherId: teacherProfile._id,
-          schoolId: scopedSchoolId,
-        }).select("className section");
-
-        if (!assignments || assignments.length === 0) {
-          return res.status(200).json({
-            total: 0,
-            page: pageNum,
-            limit: limitNum,
-            totalPages: 0,
-            students: [],
-          });
-        }
-
-        // Build a $or query so a teacher assigned to multiple sections
-        // (e.g. Class 5-A + Class 6-B) sees all of them at once.
-        filter.$or = assignments.map((a) => ({
-          className: a.className,
-          section: a.section || "",
-        }));
-        // Teachers MUST NOT have global/class/section search (per requirement).
-        // Any search/className/section params from the frontend are IGNORED.
+        // Several class/sections (e.g. 5-A + 6-B) are all visible at once.
+        filter.$or = scopeFilter(scope).$or;
+        // Teachers MUST NOT widen or narrow via search/className/section params: those are IGNORED for them.
       }
     }
 
@@ -162,12 +165,21 @@ export const getStudents = async (req, res) => {
       .skip(skip)
       .limit(limitNum);
 
+    let out = students;
+    if (req.user.role === "superAdmin") {
+      // Super admin sees students of EVERY school, so tag each row with its school's name.
+      const ids = [...new Set(students.map((s) => String(s.schoolId)))];
+      const schools = ids.length ? await School.find({ _id: { $in: ids } }).select("name").lean() : [];
+      const names = new Map(schools.map((sc) => [String(sc._id), sc.name]));
+      out = students.map((st) => ({ ...st.toObject(), schoolName: names.get(String(st.schoolId)) || "" }));
+    }
+
     res.status(200).json({
       total,
       page: pageNum,
       limit: limitNum,
       totalPages: Math.ceil(total / limitNum),
-      students,
+      students: out,
     });
   } catch (error) {
     console.error("[studentController.js]", error);
@@ -189,25 +201,9 @@ export const getStudentById = async (req, res) => {
       filter.schoolId = scopedSchoolId;
 
       if (req.user.role === "teacher") {
-        const teacherProfile = await Teacher.findOne({ userId: req.user.userId });
-        
-        if (!teacherProfile) {
-          return res.status(404).json({ message: "Student not found" });
-        }
-
-        const assignments = await ClassTeacher.find({
-          teacherId: teacherProfile._id,
-          schoolId: scopedSchoolId,
-        }).select("className section");
-
-        if (!assignments || assignments.length === 0) {
-          return res.status(404).json({ message: "Student not found" });
-        }
-
-        filter.$or = assignments.map((a) => ({
-          className: a.className,
-          section: a.section || "",
-        }));
+        const scope = await classScope(req);
+        if (!scope.length) return res.status(404).json({ message: "Student not found" });
+        filter.$or = scopeFilter(scope).$or;
       }
     }
 
@@ -224,18 +220,30 @@ export const getStudentById = async (req, res) => {
 export const updateStudent = async (req, res) => {
   try {
 
-    if (req.user.role === "teacher") {
-      return res.status(403).json({ message: "Access denied. Teachers cannot update student details." });
-    }
-
     const filter = { _id: req.params.id };
+    let scope = null;
     if (req.user.role !== "superAdmin") {
       filter.schoolId = req.user.schoolId;
+    }
+    if (req.user.role === "teacher") {
+      // A teacher can only edit students that currently sit in their own class+section.
+      scope = await classScope(req);
+      if (!scope.length) return res.status(403).json({ message: NO_CLASS_MSG });
+      filter.$or = scopeFilter(scope).$or;
     }
     const student = await Student.findOne(filter);
     if (!student) return res.status(404).json({ message: "Student not found" });
 
     const { password, studentId, ...rest } = pickStudent({ ...req.body });
+    if (scope) {
+      delete rest.monthlyFee; // money is not a teacher's call
+      // ...and they cannot move a student out of (or into somebody else's) class.
+      const nextClass = rest.className !== undefined ? rest.className : student.className;
+      const nextSection = rest.section !== undefined ? rest.section : student.section;
+      if (!inScope(scope, nextClass, nextSection)) {
+        return res.status(403).json({ message: "You can only keep students inside your own assigned class and section." });
+      }
+    }
     const phoneErr = phoneProblem(rest);
     if (phoneErr) return res.status(400).json({ message: phoneErr });
     if (typeof req.body.password === "string" && req.body.password.trim() !== "") {
@@ -261,13 +269,14 @@ export const updateStudent = async (req, res) => {
 export const deleteStudent = async (req, res) => {
   try {
 
-    if (req.user.role === "teacher") {
-      return res.status(403).json({ message: "Access denied. Teachers cannot delete students." });
-    }
-
     const filter = { _id: req.params.id };
     if (req.user.role !== "superAdmin") {
       filter.schoolId = req.user.schoolId;
+    }
+    if (req.user.role === "teacher") {
+      const scope = await classScope(req);
+      if (!scope.length) return res.status(403).json({ message: NO_CLASS_MSG });
+      filter.$or = scopeFilter(scope).$or;
     }
     const student = await Student.findOne(filter);
     if (!student) return res.status(404).json({ message: "Student not found" });
@@ -289,30 +298,9 @@ export const getStudentOptions = async (req, res) => {
       filter.schoolId = req.user.schoolId;
 
       if (req.user.role === "teacher") {
-        const teacherProfile = await Teacher.findOne({ userId: req.user.userId });
-        
-        if (!teacherProfile) {
-          return res.status(200).json([]);
-        }
-
-        // Match getStudents/getStudentById: a teacher sees students for ALL
-        // class/sections they are assigned to as Class Teacher, regardless
-        // of the isFirstPeriodTeacher flag (previously this only matched
-        // isFirstPeriodTeacher:true, which left dropdowns empty for most
-        // class teachers).
-        const assignments = await ClassTeacher.find({
-          teacherId: teacherProfile._id,
-          schoolId: req.user.schoolId,
-        }).select("className section");
-
-        if (!assignments || assignments.length === 0) {
-          return res.status(200).json([]);
-        }
-
-        filter.$or = assignments.map((a) => ({
-          className: a.className,
-          section: a.section || "",
-        }));
+        const scope = await classScope(req);
+        if (!scope.length) return res.status(200).json([]);
+        filter.$or = scopeFilter(scope).$or;
       }
     }
 

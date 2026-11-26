@@ -8,17 +8,20 @@ import {
   getStudentOptions,
 } from "../controllers/studentController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
+import { requirePermission } from "../config/permissions.js";
 import { objectIdParam } from "../middleware/validate.js";
 
 const router = express.Router();
 router.param("id", objectIdParam);
 
-router.get("/options", authMiddleware(["schoolAdmin", "teacher", "superAdmin", "staff"]), getStudentOptions);
-router.get("/", authMiddleware(["schoolAdmin", "teacher", "superAdmin", "staff"]), getStudents);
-router.get("/:id", authMiddleware(["schoolAdmin", "teacher", "superAdmin", "staff"]), getStudentById);
+// READ: superAdmin (all schools), schoolAdmin (own school), teacher (own class only - filtered in the controller), staff.
+router.get("/options", authMiddleware(), requirePermission("student:read"), getStudentOptions);
+router.get("/", authMiddleware(), requirePermission("student:read"), getStudents);
+router.get("/:id", authMiddleware(), requirePermission("student:read"), getStudentById);
 
-router.post("/", authMiddleware(["schoolAdmin", "superAdmin", "staff"]), createStudent);
-router.put("/:id", authMiddleware(["schoolAdmin", "superAdmin", "staff"]), updateStudent);
-router.delete("/:id", authMiddleware(["schoolAdmin", "superAdmin", "staff"]), deleteStudent);
+// WRITE: see config/permissions.js. schoolAdmin can NOT create students (403); teachers are class-scoped in the controller.
+router.post("/", authMiddleware(), requirePermission("student:create"), createStudent);
+router.put("/:id", authMiddleware(), requirePermission("student:update"), updateStudent);
+router.delete("/:id", authMiddleware(), requirePermission("student:delete"), deleteStudent);
 
 export default router;

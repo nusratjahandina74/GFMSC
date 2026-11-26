@@ -1,6 +1,6 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { request, app, connect, disconnect, makeSchool, makeUser, makeStudent, login, auth } from "./helpers/setup.js";
+import { request, app, connect, disconnect, makeSchool, makeUser, makeStudent, makeClassTeacher, login, auth } from "./helpers/setup.js";
 
 let A, B, adminA, adminB, tokA, tokB, studB;
 
@@ -20,8 +20,9 @@ const newStudentBody = (over = {}) => ({
   fathersName: "F", fathersPhone: "01711111111", mothersName: "M", mothersPhone: "01811111111", ...over,
 });
 
-test("C07: school A admin cannot create a student inside school B via body.schoolId", async () => {
-  const res = await request(app).post("/api/students").set(auth(tokA)).send(newStudentBody({ schoolId: String(B._id) }));
+test("C07: a school A class teacher cannot create a student inside school B via body.schoolId", async () => {
+  const ct = await makeClassTeacher(A._id, "ct-a@x.test", [["Class 7", "A"]]);
+  const res = await request(app).post("/api/students").set(auth(ct.token)).send(newStudentBody({ schoolId: String(B._id) }));
   assert.ok([200, 201].includes(res.status), JSON.stringify(res.body));
   const { default: Student } = await import("../src/models/Student.js");
   const created = await Student.findOne({ studentName: "New Kid" });

@@ -106,6 +106,14 @@ function RequireRole({ allowedRoles, children }) {
   return children;
 }
 
+// /dashboard/students: teachers manage their class here; admins use /admin/students.
+function StudentsHome() {
+  const role = getRole();
+  if (role === "teacher") return <AdminStudents />;
+  if (role === "schoolAdmin" || role === "superAdmin") return <Navigate to="/admin/students" replace />;
+  return <Navigate to="/unauthorized" replace />;
+}
+
 function RoleHome() {
   const role = getRole();
   if (role === "schoolAdmin" || role === "superAdmin")
@@ -273,7 +281,8 @@ export default function App() {
             <Route
               path="students"
               element={
-                <RequireRole allowedRoles={["schoolAdmin"]}>
+                // schoolAdmin: view / edit / delete (no Add). superAdmin: view all schools + full rights.
+                <RequireRole allowedRoles={["schoolAdmin", "superAdmin"]}>
                   <AdminStudents />
                 </RequireRole>
               }
@@ -524,16 +533,6 @@ export default function App() {
             }
           />
           <Route
-            path="/dashboard/students"
-            element={
-              <RequireAuth>
-                <RequireRole allowedRoles={["schoolAdmin"]}>
-                  <AdminStudents />
-                </RequireRole>
-              </RequireAuth>
-            }
-          />
-          <Route
             path="/dashboard/notices"
             element={
               <RequireAuth>
@@ -700,6 +699,9 @@ export default function App() {
                 </RequireRole>
               }
             />
+            {/* Students: class teachers add / view / edit / delete their OWN class (backend enforces the scope).
+                Admins are sent to their own page, which has no "Add Student". */}
+            <Route path="students" element={<StudentsHome />} />
             <Route
               path="attendance"
               element={

@@ -9,7 +9,7 @@ test("catalogue only references real roles; superAdmin is implicit", () => {
 
 test("can(): students/guardians cannot do staff things; teachers cannot touch money or users", () => {
   assert.equal(can("student", "marks:write"), false);
-  assert.equal(can("guardian", "student:write"), false);
+  assert.equal(can("guardian", "student:create"), false);
   assert.equal(can("teacher", "fees:record"), false);
   assert.equal(can("teacher", "user:manage"), false);
   assert.equal(can("teacher", "marks:write"), true);

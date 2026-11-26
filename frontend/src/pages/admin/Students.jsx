@@ -6,6 +6,7 @@ import { Label } from "../../components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
 import { Plus, Loader2, Edit, Trash2, Users, Search, Download } from "lucide-react";
 import { getStudents, createStudent, updateStudent, deleteStudent } from "../../api/students";
+import { getClassTeachers } from "../../api/classTeachers";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "../../components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../../components/ui/select";
 import { CLASS_LIST, SECTION_LIST } from "../../lib/constants";
@@ -17,6 +18,14 @@ import { listSchools } from "../../api/schools";
 export default function AdminStudents() {
   const currentUser = getUser();
   const isSuperAdmin = currentUser?.role === "superAdmin";
+  const isTeacher = currentUser?.role === "teacher";
+  // RBAC (mirrors the backend, which is the real gate):
+  //   schoolAdmin -> view / edit / delete only (NO "Add Student")
+  //   teacher     -> add / view / edit / delete, only inside their own class-teacher class+section
+  //   superAdmin  -> everything, across all schools
+  const canCreate = isSuperAdmin || isTeacher;
+  const [myClasses, setMyClasses] = useState([]); // teacher's assigned [{className, section}]
+  const [classesLoaded, setClassesLoaded] = useState(!isTeacher);
   const [schools, setSchools] = useState([]);
   const [selectedSchoolId, setSelectedSchoolId] = useState("");
 
@@ -50,11 +59,6 @@ export default function AdminStudents() {
   const PAGE_SIZE = 20;
 
   const loadStudents = async (targetPage = page) => {
-    if (isSuperAdmin && !selectedSchoolId) {
-      setStudents([]);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
       const res = await getStudents({
@@ -82,6 +86,18 @@ export default function AdminStudents() {
         .then((res) => setSchools(res.schools || []))
         .catch(() => {});
     }
+    if (isTeacher) {
+      const myId = String(currentUser?.id || currentUser?._id || "");
+      getClassTeachers()
+        .then((all) => {
+          const mine = (all || []).filter(
+            (ct) => String(ct.teacherId?.userId?._id || ct.teacherId?.userId) === myId
+          );
+          setMyClasses(mine.map((ct) => ({ className: ct.className, section: ct.section || "" })));
+        })
+        .catch(() => {})
+        .finally(() => setClassesLoaded(true));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -93,6 +109,11 @@ export default function AdminStudents() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!editingId && !canCreate) return; // school admins cannot add students
+    if (isTeacher && (!formData.className || !myClasses.some((c) => c.className === formData.className && c.section === (formData.section || "")))) {
+      setMsg("Please choose one of your assigned classes.");
+      return;
+    }
     if (!isValidPhone(formData.fathersPhone) || !isValidPhone(formData.mothersPhone)) {
       setMsg(PHONE_MESSAGE);
       return;
@@ -107,9 +128,10 @@ export default function AdminStudents() {
         const payload = isSuperAdmin ? { ...formData, schoolId: selectedSchoolId } : formData;
         const res = await createStudent(payload);
         const created = res?.student;
-        const effectivePassword = formData.password?.trim() || "123456";
+        // The server returns a one-time random password when none was typed in.
+        const effectivePassword = formData.password?.trim() || res?.temporaryPassword || "(set by you)";
         setMsg(
-          `✅ Student created! Login ID: ${created?.studentId || "(see table below)"}  ·  Password: ${effectivePassword}`
+          `✅ Student created! Login ID: ${created?.studentId || "(see table below)"}  ·  Password: ${effectivePassword}  ·  Please note it down now.`
         );
       }
       setOpen(false);
@@ -155,11 +177,13 @@ export default function AdminStudents() {
 
   const resetForm = () => {
     setEditingId(null);
+    // A teacher with exactly one class gets it pre-selected (and locked) automatically.
+    const only = isTeacher && myClasses.length === 1 ? myClasses[0] : null;
     setFormData({
       studentName: "",
       classRoll: "",
-      className: "",
-      section: "",
+      className: only ? only.className : "",
+      section: only ? only.section : "",
       sessionYear: new Date().getFullYear().toString(),
       fathersName: "",
       fathersPhone: "",
@@ -190,9 +214,16 @@ export default function AdminStudents() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Students</h1>
-          <p className="text-muted-foreground">Manage student records</p>
+          <p className="text-muted-foreground">
+            {isTeacher
+              ? "Manage the students of your own class"
+              : isSuperAdmin
+              ? "View students across all schools"
+              : "View, edit and remove students of your school"}
+          </p>
         </div>
         <div className="flex items-center gap-2">
+          {!isTeacher && (
           <button
             onClick={handleExport}
             disabled={exporting || (isSuperAdmin && !selectedSchoolId)}
@@ -202,18 +233,27 @@ export default function AdminStudents() {
             {exporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
             {exporting ? "Exporting..." : "Export to Excel"}
           </button>
+          )}
         <Dialog open={open} onOpenChange={setOpen}>
+          {canCreate && (
           <DialogTrigger asChild>
             <button
               onClick={resetForm}
-              disabled={isSuperAdmin && !selectedSchoolId}
+              disabled={(isSuperAdmin && !selectedSchoolId) || (isTeacher && (!classesLoaded || myClasses.length === 0))}
               className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-lg shadow-md flex items-center gap-2 visible opacity-100 z-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              title={isSuperAdmin && !selectedSchoolId ? "Select a school first" : undefined}
+              title={
+                isSuperAdmin && !selectedSchoolId
+                  ? "Select a school first"
+                  : isTeacher && classesLoaded && myClasses.length === 0
+                  ? "You are not assigned as a Class Teacher"
+                  : undefined
+              }
             >
               <Plus className="h-4 w-4" />
               Add Student
             </button>
           </DialogTrigger>
+          )}
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>{editingId ? "Edit Student" : "Add New Student"}</DialogTitle>
@@ -240,6 +280,38 @@ export default function AdminStudents() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {isTeacher ? (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Class &amp; Section *</Label>
+                    {myClasses.length <= 1 ? (
+                      <Input
+                        readOnly
+                        disabled
+                        value={myClasses[0] ? `${myClasses[0].className}${myClasses[0].section ? ` - ${myClasses[0].section}` : ""}` : "No class assigned"}
+                      />
+                    ) : (
+                      <Select
+                        value={formData.className ? `${formData.className}|${formData.section || ""}` : ""}
+                        onValueChange={(v) => {
+                          const [className, section] = v.split("|");
+                          setFormData({ ...formData, className, section });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your class" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {myClasses.map((c) => (
+                            <SelectItem key={`${c.className}|${c.section}`} value={`${c.className}|${c.section}`}>
+                              {c.className}{c.section ? ` - ${c.section}` : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  </div>
+                ) : (
+                  <>
                 <div className="space-y-2">
                   <Label>Class *</Label>
                   <Select
@@ -278,6 +350,8 @@ export default function AdminStudents() {
                     </SelectContent>
                   </Select>
                 </div>
+                  </>
+                )}
                 <div className="space-y-2">
                   <Label>Class Roll *</Label>
                   <Input
@@ -334,10 +408,10 @@ export default function AdminStudents() {
               </div>
 
               <div className="space-y-2">
-                <Label>Password (Optional - default is 123456)</Label>
+                <Label>Password (optional{editingId ? " - leave blank to keep the current one" : " - a random one-time password is generated if blank"})</Label>
                 <Input
                   type="password"
-                  placeholder="Set login password or leave blank for default"
+                  placeholder={editingId ? "Leave blank to keep current password" : "Set login password or leave blank"}
                   value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 />
@@ -379,21 +453,30 @@ export default function AdminStudents() {
       <Card>
         <CardHeader>
           <CardTitle>Student List</CardTitle>
-          <CardDescription>All registered students</CardDescription>
+          <CardDescription>
+            {isTeacher
+              ? myClasses.length
+                ? `Your class${myClasses.length > 1 ? "es" : ""}: ${myClasses.map((c) => `${c.className}${c.section ? ` - ${c.section}` : ""}`).join(", ")}`
+                : classesLoaded ? "You are not assigned as a Class Teacher yet." : "Loading your class..."
+              : isSuperAdmin
+              ? selectedSchoolId ? "Students of the selected school" : "All registered students across every school"
+              : "All students of your school"}
+          </CardDescription>
           <div className="flex flex-col md:flex-row gap-3 pt-3">
             {isSuperAdmin && (
               <Select value={selectedSchoolId || "__none"} onValueChange={(v) => setSelectedSchoolId(v === "__none" ? "" : v)}>
                 <SelectTrigger className="md:w-56">
-                  <SelectValue placeholder="Select a school" />
+                  <SelectValue placeholder="All Schools" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none">— Select a school —</SelectItem>
+                  <SelectItem value="__none">All Schools</SelectItem>
                   {schools.map((s) => (
                     <SelectItem key={s._id} value={s._id}>{s.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             )}
+            {!isTeacher && (<>
             <Select value={filterClass} onValueChange={(v) => setFilterClass(v === "__all" ? "" : v)}>
               <SelectTrigger className="md:w-48">
                 <SelectValue placeholder="All Classes" />
@@ -439,6 +522,7 @@ export default function AdminStudents() {
                 <Search className="h-4 w-4" />
               </Button>
             </div>
+            </>)}
           </div>
         </CardHeader>
         <CardContent className="p-0">
@@ -447,14 +531,11 @@ export default function AdminStudents() {
               <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
               Loading students...
             </div>
-          ) : isSuperAdmin && !selectedSchoolId ? (
-            <div className="p-8 text-center text-muted-foreground">
-              Select a school above to view and manage its students.
-            </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
+                  {isSuperAdmin && <TableHead>School</TableHead>}
                   <TableHead>Student ID</TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Class</TableHead>
@@ -466,6 +547,7 @@ export default function AdminStudents() {
               <TableBody>
                 {students.map((student) => (
                   <TableRow key={student._id}>
+                    {isSuperAdmin && <TableCell>{student.schoolName || "-"}</TableCell>}
                     <TableCell className="font-mono font-medium">{student.studentId}</TableCell>
                     <TableCell className="font-medium">{student.studentName}</TableCell>
                     <TableCell>{student.className}</TableCell>
@@ -474,7 +556,7 @@ export default function AdminStudents() {
                     <TableCell>
                       <div className="flex gap-2">
                         <a
-                          href={`/admin/report-card?studentId=${encodeURIComponent(student.studentId)}`}
+                          href={`${isTeacher ? "/dashboard/report-card" : "/admin/report-card"}?studentId=${encodeURIComponent(student.studentId)}`}
                           title="View Report Card"
                           className="text-emerald-600 hover:text-emerald-900 dark:text-emerald-400 dark:hover:text-emerald-200 font-bold p-2 rounded hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-all"
                         >
@@ -498,6 +580,9 @@ export default function AdminStudents() {
                 ))}
               </TableBody>
             </Table>
+          )}
+          {!loading && students.length === 0 && (
+            <div className="p-8 text-center text-muted-foreground">No students found.</div>
           )}
           {!loading && students.length > 0 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 dark:border-gray-800">

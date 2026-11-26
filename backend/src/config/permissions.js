@@ -8,7 +8,14 @@ export const ROLES = Object.freeze(["superAdmin", "schoolAdmin", "teacher", "sta
 export const PERMISSIONS = Object.freeze({
   // people
   "student:read": ["schoolAdmin", "teacher", "staff"],
-  "student:write": ["schoolAdmin"],
+  // Student management is split per action so each role gets exactly what it needs:
+  //   schoolAdmin -> view / edit / delete ONLY (no create)
+  //   teacher     -> create / view / edit / delete, strictly inside their own class-teacher class+section
+  //                  (the class scope itself is enforced in studentController, permissions only say WHAT)
+  //   superAdmin  -> everything (implicit in can())
+  "student:create": ["teacher", "staff"],
+  "student:update": ["schoolAdmin", "teacher", "staff"],
+  "student:delete": ["schoolAdmin", "teacher", "staff"],
   "guardian:write": ["schoolAdmin"],
   "teacher:write": ["schoolAdmin"],
   "staff:write": ["schoolAdmin"],

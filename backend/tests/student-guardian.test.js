@@ -2,12 +2,14 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { request, app, connect, disconnect, makeSchool, makeUser, makeStudent, makeClassTeacher, login, auth, PW } from "./helpers/setup.js";
 
-let A, B, tokA, stuA, stuB, teacherUser;
+let A, B, tokA, tokCT, stuA, stuB, teacherUser;
 before(async () => {
   await connect();
   A = await makeSchool("SG-A"); B = await makeSchool("SG-B");
   await makeUser("schoolAdmin", A._id, "sg-admin-a@x.test");
   tokA = (await login("sg-admin-a@x.test")).token;
+  // Student CREATION is a class-teacher action now (school admins can no longer add students).
+  tokCT = (await makeClassTeacher(A._id, "sg-ct-a@x.test", [["Class 6", "B"]])).token;
   stuA = await makeStudent(A._id, { classRoll: 1, section: "A", studentName: "A One" });
   await makeStudent(A._id, { classRoll: 2, section: "A", studentName: "A Two" });
   stuB = await makeStudent(B._id, { classRoll: 1, section: "A", studentName: "B One" });
@@ -18,13 +20,13 @@ const body = (o = {}) => ({ studentName: "Neo", className: "Class 6", section: "
   fathersName: "F", fathersPhone: "01711111111", mothersName: "M", mothersPhone: "01811111111", ...o });
 
 test("student create works end-to-end (regression: 'next is not a function')", async () => {
-  const r = await request(app).post("/api/students").set(auth(tokA)).send(body());
+  const r = await request(app).post("/api/students").set(auth(tokCT)).send(body());
   assert.equal(r.status, 201, JSON.stringify(r.body));
   assert.ok(r.body.student.studentId);
 });
 
 test("H22: no default 123456 — random temp password returned once, hash never returned", async () => {
-  const r = await request(app).post("/api/students").set(auth(tokA)).send(body({ classRoll: 6, studentName: "Temp Kid" }));
+  const r = await request(app).post("/api/students").set(auth(tokCT)).send(body({ classRoll: 6, studentName: "Temp Kid" }));
   assert.equal(r.status, 201);
   assert.ok(r.body.temporaryPassword && r.body.temporaryPassword.length >= 10);
   assert.notEqual(r.body.temporaryPassword, "123456");
@@ -37,12 +39,12 @@ test("H22: no default 123456 — random temp password returned once, hash never 
 });
 
 test("weak admin-supplied student password is rejected", async () => {
-  const r = await request(app).post("/api/students").set(auth(tokA)).send(body({ classRoll: 7, password: "123456" }));
+  const r = await request(app).post("/api/students").set(auth(tokCT)).send(body({ classRoll: 7, password: "123456" }));
   assert.equal(r.status, 400);
 });
 
 test("mass assignment: client cannot set isSuspended / schoolId / hashed password via create", async () => {
-  const r = await request(app).post("/api/students").set(auth(tokA)).send(body({ classRoll: 8, studentName: "Mass", isSuspended: true, schoolId: String(B._id), resetPasswordToken: "x" }));
+  const r = await request(app).post("/api/students").set(auth(tokCT)).send(body({ classRoll: 8, studentName: "Mass", isSuspended: true, schoolId: String(B._id), resetPasswordToken: "x" }));
   assert.equal(r.status, 201);
   const { default: Student } = await import("../src/models/Student.js");
   const doc = await Student.findOne({ studentName: "Mass" }).select("+resetPasswordToken");

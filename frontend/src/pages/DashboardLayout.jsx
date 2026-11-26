@@ -155,6 +155,12 @@ function DashboardLayout() {
         ...(isClassTeacher
           ? [
               {
+                // Class Teacher only: add / view / edit / delete the students of MY class.
+                name: "Students",
+                path: "/dashboard/students",
+                icon: GraduationCap,
+              },
+              {
                 name: "Student Attendance",
                 path: "/dashboard/attendance",
                 icon: Users,
